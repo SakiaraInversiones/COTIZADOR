@@ -877,6 +877,26 @@ export default function SakiaraLandingPage() {
     window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank')
   }
 
+  const scrollToSection = (sectionId) => {
+    if (typeof document === 'undefined') return
+
+    const target = document.getElementById(sectionId)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+  const handleFloatingQuote = () => {
+    if (activeView === 'home') {
+      goToView('instalacion')
+      return
+    }
+
+    scrollToSection('contacto')
+  }
+
+  const floatingQuoteLabel = activeView === 'home' ? 'Cotiza ahora' : 'Ir a cotización'
+
   const renderHomeView = () => (
     <>
       <section className="section-card">
@@ -1487,7 +1507,7 @@ export default function SakiaraLandingPage() {
         .wrap {
           width: min(1100px, calc(100% - 40px));
           margin: 0 auto;
-          padding: 28px 0 60px;
+          padding: 28px 0 140px;
         }
 
         .brand-row {
@@ -1656,6 +1676,70 @@ export default function SakiaraLandingPage() {
           color: #ffffff;
           font-weight: 800;
           box-shadow: 0 12px 24px rgba(102, 102, 107, 0.18);
+        }
+
+        .floating-cta-stack {
+          position: fixed;
+          right: 20px;
+          bottom: 20px;
+          z-index: 60;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          align-items: flex-end;
+          pointer-events: none;
+        }
+
+        .floating-cta-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          min-height: 56px;
+          padding: 0 20px;
+          border: none;
+          border-radius: 999px;
+          font: inherit;
+          font-size: 15px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+          box-shadow: 0 18px 30px rgba(17, 24, 39, 0.14);
+          pointer-events: auto;
+          white-space: nowrap;
+        }
+
+        .floating-cta-btn:hover {
+          transform: translateY(-1px);
+        }
+
+        .floating-cta-btn.quote {
+          background: #f1d433;
+          color: #1f2328;
+        }
+
+        .floating-cta-btn.whatsapp {
+          background: #25d366;
+          color: #ffffff;
+          box-shadow: 0 18px 30px rgba(37, 211, 102, 0.28);
+        }
+
+        .floating-cta-btn.whatsapp:hover {
+          background: #1fbe5a;
+        }
+
+        .floating-cta-copy {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          line-height: 1.1;
+        }
+
+        .floating-cta-copy small {
+          margin-top: 3px;
+          font-size: 11px;
+          font-weight: 700;
+          opacity: 0.78;
         }
 
         .mini-grid,
@@ -2171,6 +2255,7 @@ export default function SakiaraLandingPage() {
           .wrap {
             width: min(100% - 20px, 1100px);
             padding-top: 20px;
+            padding-bottom: 168px;
           }
 
           .brand-row {
@@ -2198,6 +2283,19 @@ export default function SakiaraLandingPage() {
           .contact-actions,
           .service-nav {
             flex-direction: column;
+          }
+
+          .floating-cta-stack {
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            align-items: stretch;
+          }
+
+          .floating-cta-btn {
+            width: 100%;
+            min-height: 54px;
+            white-space: normal;
           }
         }
       `}</style>
@@ -2320,6 +2418,21 @@ export default function SakiaraLandingPage() {
             </section>
           )}
         </div>
+      </div>
+
+      <div className="floating-cta-stack" aria-label="Accesos rápidos de contacto">
+        <button className="floating-cta-btn quote" type="button" onClick={handleFloatingQuote}>
+          <span className="floating-cta-copy">
+            <span>{floatingQuoteLabel}</span>
+            <small>{activeView === 'home' ? 'Ir al cotizador' : 'Bajar al formulario'}</small>
+          </span>
+        </button>
+        <button className="floating-cta-btn whatsapp" type="button" onClick={handleWhatsApp}>
+          <span className="floating-cta-copy">
+            <span>WhatsApp directo</span>
+            <small>Habla conmigo ahora</small>
+          </span>
+        </button>
       </div>
     </div>
   )
