@@ -3,6 +3,8 @@ import React, { useMemo, useState } from 'react'
 const sakiaraLogo = '/sakiara-logo.jpg'
 const contactEmail = 'rafael.vasquez844@gmail.com'
 const whatsappNumber = '56975807224'
+const formEndpoint = `https://formsubmit.co/${contactEmail}`
+const PANEL_POWER_KW = 0.585
 
 const formatCLP = (value) =>
   new Intl.NumberFormat('es-CL', {
@@ -18,13 +20,6 @@ const formatNumber = (value, digits = 0) =>
   }).format(Number.isFinite(value) ? value : 0)
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
-
-const estimateCostPerKwp = (kwp) => {
-  if (kwp <= 3) return 1500000
-  if (kwp <= 5) return 1380000
-  if (kwp <= 8) return 1260000
-  return 1180000
-}
 
 const zoneProduction = {
   norte: 140,
@@ -135,7 +130,7 @@ export default function SakiaraLandingPage() {
       18
     )
 
-    const estimatedPanels = Math.max(4, Math.round(systemSizeKwp / 0.55))
+    const estimatedPanels = Math.max(4, Math.round(systemSizeKwp / PANEL_POWER_KW))
     const huaweiTier = getTier(huaweiTiers, estimatedPanels)
     const solisTier = getTier(solisTiers, estimatedPanels)
 
@@ -221,25 +216,26 @@ export default function SakiaraLandingPage() {
       `Consumo boleta: ${formatNumber(metrics.monthlyConsumptionKWh)} kWh/mes`,
       `Zona: ${zone}`,
       `Perfil: ${selectedProfile.label}`,
-      `Proyecto sugerido: ${formatNumber(metrics.estimatedPanels)} paneles aprox.`,
+      `Proyecto sugerido: ${formatNumber(metrics.estimatedPanels)} paneles Trina Solar 585 W`,
       `Huawei sin batería: ${formatCLP(metrics.projectCostHuaweiNoBattery)}`,
       `Solis sin batería: ${formatCLP(metrics.projectCostSolisNoBattery)}`,
       `Huawei con batería LUNA: ${formatCLP(metrics.projectCostHuaweiWithBattery)}`,
       `Solis con batería: ${formatCLP(metrics.projectCostSolisWithBattery)}`,
-    ].join('\n')
-  }
-
-  const handleMailto = () => {
-    const subject = encodeURIComponent(`Solicitud de evaluación solar - ${name || 'Nuevo contacto'}`)
-    const body = encodeURIComponent(
-      `Nombre: ${name || '-'}\nTeléfono: ${phone || '-'}\nCorreo: ${email || '-'}\n\nResumen de cotización:\n${buildSummaryText()}\n\nMensaje adicional:\n${message || '-'}`
-    )
-    window.location.href = `mailto:${contactEmail}?subject=${subject}&body=${body}`
+    ].join('
+')
   }
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
-      `Hola, quiero una evaluación personalizada para un proyecto solar.\n\n${buildSummaryText()}\n\nNombre: ${name || '-'}\nTeléfono: ${phone || '-'}\nCorreo: ${email || '-'}\n\nMensaje: ${message || '-'}`
+      `Hola, quiero una evaluación personalizada para un proyecto solar.
+
+${buildSummaryText()}
+
+Nombre: ${name || '-'}
+Teléfono: ${phone || '-'}
+Correo: ${email || '-'}
+
+Mensaje: ${message || '-'}`
     )
     window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank')
   }
@@ -344,24 +340,28 @@ export default function SakiaraLandingPage() {
         .btn-secondary,
         .profile-btn,
         .full-btn,
-        .wa-btn {
+        .wa-btn,
+        .action-link {
           font: inherit;
           border: none;
           cursor: pointer;
           border-radius: 18px;
           transition: transform 0.16s ease, box-shadow 0.16s ease;
+          text-decoration: none;
         }
 
         .btn-primary:hover,
         .btn-secondary:hover,
         .profile-btn:hover,
         .full-btn:hover,
-        .wa-btn:hover {
+        .wa-btn:hover,
+        .action-link:hover {
           transform: translateY(-1px);
         }
 
         .btn-primary,
-        .full-btn {
+        .full-btn,
+        .action-link.primary {
           padding: 15px 24px;
           background: #f1d433;
           color: #1f2328;
@@ -369,7 +369,8 @@ export default function SakiaraLandingPage() {
           box-shadow: 0 12px 24px rgba(241, 212, 51, 0.28);
         }
 
-        .btn-secondary {
+        .btn-secondary,
+        .action-link.secondary {
           padding: 15px 24px;
           background: #ffffff;
           color: #66666b;
@@ -729,16 +730,6 @@ export default function SakiaraLandingPage() {
           box-shadow: 0 12px 24px rgba(17, 24, 39, 0.08);
         }
 
-        .full-btn {
-          background: #f1d433;
-          color: #1f2328;
-        }
-
-        .wa-btn {
-          background: #66666b;
-          color: #ffffff;
-        }
-
         .bottom {
           margin-top: 10px;
         }
@@ -838,8 +829,8 @@ export default function SakiaraLandingPage() {
                 Desarrollamos propuestas solares residenciales con foco en inversión, ahorro y escalabilidad. Compara soluciones Huawei y Solis, con y sin batería, utilizando los datos que el cliente ve normalmente en su boleta.
               </p>
               <div className="cta-row">
-                <button className="btn-primary" onClick={handleMailto}>Solicitar evaluación</button>
-                <button className="btn-secondary" onClick={handleWhatsApp}>Conocer propuesta</button>
+                <a className="action-link primary" href="#contacto">Solicitar evaluación</a>
+                <a className="action-link secondary" href="#propuesta">Conocer propuesta</a>
               </div>
             </div>
 
@@ -864,7 +855,7 @@ export default function SakiaraLandingPage() {
               <p className="eyebrow">Calculadora comercial</p>
               <h2 className="section-title">Cotiza según tu boleta</h2>
               <p className="section-text">
-                Ingresa el monto de la boleta, el consumo mensual en kWh y el tipo de uso del hogar. La calculadora entrega un valor resumido por proyecto, pensado para cotizar de forma simple y profesional.
+                Ingresa el monto de la boleta, el consumo mensual en kWh y el tipo de uso del hogar. La calculadora entrega un valor resumido por proyecto, pensado para cotizar de forma simple y profesional, calculando el proyecto con paneles Trina Solar 585 W.
               </p>
               <div className="pill">Paleta Sakiara</div>
             </div>
@@ -920,18 +911,21 @@ export default function SakiaraLandingPage() {
                   <div className="profile-buttons">
                     <button
                       className={`profile-btn ${profile === 'outside' ? 'active' : ''}`}
+                      type="button"
                       onClick={() => setProfile('outside')}
                     >
                       Fuera
                     </button>
                     <button
                       className={`profile-btn ${profile === 'mixed' ? 'active' : ''}`}
+                      type="button"
                       onClick={() => setProfile('mixed')}
                     >
                       Mixto
                     </button>
                     <button
                       className={`profile-btn ${profile === 'home' ? 'active' : ''}`}
+                      type="button"
                       onClick={() => setProfile('home')}
                     >
                       Home office
@@ -955,7 +949,7 @@ export default function SakiaraLandingPage() {
               <div className="summary-card">
                 <div className="summary-label">Proyecto sugerido</div>
                 <div className="summary-value">{formatNumber(metrics.estimatedPanels)}</div>
-                <div className="summary-sub">paneles aproximados</div>
+                <div className="summary-sub">paneles Trina Solar 585 W</div>
               </div>
 
               <div className="summary-card">
@@ -966,12 +960,12 @@ export default function SakiaraLandingPage() {
             </div>
           </section>
 
-          <section className="section-card">
+          <section className="section-card" id="propuesta">
             <div className="section-head">
               <p className="eyebrow">Alternativas de proyecto</p>
               <h2 className="section-title">Compara soluciones resumidas</h2>
               <p className="section-text">
-                Cada alternativa muestra el valor total IVA incluido, ahorro estimado, cobertura y retorno para apoyar tu decisión comercial.
+                Cada alternativa muestra un valor total IVA incluido, ahorro estimado, cobertura y retorno para apoyar tu decisión comercial, calculando la cantidad de módulos con paneles Trina Solar de 585 W.
               </p>
             </div>
 
@@ -1022,48 +1016,72 @@ export default function SakiaraLandingPage() {
             </div>
 
             <div className="note">
-              Valores referenciales sujetos a evaluación comercial, visita técnica, disponibilidad de equipos y condiciones reales de instalación.
+              Los valores son referenciales IVA incluido.
             </div>
           </section>
 
-          <section className="section-card">
+          <section className="section-card" id="contacto">
             <div className="section-head">
               <p className="eyebrow">Contacto</p>
               <h2 className="section-title">Solicita una evaluación personalizada</h2>
               <p className="section-text">
-                Completa tus datos y abre tu correo con el resumen de la cotización, o escríbenos directamente por WhatsApp con toda la información cargada.
+                Completa tus datos y envía el formulario desde la página, o escríbenos directamente por WhatsApp con toda la información cargada.
               </p>
             </div>
 
-            <div className="contact-grid">
-              <div className="contact-box">
-                <label className="label">Nombre</label>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" />
-              </div>
-              <div className="contact-box">
-                <label className="label">Teléfono</label>
-                <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+56..." />
-              </div>
-              <div className="contact-box">
-                <label className="label">Correo</label>
-                <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com" />
-              </div>
-              <div className="contact-box">
-                <label className="label">Mensaje</label>
-                <textarea className="textarea" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Cuéntanos brevemente tu proyecto o necesidad" />
-              </div>
-            </div>
+            <form action={formEndpoint} method="POST">
+              <input type="hidden" name="_subject" value="Nueva solicitud de evaluación solar - Sakiara" />
+              <input type="hidden" name="_captcha" value="false" />
+              <input type="hidden" name="resumen_cotizacion" value={buildSummaryText()} />
 
-            <div className="contact-actions">
-              <button className="full-btn" onClick={handleMailto}>Solicitar evaluación</button>
-              <button className="btn-secondary" onClick={handleMailto}>Conocer propuesta</button>
-              <button className="wa-btn" onClick={handleWhatsApp}>Hablar por WhatsApp</button>
-            </div>
+              <div className="contact-grid">
+                <div className="contact-box">
+                  <label className="label">Nombre</label>
+                  <input className="input" name="nombre" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" required />
+                </div>
+                <div className="contact-box">
+                  <label className="label">Teléfono</label>
+                  <input className="input" name="telefono" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+56..." required />
+                </div>
+                <div className="contact-box">
+                  <label className="label">Correo</label>
+                  <input className="input" type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com" required />
+                </div>
+                <div className="contact-box">
+                  <label className="label">Mensaje</label>
+                  <textarea className="textarea" name="mensaje" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Cuéntanos brevemente tu proyecto o necesidad" />
+                </div>
+              </div>
+
+              <div className="contact-actions">
+                <button className="full-btn" type="submit">Solicitar evaluación</button>
+                <button className="wa-btn" type="button" onClick={handleWhatsApp}>Hablar por WhatsApp</button>
+              </div>
+            </form>
           </section>
 
           <section className="bottom">
-            <div className="note" style={{ marginTop: 0, textAlign: 'center', fontWeight: 700 }}>
-              Los valores son referenciales IVA incluido.
+            <div className="bottom-grid">
+              <div className="info-card">
+                <h3 className="info-title">Simple para el cliente</h3>
+                <div className="info-text">
+                  Se basa en monto mensual, consumo de boleta y tipo de uso del hogar. No obliga al cliente a manejar datos técnicos complejos y usa como referencia módulos Trina Solar de 585 W.
+                </div>
+              </div>
+
+              <div className="info-card">
+                <h3 className="info-title">Profesional para vender</h3>
+                <div className="info-text">
+                  Entrega cuatro alternativas resumidas por proyecto, con ahorro estimado, cobertura y retorno referencial para apoyar la venta.
+                </div>
+              </div>
+
+              <div className="info-card">
+                <h3 className="info-title">Contacto directo</h3>
+                <div className="info-text">
+                  El formulario envía la solicitud al correo ${contactEmail} y el botón de WhatsApp abre el chat al ${whatsappNumber}, con el resumen de la evaluación precargado y valores mostrados con IVA incluido.
+                </div>
+              </div>
             </div>
           </section>
         </div>
