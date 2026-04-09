@@ -210,19 +210,20 @@ export default function SakiaraLandingPage() {
     }
   }, [monthlyBill, billConsumptionKWh, zone, selectedProfile])
 
-const buildSummaryText = () => {
-  return [
-    `Monto boleta: ${formatCLP(monthlyBill)}`,
-    `Consumo boleta: ${formatNumber(metrics.monthlyConsumptionKWh)} kWh/mes`,
-    `Zona: ${zone}`,
-    `Perfil: ${selectedProfile.label}`,
-    `Proyecto sugerido: ${formatNumber(metrics.estimatedPanels)} paneles Trina Solar 585 W`,
-    `Huawei sin batería: ${formatCLP(metrics.projectCostHuaweiNoBattery)}`,
-    `Solis sin batería: ${formatCLP(metrics.projectCostSolisNoBattery)}`,
-    `Huawei con batería LUNA: ${formatCLP(metrics.projectCostHuaweiWithBattery)}`,
-    `Solis con batería: ${formatCLP(metrics.projectCostSolisWithBattery)}`,
-  ].join('\n')
-}
+  const buildSummaryText = () => {
+    return [
+      `Monto boleta: ${formatCLP(monthlyBill)}`,
+      `Consumo boleta: ${formatNumber(metrics.monthlyConsumptionKWh)} kWh/mes`,
+      `Zona: ${zone}`,
+      `Perfil: ${selectedProfile.label}`,
+      `Proyecto sugerido: ${formatNumber(metrics.estimatedPanels)} paneles Trina Solar 585 W`,
+      `Huawei sin batería: ${formatCLP(metrics.projectCostHuaweiNoBattery)}`,
+      `Solis sin batería: ${formatCLP(metrics.projectCostSolisNoBattery)}`,
+      `Huawei con batería LUNA: ${formatCLP(metrics.projectCostHuaweiWithBattery)}`,
+      `Solis con batería: ${formatCLP(metrics.projectCostSolisWithBattery)}`,
+    ].join('
+')
+  }
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
@@ -243,11 +244,11 @@ Mensaje: ${message || '-'}`
     <div className="sakiara-root">
       <style>{`
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: Inter, Arial, Helvetica, sans-serif; background: #f3f2ee; }
+        body { margin: 0; font-family: Inter, Arial, Helvetica, sans-serif; background: #ffffff; }
 
         .sakiara-root {
           min-height: 100vh;
-          background: linear-gradient(180deg, #f3f2ee 0%, #f8f7f3 100%);
+          background: #ffffff;
           color: #66666b;
         }
 
@@ -1059,30 +1060,7 @@ Mensaje: ${message || '-'}`
             </form>
           </section>
 
-          <section className="bottom">
-            <div className="bottom-grid">
-              <div className="info-card">
-                <h3 className="info-title">Simple para el cliente</h3>
-                <div className="info-text">
-                  Se basa en monto mensual, consumo de boleta y tipo de uso del hogar. No obliga al cliente a manejar datos técnicos complejos y usa como referencia módulos Trina Solar de 585 W.
-                </div>
-              </div>
-
-              <div className="info-card">
-                <h3 className="info-title">Profesional para vender</h3>
-                <div className="info-text">
-                  Entrega cuatro alternativas resumidas por proyecto, con ahorro estimado, cobertura y retorno referencial para apoyar la venta.
-                </div>
-              </div>
-
-              <div className="info-card">
-                <h3 className="info-title">Contacto directo</h3>
-                <div className="info-text">
-                  El formulario envía la solicitud al correo ${contactEmail} y el botón de WhatsApp abre el chat al ${whatsappNumber}, con el resumen de la evaluación precargado y valores mostrados con IVA incluido.
-                </div>
-              </div>
-            </div>
-          </section>
+          
         </div>
       </div>
     </div>
