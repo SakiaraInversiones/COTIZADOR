@@ -55,7 +55,7 @@ function OfferCard({ title, subtitle, badge, price, savings, balance, payback, v
           <div className="stat-value">{savings}</div>
         </div>
         <div className="stat">
-          <div className="stat-label">Balance</div>
+          <div className="stat-label">Compensación de la cuenta</div>
           <div className="stat-value">{balance}</div>
         </div>
         <div className="stat">
@@ -115,7 +115,7 @@ export default function SakiaraLandingPage() {
     const productionFactor = zoneProduction[zone]
     const monthlyConsumptionKWh = Math.max(billConsumptionKWh, 1)
     const derivedTariff = monthlyBill / monthlyConsumptionKWh
-    const exportRate = Math.max(90, derivedTariff * 0.38)
+    const exportRate = Math.max(90, derivedTariff * 0.55)
 
     const dayEquivalentUse =
       selectedProfile.day +
@@ -972,7 +972,7 @@ Mensaje: ${message || '-'}`
               <p className="eyebrow">Alternativas de proyecto</p>
               <h2 className="section-title">Compara soluciones resumidas</h2>
               <p className="section-text">
-                Cada alternativa muestra un valor total IVA incluido, ahorro estimado, balance autoconsumo + inyecciones y retorno para apoyar tu decisión comercial, calculando la cantidad de módulos con paneles Trina Solar de 585 W.
+                Cada alternativa muestra un valor total IVA incluido, ahorro estimado, compensación de la cuenta y retorno para apoyar tu decisión comercial, considerando autoconsumo e inyecciones valorizadas para una lectura simple y comercial.
               </p>
             </div>
 
