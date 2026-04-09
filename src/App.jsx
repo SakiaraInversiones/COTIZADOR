@@ -28,12 +28,12 @@ const zoneProduction = {
 }
 
 const profileMap = {
-  outside: { label: 'Fuera de casa', morning: 15, day: 20, night: 65 },
-  mixed: { label: 'Mixto', morning: 20, day: 35, night: 45 },
-  home: { label: 'Home office', morning: 20, day: 50, night: 30 },
+  outside: { label: 'Peak AM y PM', morning: 15, day: 20, night: 65 },
+  mixed: { label: 'Equilibrado', morning: 20, day: 35, night: 45 },
+  home: { label: 'Peak sostenido', morning: 20, day: 50, night: 30 },
 }
 
-function OfferCard({ title, subtitle, badge, price, savings, coverage, payback, variant }) {
+function OfferCard({ title, subtitle, badge, price, savings, balance, payback, variant }) {
   return (
     <div className={`offer-card ${variant}`}>
       <div className="offer-head">
@@ -55,8 +55,8 @@ function OfferCard({ title, subtitle, badge, price, savings, coverage, payback, 
           <div className="stat-value">{savings}</div>
         </div>
         <div className="stat">
-          <div className="stat-label">Cobertura</div>
-          <div className="stat-value">{coverage}</div>
+          <div className="stat-label">Balance</div>
+          <div className="stat-value">{balance}</div>
         </div>
         <div className="stat">
           <div className="stat-label">Retorno</div>
@@ -148,8 +148,10 @@ export default function SakiaraLandingPage() {
       monthlyConsumptionKWh
     )
     const exportedNoBattery = Math.max(monthlyGenerationKWh - selfConsumedNoBattery, 0)
+    const selfConsumptionValueNoBattery = selfConsumedNoBattery * derivedTariff
+    const injectionCreditNoBattery = exportedNoBattery * exportRate
     const monthlySavingsNoBattery =
-      selfConsumedNoBattery * derivedTariff + exportedNoBattery * exportRate
+      selfConsumptionValueNoBattery + injectionCreditNoBattery
     const annualSavingsNoBattery = monthlySavingsNoBattery * 12
 
     const selfConsumedWithBattery = Math.min(
@@ -157,8 +159,10 @@ export default function SakiaraLandingPage() {
       monthlyConsumptionKWh
     )
     const exportedWithBattery = Math.max(monthlyGenerationKWh - selfConsumedWithBattery, 0)
+    const selfConsumptionValueWithBattery = selfConsumedWithBattery * derivedTariff
+    const injectionCreditWithBattery = exportedWithBattery * exportRate
     const monthlySavingsWithBattery =
-      selfConsumedWithBattery * derivedTariff + exportedWithBattery * exportRate
+      selfConsumptionValueWithBattery + injectionCreditWithBattery
     const annualSavingsWithBattery = monthlySavingsWithBattery * 12
 
     const commonBaseNet =
@@ -177,15 +181,15 @@ export default function SakiaraLandingPage() {
     const projectCostHuaweiWithBatteryGross = projectCostHuaweiNoBatteryGross + huaweiBatteryPackGross
     const projectCostSolisWithBatteryGross = projectCostSolisNoBatteryGross + solisBatteryPackGross
 
-    const coverageNoBattery = clamp(
+    const billBalanceNoBattery = clamp(
       (monthlySavingsNoBattery / Math.max(monthlyBill, 1)) * 100,
       0,
-      92
+      100
     )
-    const coverageWithBattery = clamp(
+    const billBalanceWithBattery = clamp(
       (monthlySavingsWithBattery / Math.max(monthlyBill, 1)) * 100,
       0,
-      98
+      100
     )
 
     return {
@@ -193,12 +197,16 @@ export default function SakiaraLandingPage() {
       estimatedPanels,
       monthlySavingsNoBattery,
       monthlySavingsWithBattery,
+      selfConsumptionValueNoBattery,
+      selfConsumptionValueWithBattery,
+      injectionCreditNoBattery,
+      injectionCreditWithBattery,
       projectCostHuaweiNoBattery: projectCostHuaweiNoBatteryGross,
       projectCostHuaweiWithBattery: projectCostHuaweiWithBatteryGross,
       projectCostSolisNoBattery: projectCostSolisNoBatteryGross,
       projectCostSolisWithBattery: projectCostSolisWithBatteryGross,
-      coverageNoBattery,
-      coverageWithBattery,
+      billBalanceNoBattery,
+      billBalanceWithBattery,
       paybackHuaweiNoBattery:
         projectCostHuaweiNoBatteryGross / Math.max(annualSavingsNoBattery, 1),
       paybackHuaweiWithBattery:
@@ -913,21 +921,21 @@ Mensaje: ${message || '-'}`
                       type="button"
                       onClick={() => setProfile('outside')}
                     >
-                      Fuera
+                      Peak AM y PM
                     </button>
                     <button
                       className={`profile-btn ${profile === 'mixed' ? 'active' : ''}`}
                       type="button"
                       onClick={() => setProfile('mixed')}
                     >
-                      Mixto
+                      Equilibrado
                     </button>
                     <button
                       className={`profile-btn ${profile === 'home' ? 'active' : ''}`}
                       type="button"
                       onClick={() => setProfile('home')}
                     >
-                      Home office
+                      Peak sostenido
                     </button>
                   </div>
                 </div>
@@ -964,7 +972,7 @@ Mensaje: ${message || '-'}`
               <p className="eyebrow">Alternativas de proyecto</p>
               <h2 className="section-title">Compara soluciones resumidas</h2>
               <p className="section-text">
-                Cada alternativa muestra un valor total IVA incluido, ahorro estimado, cobertura y retorno para apoyar tu decisión comercial, calculando la cantidad de módulos con paneles Trina Solar de 585 W.
+                Cada alternativa muestra un valor total IVA incluido, ahorro estimado, balance autoconsumo + inyecciones y retorno para apoyar tu decisión comercial, calculando la cantidad de módulos con paneles Trina Solar de 585 W.
               </p>
             </div>
 
@@ -975,7 +983,7 @@ Mensaje: ${message || '-'}`
                 badge="Línea Huawei"
                 price={formatCLP(metrics.projectCostHuaweiNoBattery)}
                 savings={formatCLP(metrics.monthlySavingsNoBattery)}
-                coverage={`${formatNumber(metrics.coverageNoBattery)}%`}
+                balance={`${formatNumber(metrics.billBalanceNoBattery)}%`}
                 payback={`${formatNumber(metrics.paybackHuaweiNoBattery, 1)} años`}
                 variant="huawei"
               />
@@ -986,7 +994,7 @@ Mensaje: ${message || '-'}`
                 badge="Línea Solis"
                 price={formatCLP(metrics.projectCostSolisNoBattery)}
                 savings={formatCLP(metrics.monthlySavingsNoBattery)}
-                coverage={`${formatNumber(metrics.coverageNoBattery)}%`}
+                balance={`${formatNumber(metrics.billBalanceNoBattery)}%`}
                 payback={`${formatNumber(metrics.paybackSolisNoBattery, 1)} años`}
                 variant="solis"
               />
@@ -997,7 +1005,7 @@ Mensaje: ${message || '-'}`
                 badge="Huawei híbrido"
                 price={formatCLP(metrics.projectCostHuaweiWithBattery)}
                 savings={formatCLP(metrics.monthlySavingsWithBattery)}
-                coverage={`${formatNumber(metrics.coverageWithBattery)}%`}
+                balance={`${formatNumber(metrics.billBalanceWithBattery)}%`}
                 payback={`${formatNumber(metrics.paybackHuaweiWithBattery, 1)} años`}
                 variant="hybrid"
               />
@@ -1008,7 +1016,7 @@ Mensaje: ${message || '-'}`
                 badge="Solis híbrido"
                 price={formatCLP(metrics.projectCostSolisWithBattery)}
                 savings={formatCLP(metrics.monthlySavingsWithBattery)}
-                coverage={`${formatNumber(metrics.coverageWithBattery)}%`}
+                balance={`${formatNumber(metrics.billBalanceWithBattery)}%`}
                 payback={`${formatNumber(metrics.paybackSolisWithBattery, 1)} años`}
                 variant="solis hybrid"
               />
