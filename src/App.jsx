@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 const sakiaraLogo = '/sakiara-logo.jpg'
 const contactEmail = 'rafael.vasquez844@gmail.com'
@@ -262,6 +262,172 @@ const maintenanceRegionOptions = Object.entries(maintenanceRegionData).map(([val
   label: config.label,
 }))
 
+const SITE_FALLBACK_URL = 'https://sakiarainversiones.com'
+
+const viewPathMap = {
+  home: '/',
+  instalacion: '/instalacion',
+  mantenimiento: '/mantenimiento',
+}
+
+const getViewFromPath = (pathname = '/') => {
+  if (pathname === '/instalacion') return 'instalacion'
+  if (pathname === '/mantenimiento') return 'mantenimiento'
+  return 'home'
+}
+
+const ensureMetaTag = (attribute, key, content) => {
+  if (typeof document === 'undefined') return
+  let tag = document.head.querySelector(`meta[${attribute}="${key}"]`)
+  if (!tag) {
+    tag = document.createElement('meta')
+    tag.setAttribute(attribute, key)
+    document.head.appendChild(tag)
+  }
+  tag.setAttribute('content', content)
+}
+
+const ensureLinkTag = (rel, href) => {
+  if (typeof document === 'undefined') return
+  let tag = document.head.querySelector(`link[rel="${rel}"]`)
+  if (!tag) {
+    tag = document.createElement('link')
+    tag.setAttribute('rel', rel)
+    document.head.appendChild(tag)
+  }
+  tag.setAttribute('href', href)
+}
+
+const ensureJsonLdScript = (id, data) => {
+  if (typeof document === 'undefined') return
+  let tag = document.getElementById(id)
+  if (!tag) {
+    tag = document.createElement('script')
+    tag.type = 'application/ld+json'
+    tag.id = id
+    document.head.appendChild(tag)
+  }
+  tag.textContent = JSON.stringify(data)
+}
+
+const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
+  const normalizedOrigin = origin || SITE_FALLBACK_URL
+  const pages = {
+    home: {
+      title: 'Sakiara | Instalación y mantenimiento de sistemas fotovoltaicos en Chile',
+      description:
+        'Cotiza instalación y mantenimiento de sistemas fotovoltaicos residenciales en Chile. Evaluación clara, profesional y orientada a ahorro, inversión y continuidad operativa.',
+      path: '/',
+      pageName: 'Inicio',
+      image: `${normalizedOrigin}${sakiaraLogo}`,
+    },
+    instalacion: {
+      title: 'Cotizador de instalación fotovoltaica | Sakiara',
+      description:
+        'Cotiza tu sistema fotovoltaico con tu boleta, tu consumo o una opción combinada. Conoce una propuesta referencial clara y profesional para tu hogar.',
+      path: '/instalacion',
+      pageName: 'Cotizador de instalación fotovoltaica',
+      image: `${normalizedOrigin}${sakiaraLogo}`,
+    },
+    mantenimiento: {
+      title: 'Mantenimiento de paneles solares | Sakiara',
+      description:
+        'Evalúa un plan de mantenimiento para tu sistema fotovoltaico según ubicación, potencia y frecuencia de servicio. Protege rendimiento, seguridad y continuidad operativa.',
+      path: '/mantenimiento',
+      pageName: 'Plan de mantenimiento fotovoltaico',
+      image: `${normalizedOrigin}${sakiaraLogo}`,
+    },
+  }
+
+  const currentPage = pages[view] || pages.home
+  const currentUrl = `${normalizedOrigin}${currentPage.path}`
+
+  const structuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: 'Sakiara',
+      url: normalizedOrigin,
+      inLanguage: 'es-CL',
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'LocalBusiness',
+      name: 'Sakiara',
+      url: normalizedOrigin,
+      logo: `${normalizedOrigin}${sakiaraLogo}`,
+      image: `${normalizedOrigin}${sakiaraLogo}`,
+      description:
+        'Instalación y mantenimiento de sistemas fotovoltaicos residenciales en Chile.',
+      telephone: '+56 9 7580 7224',
+      email: contactEmail,
+      areaServed: 'Chile',
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Colina',
+        addressRegion: 'Región Metropolitana',
+        addressCountry: 'CL',
+      },
+      makesOffer: [
+        {
+          '@type': 'Offer',
+          itemOffered: {
+            '@type': 'Service',
+            name: 'Instalación de sistemas fotovoltaicos residenciales',
+          },
+        },
+        {
+          '@type': 'Offer',
+          itemOffered: {
+            '@type': 'Service',
+            name: 'Mantenimiento de sistemas fotovoltaicos',
+          },
+        },
+      ],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: currentPage.pageName,
+      url: currentUrl,
+      description: currentPage.description,
+      isPartOf: {
+        '@type': 'WebSite',
+        name: 'Sakiara',
+        url: normalizedOrigin,
+      },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Inicio',
+          item: `${normalizedOrigin}/`,
+        },
+        ...(view !== 'home'
+          ? [
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: currentPage.pageName,
+                item: currentUrl,
+              },
+            ]
+          : []),
+      ],
+    },
+  ]
+
+  return {
+    ...currentPage,
+    canonical: currentUrl,
+    structuredData,
+  }
+}
+
 function OfferCard({ title, subtitle, badge, price, savings, compensation, payback, variant }) {
   return (
     <div className={`offer-card ${variant}`}>
@@ -307,7 +473,9 @@ function SummaryCard({ label, value, sub }) {
 }
 
 export default function SakiaraLandingPage() {
-  const [activeView, setActiveView] = useState('home')
+  const [activeView, setActiveView] = useState(() =>
+    getViewFromPath(typeof window !== 'undefined' ? window.location.pathname : '/')
+  )
 
   const [installationInputMode, setInstallationInputMode] = useState('combined')
   const [monthlyBillInput, setMonthlyBillInput] = useState('250000')
@@ -343,6 +511,47 @@ export default function SakiaraLandingPage() {
 
   const maintenanceSystemSize = Number(maintenanceSystemSizeInput || 0)
   const maintenanceMonthlySavings = Number(maintenanceMonthlySavingsInput || 0)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handlePopState = () => {
+      setActiveView(getViewFromPath(window.location.pathname))
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const seoConfig = getSeoConfig(activeView, window.location.origin || SITE_FALLBACK_URL)
+
+    document.title = seoConfig.title
+    ensureMetaTag('name', 'description', seoConfig.description)
+    ensureMetaTag('name', 'robots', 'index, follow, max-image-preview:large')
+    ensureMetaTag('property', 'og:type', 'website')
+    ensureMetaTag('property', 'og:locale', 'es_CL')
+    ensureMetaTag('property', 'og:site_name', 'Sakiara')
+    ensureMetaTag('property', 'og:title', seoConfig.title)
+    ensureMetaTag('property', 'og:description', seoConfig.description)
+    ensureMetaTag('property', 'og:url', seoConfig.canonical)
+    ensureMetaTag('property', 'og:image', seoConfig.image)
+    ensureMetaTag('name', 'twitter:card', 'summary_large_image')
+    ensureMetaTag('name', 'twitter:title', seoConfig.title)
+    ensureMetaTag('name', 'twitter:description', seoConfig.description)
+    ensureMetaTag('name', 'twitter:image', seoConfig.image)
+    ensureLinkTag('canonical', seoConfig.canonical)
+    ensureJsonLdScript('sakiara-structured-data', seoConfig.structuredData)
+
+    const desiredPath = seoConfig.path
+    if (window.location.pathname !== desiredPath) {
+      window.history.replaceState({ view: activeView }, '', desiredPath)
+    }
+  }, [activeView])
+
 
   const installationMetrics = useMemo(() => {
     const vatMultiplier = 1.19
@@ -589,7 +798,14 @@ export default function SakiaraLandingPage() {
 
   const goToView = (view) => {
     setActiveView(view)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+
+    if (typeof window !== 'undefined') {
+      const nextPath = viewPathMap[view] || '/'
+      if (window.location.pathname !== nextPath) {
+        window.history.pushState({ view }, '', nextPath)
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   const getInstallationSummaryItems = () => [
@@ -730,6 +946,17 @@ export default function SakiaraLandingPage() {
               El servicio comunica respaldo técnico sin sobrecargar con complejidad innecesaria.
             </div>
           </div>
+        </div>
+
+        <div className="seo-copy-box">
+          <h2 className="seo-copy-title">Instalación y mantenimiento fotovoltaico en Chile</h2>
+          <p className="seo-copy-text">
+            Sakiara acompaña proyectos de energía solar residencial con una propuesta clara para
+            cotizar sistemas fotovoltaicos y evaluar mantenimiento técnico según ubicación,
+            consumo, rendimiento y continuidad operativa. Atendemos la Región Metropolitana y
+            otras regiones de Chile con un enfoque profesional, cercano y orientado a proteger la
+            inversión en el tiempo.
+          </p>
         </div>
       </section>
     </>
