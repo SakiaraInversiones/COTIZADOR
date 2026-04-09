@@ -210,20 +210,19 @@ export default function SakiaraLandingPage() {
     }
   }, [monthlyBill, billConsumptionKWh, zone, selectedProfile])
 
-  const buildSummaryText = () => {
-    return [
-      `Monto boleta: ${formatCLP(monthlyBill)}`,
-      `Consumo boleta: ${formatNumber(metrics.monthlyConsumptionKWh)} kWh/mes`,
-      `Zona: ${zone}`,
-      `Perfil: ${selectedProfile.label}`,
-      `Proyecto sugerido: ${formatNumber(metrics.estimatedPanels)} paneles Trina Solar 585 W`,
-      `Huawei sin batería: ${formatCLP(metrics.projectCostHuaweiNoBattery)}`,
-      `Solis sin batería: ${formatCLP(metrics.projectCostSolisNoBattery)}`,
-      `Huawei con batería LUNA: ${formatCLP(metrics.projectCostHuaweiWithBattery)}`,
-      `Solis con batería: ${formatCLP(metrics.projectCostSolisWithBattery)}`,
-    ].join('
-')
-  }
+const buildSummaryText = () => {
+  return [
+    `Monto boleta: ${formatCLP(monthlyBill)}`,
+    `Consumo boleta: ${formatNumber(metrics.monthlyConsumptionKWh)} kWh/mes`,
+    `Zona: ${zone}`,
+    `Perfil: ${selectedProfile.label}`,
+    `Proyecto sugerido: ${formatNumber(metrics.estimatedPanels)} paneles Trina Solar 585 W`,
+    `Huawei sin batería: ${formatCLP(metrics.projectCostHuaweiNoBattery)}`,
+    `Solis sin batería: ${formatCLP(metrics.projectCostSolisNoBattery)}`,
+    `Huawei con batería LUNA: ${formatCLP(metrics.projectCostHuaweiWithBattery)}`,
+    `Solis con batería: ${formatCLP(metrics.projectCostSolisWithBattery)}`,
+  ].join('\n')
+}
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
