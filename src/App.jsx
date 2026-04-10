@@ -869,8 +869,8 @@ export default function SakiaraLandingPage() {
 
   const getMaintenanceSummaryItems = () => [
     { label: 'Servicio', value: 'Cotización de mantenimiento fotovoltaico' },
-    { label: 'Potencia del sistema', value: `${formatNumber(maintenanceSystemSize, 1)} kW` },
-    { label: 'Ahorro mensual actual', value: formatCLP(maintenanceMonthlySavings) },
+    { label: 'Potencia del sistema en kW', value: `${formatNumber(maintenanceSystemSize, 1)} kW` },
+    { label: 'Ahorro mensual actual en pesos', value: formatCLP(maintenanceMonthlySavings) },
     { label: 'Región', value: selectedMaintenanceRegion.label },
     { label: 'Comuna', value: selectedMaintenanceCommune.label },
     { label: 'Visitas por año', value: formatNumber(maintenanceVisitsPerYear) },
