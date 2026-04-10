@@ -1390,7 +1390,7 @@ export default function SakiaraLandingPage() {
 
         <div className="fields-grid">
           <div className="field">
-            <label className="label">Potencia aproximada del sistema</label>
+            <label className="label">Potencia aproximada del sistema en kW</label>
             <input
               className="input"
               type="text"
@@ -1403,7 +1403,7 @@ export default function SakiaraLandingPage() {
           </div>
 
           <div className="field">
-            <label className="label">Ahorro mensual estimado o actual</label>
+            <label className="label">Ahorro mensual estimado o actual en pesos</label>
             <input
               className="input"
               type="text"
