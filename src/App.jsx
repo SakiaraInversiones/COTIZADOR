@@ -73,6 +73,42 @@ const installationInputModeOptions = {
 }
 
 
+
+const projectShowcase = [
+  {
+    title: 'Talagante',
+    power: '8 kW',
+    type: 'Residencial',
+    image: '/proyectos/talagante-8kw.jpg',
+    description:
+      'Sistema fotovoltaico residencial con una disposición limpia sobre cubierta, se dispuso de esa forma los módulos con la finalidad de reducir sombras y mejorar la producción.',
+  },
+  {
+    title: 'Piedra Roja',
+    power: '6 kW',
+    type: 'Residencial',
+    image: '/proyectos/piedra-roja-6kw.jpg',
+    description:
+      'Proyecto residencial integrado a la vivienda, con una solución ordenada y visualmente prolija para aprovechar mejor la superficie disponible.',
+  },
+  {
+    title: 'Lo Arcaya',
+    power: '6 kW',
+    type: 'Estructura en terreno',
+    image: '/proyectos/lo-arcaya-6kw.jpg',
+    description:
+      'Instalación desarrollada sobre estructura metálica en terreno, ideal para captar radiación de forma eficiente y facilitar la mantención del sistema.',
+  },
+  {
+    title: 'Calera de Tango',
+    power: '30 kW',
+    type: 'Mayor escala',
+    image: '/proyectos/calera-de-tango-30kw.jpg',
+    description:
+      'Proyecto de mayor capacidad, diseñado para cubrir una demanda energética más alta con una configuración robusta, ordenada y profesional.',
+  },
+]
+
 const VEHICLE_EFFICIENCY_KM_PER_L = 8
 const REFERENCE_FUEL_PRICE_CLP_PER_L = 1300
 const VEHICLE_WEAR_CLP_PER_KM = 120
@@ -943,6 +979,53 @@ export default function SakiaraLandingPage() {
               Evaluar mantenimiento
             </button>
           </div>
+        </div>
+      </section>
+
+      <section className="section-card" id="proyectos">
+        <div className="section-head">
+          <p className="eyebrow">Proyectos realizados</p>
+          <h2 className="section-title">Instalaciones reales desarrolladas por Sakiara</h2>
+          <p className="section-text">
+            Una muestra de proyectos fotovoltaicos ejecutados en distintos formatos, con soluciones pensadas para aprovechar mejor la energía solar y presentar una instalación limpia, ordenada y profesional.
+          </p>
+        </div>
+
+        <div className="project-grid">
+          {projectShowcase.map((project) => (
+            <article key={project.title} className="project-card">
+              <div className="project-image-wrap">
+                <img className="project-image" src={project.image} alt={`Proyecto fotovoltaico en ${project.title}`} />
+              </div>
+
+              <div className="project-body">
+                <div className="project-top">
+                  <div>
+                    <div className="project-chip">{project.type}</div>
+                    <h3 className="project-title">{project.title}</h3>
+                  </div>
+                  <div className="project-power">{project.power}</div>
+                </div>
+
+                <p className="project-description">{project.description}</p>
+
+                <div className="project-meta-grid">
+                  <div className="project-meta-item">
+                    <span>Ubicación</span>
+                    <strong>{project.title}</strong>
+                  </div>
+                  <div className="project-meta-item">
+                    <span>Potencia instalada</span>
+                    <strong>{project.power}</strong>
+                  </div>
+                </div>
+
+                <button className="btn-primary project-btn" type="button" onClick={() => goToView('instalacion')}>
+                  Quiero una evaluación similar
+                </button>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -1876,6 +1959,119 @@ export default function SakiaraLandingPage() {
           background: #fffef5;
         }
 
+        .project-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 18px;
+          margin-top: 20px;
+        }
+
+        .project-card {
+          overflow: hidden;
+          background: #fbfbfa;
+          border: 1px solid rgba(102, 102, 107, 0.10);
+          border-radius: 24px;
+          box-shadow: 0 16px 28px rgba(17, 24, 39, 0.05);
+          display: flex;
+          flex-direction: column;
+        }
+
+        .project-image-wrap {
+          aspect-ratio: 16 / 10;
+          overflow: hidden;
+          background: #f4f4f2;
+        }
+
+        .project-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .project-body {
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          flex: 1;
+        }
+
+        .project-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .project-chip {
+          display: inline-flex;
+          align-items: center;
+          min-height: 30px;
+          padding: 0 12px;
+          border-radius: 999px;
+          background: rgba(241, 212, 51, 0.20);
+          color: #66666b;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+
+        .project-title {
+          margin: 10px 0 0;
+          font-size: 30px;
+          line-height: 1.05;
+          color: #66666b;
+        }
+
+        .project-power {
+          color: #66666b;
+          font-size: 18px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+
+        .project-description {
+          margin: 0;
+          font-size: 15px;
+          line-height: 1.72;
+          color: #66666b;
+        }
+
+        .project-meta-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .project-meta-item {
+          background: #ffffff;
+          border: 1px solid rgba(102, 102, 107, 0.10);
+          border-radius: 16px;
+          padding: 14px 16px;
+        }
+
+        .project-meta-item span {
+          display: block;
+          font-size: 12px;
+          color: rgba(102, 102, 107, 0.78);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .project-meta-item strong {
+          display: block;
+          margin-top: 6px;
+          font-size: 16px;
+          color: #66666b;
+        }
+
+        .project-btn {
+          width: 100%;
+          justify-content: center;
+        }
+
         .service-title {
           margin: 14px 0 0;
           font-size: 28px;
@@ -2242,7 +2438,9 @@ export default function SakiaraLandingPage() {
           .contact-grid,
           .fields-grid,
           .service-grid,
-          .profile-legend {
+          .project-grid,
+          .profile-legend,
+          .project-meta-grid {
             grid-template-columns: 1fr;
           }
         }
