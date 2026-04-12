@@ -1,452 +1,554 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from "react";
 
-const sakiaraLogo = '/sakiara-logo.jpg'
-const contactEmail = 'rafael.vasquez844@gmail.com'
-const whatsappNumber = '56975807224'
-const formEndpoint = `https://formsubmit.co/${contactEmail}`
-const PANEL_POWER_KW = 0.585
-const REFERENCE_TARIFF_CLP_PER_KWH = 278
+const sakiaraLogo = "/sakiara-logo.jpg";
+const contactEmail = "rafael.vasquez844@gmail.com";
+const whatsappNumber = "56975807224";
+const formEndpoint = `https://formsubmit.co/${contactEmail}`;
+const PANEL_POWER_KW = 0.585;
+const REFERENCE_TARIFF_CLP_PER_KWH = 278;
 
-const sanitizeIntegerInput = (value) => value.replace(/[^\d]/g, '')
+const sanitizeIntegerInput = (value) => value.replace(/[^\d]/g, "");
 
 const formatCLP = (value) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
+  new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
     maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0)
+  }).format(Number.isFinite(value) ? value : 0);
 
 const formatNumber = (value, digits = 0) =>
-  new Intl.NumberFormat('es-CL', {
+  new Intl.NumberFormat("es-CL", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
-  }).format(Number.isFinite(value) ? value : 0)
+  }).format(Number.isFinite(value) ? value : 0);
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const zoneProduction = {
   norte: 140,
   centro: 125,
   sur: 112,
-}
+};
 
 const profileMap = {
   outside: {
-    label: 'Peak AM y PM',
+    label: "Peak AM y PM",
     morning: 15,
     day: 20,
     night: 65,
+    chartBars: [86, 14, 86],
     description:
-      'Hogar con consumo más marcado temprano en la mañana y desde la tarde hacia la noche.',
+      "Hogar con consumo más marcado temprano en la mañana y desde la tarde hacia la noche.",
   },
   mixed: {
-    label: 'Mixto',
+    label: "Mixto",
     morning: 20,
     day: 35,
     night: 45,
+    chartBars: [68, 42, 82],
     description:
-      'Consumo repartido durante el día, con un comportamiento más equilibrado entre mañana, tarde y noche.',
+      "Consumo repartido durante el día, con un comportamiento más equilibrado entre mañana, tarde y noche.",
   },
   home: {
-    label: 'Peak sostenido',
+    label: "Peak sostenido",
     morning: 20,
     day: 50,
     night: 30,
+    chartBars: [84, 84, 84],
     description:
-      'Hogar con uso más constante durante el día, ideal cuando hay mayor presencia o actividad diurna.',
+      "Hogar con uso más constante durante el día, ideal cuando hay mayor presencia o actividad diurna.",
   },
-}
+};
 
 const installationInputModeOptions = {
   bill: {
-    label: 'Cotiza con tu boleta',
-    helper: 'Ingresas solo el valor mensual y estimamos el consumo con una tarifa referencial.',
+    label: "Cotiza con tu boleta",
+    helper:
+      "Ingresas solo el valor mensual y estimamos el consumo con una tarifa referencial.",
   },
   consumption: {
-    label: 'Cotiza con tu consumo',
-    helper: 'Ingresas solo los kWh mensuales y estimamos una boleta referencial para proyectar la inversión.',
+    label: "Cotiza con tu consumo",
+    helper:
+      "Ingresas solo los kWh mensuales y estimamos una boleta referencial para proyectar la inversión.",
   },
   combined: {
-    label: 'Opción combinada',
-    helper: 'Usar ambos datos entrega una lectura más precisa del proyecto.',
+    label: "Opción combinada",
+    helper: "Usar ambos datos entrega una lectura más precisa del proyecto.",
   },
-}
-
-
+};
 
 const projectShowcase = [
   {
-    title: 'Talagante',
-    power: '8 kW',
-    type: 'Residencial',
-    image: '/proyectos/talagante-8kw.jpg',
+    title: "Talagante",
+    power: "8 kW",
+    type: "Residencial",
+    image: "/proyectos/talagante-8kw.jpg",
     description:
-      'Sistema fotovoltaico residencial con una disposición limpia sobre cubierta, se dispuso de esa forma los módulos con la finalidad de reducir sombras y mejorar la producción.',
+      "Sistema fotovoltaico residencial con una disposición limpia sobre cubierta, se dispuso de esa forma los módulos con la finalidad de reducir sombras y mejorar la producción.",
   },
   {
-    title: 'Piedra Roja',
-    power: '6 kW',
-    type: 'Residencial',
-    image: '/proyectos/piedra-roja-6kw.jpg',
+    title: "Piedra Roja",
+    power: "6 kW",
+    type: "Residencial",
+    image: "/proyectos/piedra-roja-6kw.jpg",
     description:
-      'Proyecto residencial integrado a la vivienda, con una solución ordenada y visualmente prolija para aprovechar mejor la superficie disponible.',
+      "Proyecto residencial integrado a la vivienda, con una solución ordenada y visualmente prolija para aprovechar mejor la superficie disponible.",
   },
   {
-    title: 'Lo Arcaya',
-    power: '6 kW',
-    type: 'Estructura en terreno',
-    image: '/proyectos/lo-arcaya-6kw.jpg',
+    title: "Lo Arcaya",
+    power: "6 kW",
+    type: "Estructura en terreno",
+    image: "/proyectos/lo-arcaya-6kw.jpg",
     description:
-      'Instalación desarrollada sobre estructura metálica en terreno, ideal para captar radiación de forma eficiente y facilitar la mantención del sistema.',
+      "Instalación desarrollada sobre estructura metálica en terreno, ideal para captar radiación de forma eficiente y facilitar la mantención del sistema.",
   },
   {
-    title: 'Calera de Tango',
-    power: '30 kW',
-    type: 'Mayor escala',
-    image: '/proyectos/calera-de-tango-30kw.jpg',
+    title: "Calera de Tango",
+    power: "30 kW",
+    type: "Mayor escala",
+    image: "/proyectos/calera-de-tango-30kw.jpg",
     description:
-      'Proyecto de mayor capacidad, diseñado para cubrir una demanda energética más alta con una configuración robusta, ordenada y profesional.',
+      "Proyecto de mayor capacidad, diseñado para cubrir una demanda energética más alta con una configuración robusta, ordenada y profesional.",
   },
-]
+];
 
-const VEHICLE_EFFICIENCY_KM_PER_L = 8
-const REFERENCE_FUEL_PRICE_CLP_PER_L = 1300
-const VEHICLE_WEAR_CLP_PER_KM = 120
-const BASE_TRAVEL_FEE = 10000
-const TRAVEL_BLOCK_KM = 50
-const TRAVEL_BLOCK_FEE = 20000
+const VEHICLE_EFFICIENCY_KM_PER_L = 8;
+const REFERENCE_FUEL_PRICE_CLP_PER_L = 1300;
+const VEHICLE_WEAR_CLP_PER_KM = 120;
+const BASE_TRAVEL_FEE = 10000;
+const TRAVEL_BLOCK_KM = 50;
+const TRAVEL_BLOCK_FEE = 20000;
+const INSTALLATION_PROJECT_WORK_DAYS = 5;
+const INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM = 100;
+const INSTALLATION_OVERNIGHT_CLP_PER_NIGHT = 100000;
+const INSTALLATION_LOCAL_LOGISTICS_CLP_PER_DAY = 20000;
+
+const installationZoneMap = {
+  aricaParinacota: "norte",
+  tarapaca: "norte",
+  antofagasta: "norte",
+  atacama: "norte",
+  coquimbo: "norte",
+  valparaiso: "centro",
+  metropolitana: "centro",
+  ohiggins: "centro",
+  maule: "centro",
+  nuble: "sur",
+  biobio: "sur",
+  araucania: "sur",
+  losRios: "sur",
+  losLagos: "sur",
+  aysen: "sur",
+  magallanes: "sur",
+};
+
+const getZoneFromRegion = (regionKey) =>
+  installationZoneMap[regionKey] || "centro";
+
+const getTravelLogisticsBase = (roundTripKm, tolls = 0) => {
+  const variableMobilityCostPerKm =
+    REFERENCE_FUEL_PRICE_CLP_PER_L / VEHICLE_EFFICIENCY_KM_PER_L +
+    VEHICLE_WEAR_CLP_PER_KM;
+  const internalTravelEstimate =
+    Math.max(roundTripKm, 0) * variableMobilityCostPerKm + tolls;
+  const travelBlocks = Math.floor(Math.max(roundTripKm, 0) / TRAVEL_BLOCK_KM);
+  const commercialTravelFee = BASE_TRAVEL_FEE + travelBlocks * TRAVEL_BLOCK_FEE;
+
+  return {
+    variableMobilityCostPerKm,
+    internalTravelEstimate,
+    travelBlocks,
+    commercialTravelFee,
+    logisticsBase: Math.max(internalTravelEstimate, commercialTravelFee),
+  };
+};
+
+const getInstallationProjectLogistics = (communeConfig) => {
+  const safeCommune = communeConfig || { roundTripKm: 0, tolls: 0 };
+  const travelMetrics = getTravelLogisticsBase(
+    safeCommune.roundTripKm,
+    safeCommune.tolls,
+  );
+  const isRemoteProject =
+    safeCommune.roundTripKm > INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM;
+
+  if (isRemoteProject) {
+    const lodgingNights = INSTALLATION_PROJECT_WORK_DAYS + 1;
+    const localLogistics =
+      INSTALLATION_PROJECT_WORK_DAYS * INSTALLATION_LOCAL_LOGISTICS_CLP_PER_DAY;
+
+    return {
+      ...travelMetrics,
+      roundTripKm: safeCommune.roundTripKm,
+      tolls: safeCommune.tolls,
+      isRemoteProject,
+      projectWorkDays: INSTALLATION_PROJECT_WORK_DAYS,
+      travelDays: 2,
+      lodgingNights,
+      localLogistics,
+      logisticsTotal:
+        travelMetrics.logisticsBase +
+        lodgingNights * INSTALLATION_OVERNIGHT_CLP_PER_NIGHT +
+        localLogistics,
+    };
+  }
+
+  return {
+    ...travelMetrics,
+    roundTripKm: safeCommune.roundTripKm,
+    tolls: safeCommune.tolls,
+    isRemoteProject,
+    projectWorkDays: INSTALLATION_PROJECT_WORK_DAYS,
+    travelDays: 0,
+    lodgingNights: 0,
+    localLogistics: 0,
+    logisticsTotal:
+      travelMetrics.logisticsBase * INSTALLATION_PROJECT_WORK_DAYS,
+  };
+};
 
 const maintenanceMetropolitanaCommunes = {
-  alhue: { label: 'Alhué', roundTripKm: 250, tolls: 12000 },
-  buin: { label: 'Buin', roundTripKm: 118, tolls: 3000 },
-  caleraDeTango: { label: 'Calera de Tango', roundTripKm: 92, tolls: 0 },
-  cerrillos: { label: 'Cerrillos', roundTripKm: 62, tolls: 0 },
-  cerroNavia: { label: 'Cerro Navia', roundTripKm: 50, tolls: 0 },
-  colina: { label: 'Colina', roundTripKm: 0, tolls: 0 },
-  conchali: { label: 'Conchalí', roundTripKm: 44, tolls: 0 },
-  curacavi: { label: 'Curacaví', roundTripKm: 132, tolls: 9000 },
-  elBosque: { label: 'El Bosque', roundTripKm: 72, tolls: 0 },
-  elMonte: { label: 'El Monte', roundTripKm: 118, tolls: 4000 },
-  estacionCentral: { label: 'Estación Central', roundTripKm: 58, tolls: 0 },
-  huechuraba: { label: 'Huechuraba', roundTripKm: 36, tolls: 0 },
-  independencia: { label: 'Independencia', roundTripKm: 46, tolls: 0 },
-  islaDeMaipo: { label: 'Isla de Maipo', roundTripKm: 122, tolls: 5000 },
-  laCisterna: { label: 'La Cisterna', roundTripKm: 70, tolls: 0 },
-  laFlorida: { label: 'La Florida', roundTripKm: 74, tolls: 0 },
-  laGranja: { label: 'La Granja', roundTripKm: 76, tolls: 0 },
-  laPintana: { label: 'La Pintana', roundTripKm: 86, tolls: 0 },
-  laReina: { label: 'La Reina', roundTripKm: 72, tolls: 0 },
-  lampa: { label: 'Lampa', roundTripKm: 28, tolls: 0 },
-  lasCondes: { label: 'Las Condes', roundTripKm: 72, tolls: 0 },
-  loBarnechea: { label: 'Lo Barnechea', roundTripKm: 84, tolls: 0 },
-  loEspejo: { label: 'Lo Espejo', roundTripKm: 72, tolls: 0 },
-  loPrado: { label: 'Lo Prado', roundTripKm: 54, tolls: 0 },
-  macul: { label: 'Macul', roundTripKm: 70, tolls: 0 },
-  maipu: { label: 'Maipú', roundTripKm: 78, tolls: 0 },
-  mariaPinto: { label: 'María Pinto', roundTripKm: 150, tolls: 6000 },
-  melipilla: { label: 'Melipilla', roundTripKm: 154, tolls: 7000 },
-  nunoa: { label: 'Ñuñoa', roundTripKm: 66, tolls: 0 },
-  padreHurtado: { label: 'Padre Hurtado', roundTripKm: 92, tolls: 4000 },
-  paine: { label: 'Paine', roundTripKm: 150, tolls: 5000 },
-  pedroAguirreCerda: { label: 'Pedro Aguirre Cerda', roundTripKm: 64, tolls: 0 },
-  penaflor: { label: 'Peñaflor', roundTripKm: 98, tolls: 4000 },
-  penalolen: { label: 'Peñalolén', roundTripKm: 76, tolls: 0 },
-  pirque: { label: 'Pirque', roundTripKm: 106, tolls: 0 },
-  providencia: { label: 'Providencia', roundTripKm: 60, tolls: 0 },
-  pudahuel: { label: 'Pudahuel', roundTripKm: 58, tolls: 0 },
-  puenteAlto: { label: 'Puente Alto', roundTripKm: 90, tolls: 0 },
-  quilicura: { label: 'Quilicura', roundTripKm: 26, tolls: 0 },
-  quintaNormal: { label: 'Quinta Normal', roundTripKm: 52, tolls: 0 },
-  recoleta: { label: 'Recoleta', roundTripKm: 48, tolls: 0 },
-  renca: { label: 'Renca', roundTripKm: 42, tolls: 0 },
-  sanBernardo: { label: 'San Bernardo', roundTripKm: 88, tolls: 0 },
-  sanJoaquin: { label: 'San Joaquín', roundTripKm: 70, tolls: 0 },
-  sanJoseDeMaipo: { label: 'San José de Maipo', roundTripKm: 156, tolls: 0 },
-  sanMiguel: { label: 'San Miguel', roundTripKm: 66, tolls: 0 },
-  sanPedro: { label: 'San Pedro', roundTripKm: 216, tolls: 9000 },
-  sanRamon: { label: 'San Ramón', roundTripKm: 78, tolls: 0 },
-  santiago: { label: 'Santiago', roundTripKm: 54, tolls: 0 },
-  talagante: { label: 'Talagante', roundTripKm: 108, tolls: 4000 },
-  tiltil: { label: 'Tiltil', roundTripKm: 76, tolls: 0 },
-  vitacura: { label: 'Vitacura', roundTripKm: 64, tolls: 0 },
-}
+  alhue: { label: "Alhué", roundTripKm: 250, tolls: 12000 },
+  buin: { label: "Buin", roundTripKm: 118, tolls: 3000 },
+  caleraDeTango: { label: "Calera de Tango", roundTripKm: 92, tolls: 0 },
+  cerrillos: { label: "Cerrillos", roundTripKm: 62, tolls: 0 },
+  cerroNavia: { label: "Cerro Navia", roundTripKm: 50, tolls: 0 },
+  colina: { label: "Colina", roundTripKm: 0, tolls: 0 },
+  conchali: { label: "Conchalí", roundTripKm: 44, tolls: 0 },
+  curacavi: { label: "Curacaví", roundTripKm: 132, tolls: 9000 },
+  elBosque: { label: "El Bosque", roundTripKm: 72, tolls: 0 },
+  elMonte: { label: "El Monte", roundTripKm: 118, tolls: 4000 },
+  estacionCentral: { label: "Estación Central", roundTripKm: 58, tolls: 0 },
+  huechuraba: { label: "Huechuraba", roundTripKm: 36, tolls: 0 },
+  independencia: { label: "Independencia", roundTripKm: 46, tolls: 0 },
+  islaDeMaipo: { label: "Isla de Maipo", roundTripKm: 122, tolls: 5000 },
+  laCisterna: { label: "La Cisterna", roundTripKm: 70, tolls: 0 },
+  laFlorida: { label: "La Florida", roundTripKm: 74, tolls: 0 },
+  laGranja: { label: "La Granja", roundTripKm: 76, tolls: 0 },
+  laPintana: { label: "La Pintana", roundTripKm: 86, tolls: 0 },
+  laReina: { label: "La Reina", roundTripKm: 72, tolls: 0 },
+  lampa: { label: "Lampa", roundTripKm: 28, tolls: 0 },
+  lasCondes: { label: "Las Condes", roundTripKm: 72, tolls: 0 },
+  loBarnechea: { label: "Lo Barnechea", roundTripKm: 84, tolls: 0 },
+  loEspejo: { label: "Lo Espejo", roundTripKm: 72, tolls: 0 },
+  loPrado: { label: "Lo Prado", roundTripKm: 54, tolls: 0 },
+  macul: { label: "Macul", roundTripKm: 70, tolls: 0 },
+  maipu: { label: "Maipú", roundTripKm: 78, tolls: 0 },
+  mariaPinto: { label: "María Pinto", roundTripKm: 150, tolls: 6000 },
+  melipilla: { label: "Melipilla", roundTripKm: 154, tolls: 7000 },
+  nunoa: { label: "Ñuñoa", roundTripKm: 66, tolls: 0 },
+  padreHurtado: { label: "Padre Hurtado", roundTripKm: 92, tolls: 4000 },
+  paine: { label: "Paine", roundTripKm: 150, tolls: 5000 },
+  pedroAguirreCerda: {
+    label: "Pedro Aguirre Cerda",
+    roundTripKm: 64,
+    tolls: 0,
+  },
+  penaflor: { label: "Peñaflor", roundTripKm: 98, tolls: 4000 },
+  penalolen: { label: "Peñalolén", roundTripKm: 76, tolls: 0 },
+  pirque: { label: "Pirque", roundTripKm: 106, tolls: 0 },
+  providencia: { label: "Providencia", roundTripKm: 60, tolls: 0 },
+  pudahuel: { label: "Pudahuel", roundTripKm: 58, tolls: 0 },
+  puenteAlto: { label: "Puente Alto", roundTripKm: 90, tolls: 0 },
+  quilicura: { label: "Quilicura", roundTripKm: 26, tolls: 0 },
+  quintaNormal: { label: "Quinta Normal", roundTripKm: 52, tolls: 0 },
+  recoleta: { label: "Recoleta", roundTripKm: 48, tolls: 0 },
+  renca: { label: "Renca", roundTripKm: 42, tolls: 0 },
+  sanBernardo: { label: "San Bernardo", roundTripKm: 88, tolls: 0 },
+  sanJoaquin: { label: "San Joaquín", roundTripKm: 70, tolls: 0 },
+  sanJoseDeMaipo: { label: "San José de Maipo", roundTripKm: 156, tolls: 0 },
+  sanMiguel: { label: "San Miguel", roundTripKm: 66, tolls: 0 },
+  sanPedro: { label: "San Pedro", roundTripKm: 216, tolls: 9000 },
+  sanRamon: { label: "San Ramón", roundTripKm: 78, tolls: 0 },
+  santiago: { label: "Santiago", roundTripKm: 54, tolls: 0 },
+  talagante: { label: "Talagante", roundTripKm: 108, tolls: 4000 },
+  tiltil: { label: "Tiltil", roundTripKm: 76, tolls: 0 },
+  vitacura: { label: "Vitacura", roundTripKm: 64, tolls: 0 },
+};
 
 const maintenanceRegionData = {
   aricaParinacota: {
-    label: 'Arica y Parinacota',
+    label: "Arica y Parinacota",
     communes: {
-      arica: { label: 'Arica', roundTripKm: 4120, tolls: 65000 },
-      putre: { label: 'Putre', roundTripKm: 4300, tolls: 65000 },
+      arica: { label: "Arica", roundTripKm: 4120, tolls: 65000 },
+      putre: { label: "Putre", roundTripKm: 4300, tolls: 65000 },
     },
   },
   tarapaca: {
-    label: 'Tarapacá',
+    label: "Tarapacá",
     communes: {
-      iquique: { label: 'Iquique', roundTripKm: 3600, tolls: 56000 },
-      altoHospicio: { label: 'Alto Hospicio', roundTripKm: 3600, tolls: 56000 },
+      iquique: { label: "Iquique", roundTripKm: 3600, tolls: 56000 },
+      altoHospicio: { label: "Alto Hospicio", roundTripKm: 3600, tolls: 56000 },
     },
   },
   antofagasta: {
-    label: 'Antofagasta',
+    label: "Antofagasta",
     communes: {
-      antofagasta: { label: 'Antofagasta', roundTripKm: 2740, tolls: 46000 },
-      calama: { label: 'Calama', roundTripKm: 3000, tolls: 49000 },
+      antofagasta: { label: "Antofagasta", roundTripKm: 2740, tolls: 46000 },
+      calama: { label: "Calama", roundTripKm: 3000, tolls: 49000 },
     },
   },
   atacama: {
-    label: 'Atacama',
+    label: "Atacama",
     communes: {
-      copiapo: { label: 'Copiapó', roundTripKm: 1660, tolls: 30000 },
-      vallenar: { label: 'Vallenar', roundTripKm: 1320, tolls: 26000 },
+      copiapo: { label: "Copiapó", roundTripKm: 1660, tolls: 30000 },
+      vallenar: { label: "Vallenar", roundTripKm: 1320, tolls: 26000 },
     },
   },
   coquimbo: {
-    label: 'Coquimbo',
+    label: "Coquimbo",
     communes: {
-      laSerena: { label: 'La Serena', roundTripKm: 940, tolls: 18000 },
-      coquimbo: { label: 'Coquimbo', roundTripKm: 950, tolls: 18000 },
-      ovalle: { label: 'Ovalle', roundTripKm: 780, tolls: 16000 },
+      laSerena: { label: "La Serena", roundTripKm: 940, tolls: 18000 },
+      coquimbo: { label: "Coquimbo", roundTripKm: 950, tolls: 18000 },
+      ovalle: { label: "Ovalle", roundTripKm: 780, tolls: 16000 },
     },
   },
   valparaiso: {
-    label: 'Valparaíso',
+    label: "Valparaíso",
     communes: {
-      valparaiso: { label: 'Valparaíso', roundTripKm: 300, tolls: 12000 },
-      vinaDelMar: { label: 'Viña del Mar', roundTripKm: 310, tolls: 12000 },
-      quilpue: { label: 'Quilpué', roundTripKm: 290, tolls: 10000 },
-      concon: { label: 'Concón', roundTripKm: 320, tolls: 12000 },
-      losAndes: { label: 'Los Andes', roundTripKm: 220, tolls: 9000 },
-      sanFelipe: { label: 'San Felipe', roundTripKm: 200, tolls: 9000 },
+      valparaiso: { label: "Valparaíso", roundTripKm: 300, tolls: 12000 },
+      vinaDelMar: { label: "Viña del Mar", roundTripKm: 310, tolls: 12000 },
+      quilpue: { label: "Quilpué", roundTripKm: 290, tolls: 10000 },
+      concon: { label: "Concón", roundTripKm: 320, tolls: 12000 },
+      losAndes: { label: "Los Andes", roundTripKm: 220, tolls: 9000 },
+      sanFelipe: { label: "San Felipe", roundTripKm: 200, tolls: 9000 },
     },
   },
   metropolitana: {
-    label: 'Región Metropolitana',
+    label: "Región Metropolitana",
     communes: maintenanceMetropolitanaCommunes,
   },
   ohiggins: {
     label: "O'Higgins",
     communes: {
-      rancagua: { label: 'Rancagua', roundTripKm: 170, tolls: 6000 },
-      machali: { label: 'Machalí', roundTripKm: 180, tolls: 6000 },
-      sanFernando: { label: 'San Fernando', roundTripKm: 280, tolls: 9000 },
-      pichilemu: { label: 'Pichilemu', roundTripKm: 430, tolls: 13000 },
+      rancagua: { label: "Rancagua", roundTripKm: 170, tolls: 6000 },
+      machali: { label: "Machalí", roundTripKm: 180, tolls: 6000 },
+      sanFernando: { label: "San Fernando", roundTripKm: 280, tolls: 9000 },
+      pichilemu: { label: "Pichilemu", roundTripKm: 430, tolls: 13000 },
     },
   },
   maule: {
-    label: 'Maule',
+    label: "Maule",
     communes: {
-      talca: { label: 'Talca', roundTripKm: 510, tolls: 14000 },
-      curico: { label: 'Curicó', roundTripKm: 380, tolls: 11000 },
-      linares: { label: 'Linares', roundTripKm: 620, tolls: 16000 },
+      talca: { label: "Talca", roundTripKm: 510, tolls: 14000 },
+      curico: { label: "Curicó", roundTripKm: 380, tolls: 11000 },
+      linares: { label: "Linares", roundTripKm: 620, tolls: 16000 },
     },
   },
   nuble: {
-    label: 'Ñuble',
+    label: "Ñuble",
     communes: {
-      chillan: { label: 'Chillán', roundTripKm: 800, tolls: 19000 },
-      sanCarlos: { label: 'San Carlos', roundTripKm: 740, tolls: 18000 },
+      chillan: { label: "Chillán", roundTripKm: 800, tolls: 19000 },
+      sanCarlos: { label: "San Carlos", roundTripKm: 740, tolls: 18000 },
     },
   },
   biobio: {
-    label: 'Biobío',
+    label: "Biobío",
     communes: {
-      concepcion: { label: 'Concepción', roundTripKm: 1040, tolls: 24000 },
-      talcahuano: { label: 'Talcahuano', roundTripKm: 1060, tolls: 24000 },
-      losAngeles: { label: 'Los Ángeles', roundTripKm: 900, tolls: 21000 },
+      concepcion: { label: "Concepción", roundTripKm: 1040, tolls: 24000 },
+      talcahuano: { label: "Talcahuano", roundTripKm: 1060, tolls: 24000 },
+      losAngeles: { label: "Los Ángeles", roundTripKm: 900, tolls: 21000 },
     },
   },
   araucania: {
-    label: 'La Araucanía',
+    label: "La Araucanía",
     communes: {
-      temuco: { label: 'Temuco', roundTripKm: 1380, tolls: 30000 },
-      villarrica: { label: 'Villarrica', roundTripKm: 1520, tolls: 32000 },
+      temuco: { label: "Temuco", roundTripKm: 1380, tolls: 30000 },
+      villarrica: { label: "Villarrica", roundTripKm: 1520, tolls: 32000 },
     },
   },
   losRios: {
-    label: 'Los Ríos',
+    label: "Los Ríos",
     communes: {
-      valdivia: { label: 'Valdivia', roundTripKm: 1680, tolls: 35000 },
-      laUnion: { label: 'La Unión', roundTripKm: 1750, tolls: 36000 },
+      valdivia: { label: "Valdivia", roundTripKm: 1680, tolls: 35000 },
+      laUnion: { label: "La Unión", roundTripKm: 1750, tolls: 36000 },
     },
   },
   losLagos: {
-    label: 'Los Lagos',
+    label: "Los Lagos",
     communes: {
-      puertoMontt: { label: 'Puerto Montt', roundTripKm: 2090, tolls: 40000 },
-      osorno: { label: 'Osorno', roundTripKm: 1820, tolls: 38000 },
-      castro: { label: 'Castro', roundTripKm: 2390, tolls: 45000 },
+      puertoMontt: { label: "Puerto Montt", roundTripKm: 2090, tolls: 40000 },
+      osorno: { label: "Osorno", roundTripKm: 1820, tolls: 38000 },
+      castro: { label: "Castro", roundTripKm: 2390, tolls: 45000 },
     },
   },
   aysen: {
-    label: 'Aysén',
+    label: "Aysén",
     communes: {
-      coyhaique: { label: 'Coyhaique', roundTripKm: 3380, tolls: 20000 },
-      puertoAysen: { label: 'Puerto Aysén', roundTripKm: 3460, tolls: 20000 },
+      coyhaique: { label: "Coyhaique", roundTripKm: 3380, tolls: 20000 },
+      puertoAysen: { label: "Puerto Aysén", roundTripKm: 3460, tolls: 20000 },
     },
   },
   magallanes: {
-    label: 'Magallanes',
+    label: "Magallanes",
     communes: {
-      puntaArenas: { label: 'Punta Arenas', roundTripKm: 5660, tolls: 10000 },
-      puertoNatales: { label: 'Puerto Natales', roundTripKm: 5400, tolls: 10000 },
+      puntaArenas: { label: "Punta Arenas", roundTripKm: 5660, tolls: 10000 },
+      puertoNatales: {
+        label: "Puerto Natales",
+        roundTripKm: 5400,
+        tolls: 10000,
+      },
     },
   },
-}
+};
 
-const maintenanceRegionOptions = Object.entries(maintenanceRegionData).map(([value, config]) => ({
-  value,
-  label: config.label,
-}))
+const maintenanceRegionOptions = Object.entries(maintenanceRegionData).map(
+  ([value, config]) => ({
+    value,
+    label: config.label,
+  }),
+);
 
-const SITE_FALLBACK_URL = 'https://sakiarainversiones.com'
+const SITE_FALLBACK_URL = "https://sakiarainversiones.com";
 
 const viewPathMap = {
-  home: '/',
-  instalacion: '/instalacion',
-  mantenimiento: '/mantenimiento',
-}
+  home: "/",
+  instalacion: "/instalacion",
+  mantenimiento: "/mantenimiento",
+};
 
-const getViewFromPath = (pathname = '/') => {
-  if (pathname === '/instalacion') return 'instalacion'
-  if (pathname === '/mantenimiento') return 'mantenimiento'
-  return 'home'
-}
+const getViewFromPath = (pathname = "/") => {
+  if (pathname === "/instalacion") return "instalacion";
+  if (pathname === "/mantenimiento") return "mantenimiento";
+  return "home";
+};
 
 const ensureMetaTag = (attribute, key, content) => {
-  if (typeof document === 'undefined') return
-  let tag = document.head.querySelector(`meta[${attribute}="${key}"]`)
+  if (typeof document === "undefined") return;
+  let tag = document.head.querySelector(`meta[${attribute}="${key}"]`);
   if (!tag) {
-    tag = document.createElement('meta')
-    tag.setAttribute(attribute, key)
-    document.head.appendChild(tag)
+    tag = document.createElement("meta");
+    tag.setAttribute(attribute, key);
+    document.head.appendChild(tag);
   }
-  tag.setAttribute('content', content)
-}
+  tag.setAttribute("content", content);
+};
 
 const ensureLinkTag = (rel, href) => {
-  if (typeof document === 'undefined') return
-  let tag = document.head.querySelector(`link[rel="${rel}"]`)
+  if (typeof document === "undefined") return;
+  let tag = document.head.querySelector(`link[rel="${rel}"]`);
   if (!tag) {
-    tag = document.createElement('link')
-    tag.setAttribute('rel', rel)
-    document.head.appendChild(tag)
+    tag = document.createElement("link");
+    tag.setAttribute("rel", rel);
+    document.head.appendChild(tag);
   }
-  tag.setAttribute('href', href)
-}
+  tag.setAttribute("href", href);
+};
 
 const ensureJsonLdScript = (id, data) => {
-  if (typeof document === 'undefined') return
-  let tag = document.getElementById(id)
+  if (typeof document === "undefined") return;
+  let tag = document.getElementById(id);
   if (!tag) {
-    tag = document.createElement('script')
-    tag.type = 'application/ld+json'
-    tag.id = id
-    document.head.appendChild(tag)
+    tag = document.createElement("script");
+    tag.type = "application/ld+json";
+    tag.id = id;
+    document.head.appendChild(tag);
   }
-  tag.textContent = JSON.stringify(data)
-}
+  tag.textContent = JSON.stringify(data);
+};
 
 const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
-  const normalizedOrigin = origin || SITE_FALLBACK_URL
+  const normalizedOrigin = origin || SITE_FALLBACK_URL;
   const pages = {
     home: {
-      title: 'Sakiara | Instalación y mantenimiento de sistemas fotovoltaicos en Chile',
+      title:
+        "Sakiara | Instalación y mantenimiento de sistemas fotovoltaicos en Chile",
       description:
-        'Cotiza instalación y mantenimiento de sistemas fotovoltaicos residenciales en Chile. Evaluación clara, profesional y orientada a ahorro, inversión y continuidad operativa.',
-      path: '/',
-      pageName: 'Inicio',
+        "Cotiza una instalación fotovoltaica o evalúa el mantenimiento de tu sistema con una experiencia clara, profesional y orientada a ahorro, inversión y protección del rendimiento.",
+      path: "/",
+      pageName: "Inicio",
       image: `${normalizedOrigin}${sakiaraLogo}`,
     },
     instalacion: {
-      title: 'Cotizador de instalación fotovoltaica | Sakiara',
+      title: "Cotizador de instalación fotovoltaica | Sakiara",
       description:
-        'Cotiza tu sistema fotovoltaico con tu boleta, tu consumo o una opción combinada. Conoce una propuesta referencial clara y profesional para tu hogar.',
-      path: '/instalacion',
-      pageName: 'Cotizador de instalación fotovoltaica',
+        "Cotiza tu sistema fotovoltaico con tu boleta, tu consumo o una opción combinada. Compara alternativas claras para tu proyecto y avanza con una evaluación inicial profesional.",
+      path: "/instalacion",
+      pageName: "Cotizador de instalación fotovoltaica",
       image: `${normalizedOrigin}${sakiaraLogo}`,
     },
     mantenimiento: {
-      title: 'Mantenimiento de paneles solares | Sakiara',
+      title: "Mantenimiento de paneles solares | Sakiara",
       description:
-        'Evalúa un plan de mantenimiento para tu sistema fotovoltaico según ubicación, potencia y frecuencia de servicio. Protege rendimiento, seguridad y continuidad operativa.',
-      path: '/mantenimiento',
-      pageName: 'Plan de mantenimiento fotovoltaico',
+        "Evalúa un plan de mantenimiento para tu sistema fotovoltaico según ubicación, potencia y frecuencia de servicio. Protege rendimiento, seguridad y continuidad del sistema.",
+      path: "/mantenimiento",
+      pageName: "Plan de mantenimiento fotovoltaico",
       image: `${normalizedOrigin}${sakiaraLogo}`,
     },
-  }
+  };
 
-  const currentPage = pages[view] || pages.home
-  const currentUrl = `${normalizedOrigin}${currentPage.path}`
+  const currentPage = pages[view] || pages.home;
+  const currentUrl = `${normalizedOrigin}${currentPage.path}`;
 
   const structuredData = [
     {
-      '@context': 'https://schema.org',
-      '@type': 'WebSite',
-      name: 'Sakiara',
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "Sakiara",
       url: normalizedOrigin,
-      inLanguage: 'es-CL',
+      inLanguage: "es-CL",
     },
     {
-      '@context': 'https://schema.org',
-      '@type': 'LocalBusiness',
-      name: 'Sakiara',
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      name: "Sakiara",
       url: normalizedOrigin,
       logo: `${normalizedOrigin}${sakiaraLogo}`,
       image: `${normalizedOrigin}${sakiaraLogo}`,
       description:
-        'Instalación y mantenimiento de sistemas fotovoltaicos residenciales en Chile.',
-      telephone: '+56 9 7580 7224',
+        "Instalación y mantenimiento de sistemas fotovoltaicos residenciales en Chile.",
+      telephone: "+56 9 7580 7224",
       email: contactEmail,
-      areaServed: 'Chile',
+      areaServed: "Chile",
       address: {
-        '@type': 'PostalAddress',
-        addressLocality: 'Colina',
-        addressRegion: 'Región Metropolitana',
-        addressCountry: 'CL',
+        "@type": "PostalAddress",
+        addressLocality: "Colina",
+        addressRegion: "Región Metropolitana",
+        addressCountry: "CL",
       },
       makesOffer: [
         {
-          '@type': 'Offer',
+          "@type": "Offer",
           itemOffered: {
-            '@type': 'Service',
-            name: 'Instalación de sistemas fotovoltaicos residenciales',
+            "@type": "Service",
+            name: "Instalación de sistemas fotovoltaicos residenciales",
           },
         },
         {
-          '@type': 'Offer',
+          "@type": "Offer",
           itemOffered: {
-            '@type': 'Service',
-            name: 'Mantenimiento de sistemas fotovoltaicos',
+            "@type": "Service",
+            name: "Mantenimiento de sistemas fotovoltaicos",
           },
         },
       ],
     },
     {
-      '@context': 'https://schema.org',
-      '@type': 'WebPage',
+      "@context": "https://schema.org",
+      "@type": "WebPage",
       name: currentPage.pageName,
       url: currentUrl,
       description: currentPage.description,
       isPartOf: {
-        '@type': 'WebSite',
-        name: 'Sakiara',
+        "@type": "WebSite",
+        name: "Sakiara",
         url: normalizedOrigin,
       },
     },
     {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
       itemListElement: [
         {
-          '@type': 'ListItem',
+          "@type": "ListItem",
           position: 1,
-          name: 'Inicio',
+          name: "Inicio",
           item: `${normalizedOrigin}/`,
         },
-        ...(view !== 'home'
+        ...(view !== "home"
           ? [
               {
-                '@type': 'ListItem',
+                "@type": "ListItem",
                 position: 2,
                 name: currentPage.pageName,
                 item: currentUrl,
@@ -455,151 +557,276 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
           : []),
       ],
     },
-  ]
+  ];
 
   return {
     ...currentPage,
     canonical: currentUrl,
     structuredData,
-  }
-}
+  };
+};
 
-function OfferCard({ title, subtitle, badge, price, savings, compensation, payback, variant }) {
+function OfferCard({
+  title,
+  subtitle,
+  badge,
+  price,
+  savings,
+  compensation,
+  payback,
+  variant,
+  collapsible = false,
+  isOpen = true,
+  onToggle,
+  selectable = false,
+  isSelected = false,
+  onSelect,
+}) {
   return (
-    <div className={`offer-card ${variant}`}>
+    <div
+      className={`offer-card ${variant} ${collapsible ? "collapsible" : ""} ${isOpen ? "expanded" : "collapsed"} ${isSelected ? "selected" : ""}`}
+    >
       <div className="offer-head">
         <div>
           <h3 className="offer-title">{title}</h3>
           <p className="offer-sub">{subtitle}</p>
         </div>
-        <div className="offer-badge">{badge}</div>
+
+        <div className="offer-head-actions">
+          <div className="offer-badge">{badge}</div>
+          {collapsible && (
+            <button
+              className={`offer-toggle ${isOpen ? "active" : ""}`}
+              type="button"
+              onClick={onToggle}
+            >
+              {isOpen ? "Ocultar detalle" : "Ver detalle"}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="price-box">
-        <div className="price-label">Valor total IVA incluido</div>
-        <div className="price-value">{price}</div>
-      </div>
+      {(!collapsible || isOpen) && (
+        <>
+          <div className="price-box">
+            <div className="price-label">Valor total IVA incluido</div>
+            <div className="price-value">{price}</div>
+          </div>
 
-      <div className="stats-grid">
-        <div className="stat">
-          <div className="stat-label">Ahorro</div>
-          <div className="stat-value">{savings}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Compensación de la cuenta</div>
-          <div className="stat-value">{compensation}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Retorno</div>
-          <div className="stat-value">{payback}</div>
-        </div>
-      </div>
+          <div className="stats-grid">
+            <div className="stat">
+              <div className="stat-label">Ahorro</div>
+              <div className="stat-value">{savings}</div>
+            </div>
+            <div className="stat">
+              <div className="stat-label">Compensación de la cuenta</div>
+              <div className="stat-value">{compensation}</div>
+            </div>
+            <div className="stat">
+              <div className="stat-label">Retorno</div>
+              <div className="stat-value">{payback}</div>
+            </div>
+          </div>
+
+          {selectable && (
+            <div className="offer-selection-row">
+              <button
+                className={`offer-select-btn ${isSelected ? "selected" : ""}`}
+                type="button"
+                onClick={onSelect}
+              >
+                {isSelected ? "Alternativa seleccionada" : "Seleccionar alternativa"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
-  )
+  );
 }
 
-function SummaryCard({ label, value, sub }) {
+function SummaryCard({ label, value, sub, valueClassName = "" }) {
+  const summaryValueClassName = ["summary-value", valueClassName].filter(Boolean).join(" ");
+
   return (
     <div className="summary-card">
       <div className="summary-label">{label}</div>
-      <div className="summary-value">{value}</div>
+      <div className={summaryValueClassName}>{value}</div>
       <div className="summary-sub">{sub}</div>
     </div>
-  )
+  );
+}
+
+function ProfileOptionCard({ option, isSelected, onSelect }) {
+  const chartBars = option.chartBars || [option.morning, option.day, option.night];
+  const maxBar = Math.max(...chartBars, 1);
+  const bars = [
+    { label: "AM", value: chartBars[0] },
+    { label: "Día", value: chartBars[1] },
+    { label: "PM", value: chartBars[2] },
+  ];
+
+  return (
+    <button
+      className={`profile-option-card ${isSelected ? 'selected' : ''}`}
+      type="button"
+      onClick={onSelect}
+    >
+      <div className="profile-option-top">
+        <div>
+          <div className="profile-option-title">{option.label}</div>
+          <p className="profile-option-description">{option.description}</p>
+        </div>
+        <div className={`profile-option-check ${isSelected ? 'selected' : ''}`}>
+          {isSelected ? 'Seleccionado' : 'Seleccionar'}
+        </div>
+      </div>
+
+      <div className="profile-example-chart" aria-hidden="true">
+        {bars.map((bar) => (
+          <div key={bar.label} className="profile-example-bar-wrap">
+            <div
+              className="profile-example-bar"
+              style={{ height: `${Math.max((bar.value / maxBar) * 88, 18)}px` }}
+            />
+            <span>{bar.label}</span>
+          </div>
+        ))}
+      </div>
+    </button>
+  );
 }
 
 export default function SakiaraLandingPage() {
   const [activeView, setActiveView] = useState(() =>
-    getViewFromPath(typeof window !== 'undefined' ? window.location.pathname : '/')
-  )
+    getViewFromPath(
+      typeof window !== "undefined" ? window.location.pathname : "/",
+    ),
+  );
 
-  const [installationInputMode, setInstallationInputMode] = useState('combined')
-  const [monthlyBillInput, setMonthlyBillInput] = useState('250000')
-  const [billConsumptionInput, setBillConsumptionInput] = useState('900')
-  const [zone, setZone] = useState('centro')
-  const [profile, setProfile] = useState('outside')
+  const [installationInputMode, setInstallationInputMode] =
+    useState("combined");
+  const [monthlyBillInput, setMonthlyBillInput] = useState("250000");
+  const [billConsumptionInput, setBillConsumptionInput] = useState("900");
+  const [installationRegion, setInstallationRegion] = useState("metropolitana");
+  const [installationCommune, setInstallationCommune] = useState("colina");
+  const [installationStep, setInstallationStep] = useState(1);
+  const [expandedInstallationOffer, setExpandedInstallationOffer] =
+    useState("huaweiNoBattery");
+  const [selectedInstallationOffer, setSelectedInstallationOffer] =
+    useState("");
+  const [profile, setProfile] = useState("outside");
 
-  const [maintenanceSystemSizeInput, setMaintenanceSystemSizeInput] = useState('8')
-  const [maintenanceMonthlySavingsInput, setMaintenanceMonthlySavingsInput] = useState('120000')
-  const [maintenanceRegion, setMaintenanceRegion] = useState('metropolitana')
-  const [maintenanceCommune, setMaintenanceCommune] = useState('colina')
-  const [maintenanceVisitsPerYear, setMaintenanceVisitsPerYear] = useState(1)
+  const [maintenanceSystemSizeInput, setMaintenanceSystemSizeInput] =
+    useState("8");
+  const [maintenanceMonthlySavingsInput, setMaintenanceMonthlySavingsInput] =
+    useState("120000");
+  const [maintenanceRegion, setMaintenanceRegion] = useState("metropolitana");
+  const [maintenanceCommune, setMaintenanceCommune] = useState("colina");
+  const [maintenanceVisitsPerYear, setMaintenanceVisitsPerYear] = useState(1);
+  const [maintenanceStep, setMaintenanceStep] = useState(1);
 
-  const [logoHidden, setLogoHidden] = useState(false)
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [message, setMessage] = useState('')
+  const [logoHidden, setLogoHidden] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
 
-  const selectedProfile = profileMap[profile]
-  const selectedMaintenanceRegion = maintenanceRegionData[maintenanceRegion] || maintenanceRegionData.metropolitana
+  const selectedProfile = profileMap[profile];
+  const selectedInstallationRegion =
+    maintenanceRegionData[installationRegion] ||
+    maintenanceRegionData.metropolitana;
+  const installationCommuneOptions = useMemo(
+    () =>
+      Object.entries(selectedInstallationRegion.communes)
+        .map(([value, config]) => ({ value, label: config.label }))
+        .sort((a, b) => a.label.localeCompare(b.label, "es")),
+    [selectedInstallationRegion],
+  );
+  const fallbackInstallationCommuneKey =
+    installationCommuneOptions[0]?.value || "colina";
+  const selectedInstallationCommune =
+    selectedInstallationRegion.communes[installationCommune] ||
+    selectedInstallationRegion.communes[fallbackInstallationCommuneKey];
+  const installationZone = getZoneFromRegion(installationRegion);
+  const installationLogisticsMetrics = useMemo(
+    () => getInstallationProjectLogistics(selectedInstallationCommune),
+    [selectedInstallationCommune],
+  );
+
+  const selectedMaintenanceRegion =
+    maintenanceRegionData[maintenanceRegion] ||
+    maintenanceRegionData.metropolitana;
   const maintenanceCommuneOptions = useMemo(
     () =>
       Object.entries(selectedMaintenanceRegion.communes)
         .map(([value, config]) => ({ value, label: config.label }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'es')),
-    [selectedMaintenanceRegion]
-  )
-  const fallbackMaintenanceCommuneKey = maintenanceCommuneOptions[0]?.value || 'colina'
+        .sort((a, b) => a.label.localeCompare(b.label, "es")),
+    [selectedMaintenanceRegion],
+  );
+  const fallbackMaintenanceCommuneKey =
+    maintenanceCommuneOptions[0]?.value || "colina";
   const selectedMaintenanceCommune =
     selectedMaintenanceRegion.communes[maintenanceCommune] ||
-    selectedMaintenanceRegion.communes[fallbackMaintenanceCommuneKey]
+    selectedMaintenanceRegion.communes[fallbackMaintenanceCommuneKey];
 
-  const maintenanceSystemSize = Number(maintenanceSystemSizeInput || 0)
-  const maintenanceMonthlySavings = Number(maintenanceMonthlySavingsInput || 0)
+  const maintenanceSystemSize = Number(maintenanceSystemSizeInput || 0);
+  const maintenanceMonthlySavings = Number(maintenanceMonthlySavingsInput || 0);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined
+    if (typeof window === "undefined") return undefined;
 
     const handlePopState = () => {
-      setActiveView(getViewFromPath(window.location.pathname))
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
+      setActiveView(getViewFromPath(window.location.pathname));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
 
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return;
 
-    const seoConfig = getSeoConfig(activeView, window.location.origin || SITE_FALLBACK_URL)
+    const seoConfig = getSeoConfig(
+      activeView,
+      window.location.origin || SITE_FALLBACK_URL,
+    );
 
-    document.title = seoConfig.title
-    ensureMetaTag('name', 'description', seoConfig.description)
-    ensureMetaTag('name', 'robots', 'index, follow, max-image-preview:large')
-    ensureMetaTag('property', 'og:type', 'website')
-    ensureMetaTag('property', 'og:locale', 'es_CL')
-    ensureMetaTag('property', 'og:site_name', 'Sakiara')
-    ensureMetaTag('property', 'og:title', seoConfig.title)
-    ensureMetaTag('property', 'og:description', seoConfig.description)
-    ensureMetaTag('property', 'og:url', seoConfig.canonical)
-    ensureMetaTag('property', 'og:image', seoConfig.image)
-    ensureMetaTag('name', 'twitter:card', 'summary_large_image')
-    ensureMetaTag('name', 'twitter:title', seoConfig.title)
-    ensureMetaTag('name', 'twitter:description', seoConfig.description)
-    ensureMetaTag('name', 'twitter:image', seoConfig.image)
-    ensureLinkTag('canonical', seoConfig.canonical)
-    ensureJsonLdScript('sakiara-structured-data', seoConfig.structuredData)
+    document.title = seoConfig.title;
+    ensureMetaTag("name", "description", seoConfig.description);
+    ensureMetaTag("name", "robots", "index, follow, max-image-preview:large");
+    ensureMetaTag("property", "og:type", "website");
+    ensureMetaTag("property", "og:locale", "es_CL");
+    ensureMetaTag("property", "og:site_name", "Sakiara");
+    ensureMetaTag("property", "og:title", seoConfig.title);
+    ensureMetaTag("property", "og:description", seoConfig.description);
+    ensureMetaTag("property", "og:url", seoConfig.canonical);
+    ensureMetaTag("property", "og:image", seoConfig.image);
+    ensureMetaTag("name", "twitter:card", "summary_large_image");
+    ensureMetaTag("name", "twitter:title", seoConfig.title);
+    ensureMetaTag("name", "twitter:description", seoConfig.description);
+    ensureMetaTag("name", "twitter:image", seoConfig.image);
+    ensureLinkTag("canonical", seoConfig.canonical);
+    ensureJsonLdScript("sakiara-structured-data", seoConfig.structuredData);
 
-    const desiredPath = seoConfig.path
+    const desiredPath = seoConfig.path;
     if (window.location.pathname !== desiredPath) {
-      window.history.replaceState({ view: activeView }, '', desiredPath)
+      window.history.replaceState({ view: activeView }, "", desiredPath);
     }
-  }, [activeView])
-
+  }, [activeView]);
 
   const installationMetrics = useMemo(() => {
-    const vatMultiplier = 1.19
-    const fixedCertSec = 500000
-    const fixedLogistics = 500000
-    const moduleSellPerPanel = 88456.44
-    const structurePerPanel = 4514.43
-    const ccPerPanel = 22089.34
-    const laborPerPanel = 56023.57
+    const vatMultiplier = 1.19;
+    const fixedCertSec = 500000;
+    const fixedLogistics = installationLogisticsMetrics.logisticsTotal;
+    const moduleSellPerPanel = 88456.44;
+    const structurePerPanel = 4514.43;
+    const ccPerPanel = 22089.34;
+    const laborPerPanel = 56023.57;
 
-    const huaweiBatteryPackGross = 4000000
-    const solisBatteryPackGross = 2000000
+    const huaweiBatteryPackGross = 4000000;
+    const solisBatteryPackGross = 2000000;
 
     const huaweiTiers = [
       { maxPanels: 6, inverter: 460000, ac: 255000, ccBoard: 0 },
@@ -608,7 +835,7 @@ export default function SakiaraLandingPage() {
       { maxPanels: 20, inverter: 980000, ac: 492104.58, ccBoard: 113352.94 },
       { maxPanels: 24, inverter: 1080000, ac: 548000, ccBoard: 113352.94 },
       { maxPanels: 30, inverter: 1220000, ac: 618000, ccBoard: 154000 },
-    ]
+    ];
 
     const solisTiers = [
       { maxPanels: 6, inverter: 760000, ac: 255000, ccBoard: 0 },
@@ -617,101 +844,144 @@ export default function SakiaraLandingPage() {
       { maxPanels: 20, inverter: 1500000, ac: 492104.58, ccBoard: 113352.94 },
       { maxPanels: 24, inverter: 1620000, ac: 548000, ccBoard: 113352.94 },
       { maxPanels: 30, inverter: 1780000, ac: 618000, ccBoard: 154000 },
-    ]
+    ];
 
     const getTier = (tiers, panels) =>
-      tiers.find((tier) => panels <= tier.maxPanels) || tiers[tiers.length - 1]
+      tiers.find((tier) => panels <= tier.maxPanels) || tiers[tiers.length - 1];
 
-    const enteredMonthlyBill = Number(monthlyBillInput || 0)
-    const enteredMonthlyConsumptionKWh = Number(billConsumptionInput || 0)
-    const hasBill = enteredMonthlyBill > 0
-    const hasConsumption = enteredMonthlyConsumptionKWh > 0
+    const enteredMonthlyBill = Number(monthlyBillInput || 0);
+    const enteredMonthlyConsumptionKWh = Number(billConsumptionInput || 0);
+    const hasBill = enteredMonthlyBill > 0;
+    const hasConsumption = enteredMonthlyConsumptionKWh > 0;
 
-    let normalizedMonthlyBill = enteredMonthlyBill
-    let monthlyConsumptionKWh = enteredMonthlyConsumptionKWh
-    let derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH
-    let modeSummaryLabel = installationInputModeOptions[installationInputMode].label
-    let modeSummaryHint = installationInputModeOptions[installationInputMode].helper
+    let normalizedMonthlyBill = enteredMonthlyBill;
+    let monthlyConsumptionKWh = enteredMonthlyConsumptionKWh;
+    let derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH;
+    let modeSummaryLabel =
+      installationInputModeOptions[installationInputMode].label;
+    let modeSummaryHint =
+      installationInputModeOptions[installationInputMode].helper;
 
-    if (installationInputMode === 'bill') {
-      normalizedMonthlyBill = hasBill ? enteredMonthlyBill : 250000
-      monthlyConsumptionKWh = Math.max(normalizedMonthlyBill / REFERENCE_TARIFF_CLP_PER_KWH, 1)
-      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH
+    if (installationInputMode === "bill") {
+      normalizedMonthlyBill = hasBill ? enteredMonthlyBill : 250000;
+      monthlyConsumptionKWh = Math.max(
+        normalizedMonthlyBill / REFERENCE_TARIFF_CLP_PER_KWH,
+        1,
+      );
+      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH;
       if (!hasBill) {
-        modeSummaryHint = 'Ingresa el valor de tu boleta y estimaremos el consumo con una tarifa referencial.'
+        modeSummaryHint =
+          "Ingresa el valor de tu boleta y estimaremos el consumo con una tarifa referencial.";
       }
-    } else if (installationInputMode === 'consumption') {
-      monthlyConsumptionKWh = hasConsumption ? enteredMonthlyConsumptionKWh : 900
-      normalizedMonthlyBill = monthlyConsumptionKWh * REFERENCE_TARIFF_CLP_PER_KWH
-      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH
+    } else if (installationInputMode === "consumption") {
+      monthlyConsumptionKWh = hasConsumption
+        ? enteredMonthlyConsumptionKWh
+        : 900;
+      normalizedMonthlyBill =
+        monthlyConsumptionKWh * REFERENCE_TARIFF_CLP_PER_KWH;
+      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH;
       if (!hasConsumption) {
-        modeSummaryHint = 'Ingresa tu consumo mensual y estimaremos una boleta referencial para proyectar la inversión.'
+        modeSummaryHint =
+          "Ingresa tu consumo mensual y estimaremos una boleta referencial para proyectar la inversión.";
       }
     } else if (hasBill && hasConsumption) {
-      normalizedMonthlyBill = enteredMonthlyBill
-      monthlyConsumptionKWh = enteredMonthlyConsumptionKWh
-      derivedTariff = normalizedMonthlyBill / Math.max(monthlyConsumptionKWh, 1)
+      normalizedMonthlyBill = enteredMonthlyBill;
+      monthlyConsumptionKWh = enteredMonthlyConsumptionKWh;
+      derivedTariff =
+        normalizedMonthlyBill / Math.max(monthlyConsumptionKWh, 1);
     } else if (hasBill) {
-      normalizedMonthlyBill = enteredMonthlyBill
-      monthlyConsumptionKWh = Math.max(normalizedMonthlyBill / REFERENCE_TARIFF_CLP_PER_KWH, 1)
-      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH
-      modeSummaryHint = 'Se completó el cálculo con una tarifa referencial, porque solo se ingresó la boleta.'
+      normalizedMonthlyBill = enteredMonthlyBill;
+      monthlyConsumptionKWh = Math.max(
+        normalizedMonthlyBill / REFERENCE_TARIFF_CLP_PER_KWH,
+        1,
+      );
+      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH;
+      modeSummaryHint =
+        "Se completó el cálculo con una tarifa referencial, porque solo se ingresó la boleta.";
     } else if (hasConsumption) {
-      monthlyConsumptionKWh = enteredMonthlyConsumptionKWh
-      normalizedMonthlyBill = monthlyConsumptionKWh * REFERENCE_TARIFF_CLP_PER_KWH
-      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH
-      modeSummaryHint = 'Se completó el cálculo con una tarifa referencial, porque solo se ingresó el consumo.'
+      monthlyConsumptionKWh = enteredMonthlyConsumptionKWh;
+      normalizedMonthlyBill =
+        monthlyConsumptionKWh * REFERENCE_TARIFF_CLP_PER_KWH;
+      derivedTariff = REFERENCE_TARIFF_CLP_PER_KWH;
+      modeSummaryHint =
+        "Se completó el cálculo con una tarifa referencial, porque solo se ingresó el consumo.";
     } else {
-      normalizedMonthlyBill = 250000
-      monthlyConsumptionKWh = 900
-      derivedTariff = normalizedMonthlyBill / monthlyConsumptionKWh
-      modeSummaryHint = 'Puedes cotizar con tu boleta, con tu consumo o con ambos datos.'
+      normalizedMonthlyBill = 250000;
+      monthlyConsumptionKWh = 900;
+      derivedTariff = normalizedMonthlyBill / monthlyConsumptionKWh;
+      modeSummaryHint =
+        "Puedes cotizar con tu boleta, con tu consumo o con ambos datos.";
     }
 
-    const exportRate = derivedTariff * 0.55
-    const productionFactor = zoneProduction[zone]
+    const exportRate = derivedTariff * 0.55;
+    const productionFactor = zoneProduction[installationZone];
 
     const dayEquivalentUse =
       selectedProfile.day +
       selectedProfile.morning * 0.35 +
-      selectedProfile.night * 0.08
+      selectedProfile.night * 0.08;
 
-    const recommendedCoverage = clamp(0.76 + dayEquivalentUse * 0.0022, 0.78, 0.96)
+    const recommendedCoverage = clamp(
+      0.76 + dayEquivalentUse * 0.0022,
+      0.78,
+      0.96,
+    );
 
     const systemSizeKwp = clamp(
-      (monthlyConsumptionKWh / Math.max(productionFactor, 1)) * recommendedCoverage,
+      (monthlyConsumptionKWh / Math.max(productionFactor, 1)) *
+        recommendedCoverage,
       2.2,
-      18
-    )
+      18,
+    );
 
-    const estimatedPanels = Math.max(4, Math.round(systemSizeKwp / PANEL_POWER_KW))
-    const huaweiTier = getTier(huaweiTiers, estimatedPanels)
-    const solisTier = getTier(solisTiers, estimatedPanels)
+    const estimatedPanels = Math.max(
+      4,
+      Math.round(systemSizeKwp / PANEL_POWER_KW),
+    );
+    const huaweiTier = getTier(huaweiTiers, estimatedPanels);
+    const solisTier = getTier(solisTiers, estimatedPanels);
 
-    const selfConsumptionNoBatteryRate = clamp(0.48 + dayEquivalentUse * 0.0068, 0.58, 0.84)
-    const selfConsumptionWithBatteryRate = clamp(selfConsumptionNoBatteryRate + 0.18, 0.72, 0.97)
+    const selfConsumptionNoBatteryRate = clamp(
+      0.48 + dayEquivalentUse * 0.0068,
+      0.58,
+      0.84,
+    );
+    const selfConsumptionWithBatteryRate = clamp(
+      selfConsumptionNoBatteryRate + 0.18,
+      0.72,
+      0.97,
+    );
 
-    const monthlyGenerationKWh = systemSizeKwp * productionFactor
+    const monthlyGenerationKWh = systemSizeKwp * productionFactor;
 
     const selfConsumedNoBattery = Math.min(
       monthlyGenerationKWh * selfConsumptionNoBatteryRate,
-      monthlyConsumptionKWh
-    )
-    const exportedNoBattery = Math.max(monthlyGenerationKWh - selfConsumedNoBattery, 0)
-    const selfConsumptionValueNoBattery = selfConsumedNoBattery * derivedTariff
-    const injectionCreditNoBattery = exportedNoBattery * exportRate
-    const monthlySavingsNoBattery = selfConsumptionValueNoBattery + injectionCreditNoBattery
-    const annualSavingsNoBattery = monthlySavingsNoBattery * 12
+      monthlyConsumptionKWh,
+    );
+    const exportedNoBattery = Math.max(
+      monthlyGenerationKWh - selfConsumedNoBattery,
+      0,
+    );
+    const selfConsumptionValueNoBattery = selfConsumedNoBattery * derivedTariff;
+    const injectionCreditNoBattery = exportedNoBattery * exportRate;
+    const monthlySavingsNoBattery =
+      selfConsumptionValueNoBattery + injectionCreditNoBattery;
+    const annualSavingsNoBattery = monthlySavingsNoBattery * 12;
 
     const selfConsumedWithBattery = Math.min(
       monthlyGenerationKWh * selfConsumptionWithBatteryRate,
-      monthlyConsumptionKWh
-    )
-    const exportedWithBattery = Math.max(monthlyGenerationKWh - selfConsumedWithBattery, 0)
-    const selfConsumptionValueWithBattery = selfConsumedWithBattery * derivedTariff
-    const injectionCreditWithBattery = exportedWithBattery * exportRate
-    const monthlySavingsWithBattery = selfConsumptionValueWithBattery + injectionCreditWithBattery
-    const annualSavingsWithBattery = monthlySavingsWithBattery * 12
+      monthlyConsumptionKWh,
+    );
+    const exportedWithBattery = Math.max(
+      monthlyGenerationKWh - selfConsumedWithBattery,
+      0,
+    );
+    const selfConsumptionValueWithBattery =
+      selfConsumedWithBattery * derivedTariff;
+    const injectionCreditWithBattery = exportedWithBattery * exportRate;
+    const monthlySavingsWithBattery =
+      selfConsumptionValueWithBattery + injectionCreditWithBattery;
+    const annualSavingsWithBattery = monthlySavingsWithBattery * 12;
 
     const commonBaseNet =
       estimatedPanels * moduleSellPerPanel +
@@ -719,28 +989,37 @@ export default function SakiaraLandingPage() {
       estimatedPanels * ccPerPanel +
       estimatedPanels * laborPerPanel +
       fixedCertSec +
-      fixedLogistics
+      fixedLogistics;
 
     const projectCostHuaweiNoBatteryGross =
-      (commonBaseNet + huaweiTier.inverter + huaweiTier.ac + huaweiTier.ccBoard) * vatMultiplier
+      (commonBaseNet +
+        huaweiTier.inverter +
+        huaweiTier.ac +
+        huaweiTier.ccBoard) *
+      vatMultiplier;
     const projectCostSolisNoBatteryGross =
-      (commonBaseNet + solisTier.inverter + solisTier.ac + solisTier.ccBoard) * vatMultiplier
+      (commonBaseNet + solisTier.inverter + solisTier.ac + solisTier.ccBoard) *
+      vatMultiplier;
 
     const projectCostHuaweiWithBatteryGross =
-      projectCostHuaweiNoBatteryGross + huaweiBatteryPackGross
+      projectCostHuaweiNoBatteryGross + huaweiBatteryPackGross;
     const projectCostSolisWithBatteryGross =
-      projectCostSolisNoBatteryGross + solisBatteryPackGross
+      projectCostSolisNoBatteryGross + solisBatteryPackGross;
 
     const compensationNoBattery = clamp(
       (monthlySavingsNoBattery / Math.max(normalizedMonthlyBill, 1)) * 100,
       0,
-      100
-    )
+      100,
+    );
     const compensationWithBattery = clamp(
       (monthlySavingsWithBattery / Math.max(normalizedMonthlyBill, 1)) * 100,
       0,
-      100
-    )
+      100,
+    );
+
+    const projectExecutionNote = installationLogisticsMetrics.isRemoteProject
+      ? "La propuesta considera condiciones base de ejecución con permanencia operativa referencial y puede ajustarse según evaluación técnica."
+      : "La propuesta considera condiciones base de ejecución y puede ajustarse según evaluación técnica.";
 
     return {
       monthlyBill: normalizedMonthlyBill,
@@ -763,47 +1042,71 @@ export default function SakiaraLandingPage() {
       paybackHuaweiNoBattery:
         projectCostHuaweiNoBatteryGross / Math.max(annualSavingsNoBattery, 1),
       paybackHuaweiWithBattery:
-        projectCostHuaweiWithBatteryGross / Math.max(annualSavingsWithBattery, 1),
+        projectCostHuaweiWithBatteryGross /
+        Math.max(annualSavingsWithBattery, 1),
       paybackSolisNoBattery:
         projectCostSolisNoBatteryGross / Math.max(annualSavingsNoBattery, 1),
       paybackSolisWithBattery:
-        projectCostSolisWithBatteryGross / Math.max(annualSavingsWithBattery, 1),
-    }
-  }, [installationInputMode, monthlyBillInput, billConsumptionInput, zone, selectedProfile])
+        projectCostSolisWithBatteryGross /
+        Math.max(annualSavingsWithBattery, 1),
+      locationLabel: `${selectedInstallationRegion.label} · ${selectedInstallationCommune.label}`,
+      productionZone: installationZone,
+      logisticsTotal: installationLogisticsMetrics.logisticsTotal,
+      projectExecutionNote,
+    };
+  }, [
+    installationInputMode,
+    monthlyBillInput,
+    billConsumptionInput,
+    installationZone,
+    selectedProfile,
+    installationLogisticsMetrics,
+    selectedInstallationRegion.label,
+    selectedInstallationCommune.label,
+  ]);
 
   const maintenanceMetrics = useMemo(() => {
-    const annualSavings = Math.max(maintenanceMonthlySavings, 0) * 12
-    const safeBudget = annualSavings * 0.2
-    const protectedValueObjective = annualSavings * 0.3
+    const annualSavings = Math.max(maintenanceMonthlySavings, 0) * 12;
+    const safeBudget = annualSavings * 0.2;
+    const protectedValueObjective = annualSavings * 0.3;
 
     const baseVisitCost =
       maintenanceSystemSize <= 8
         ? 150000
-        : 150000 + Math.max(0, maintenanceSystemSize - 8) * 18000
+        : 150000 + Math.max(0, maintenanceSystemSize - 8) * 18000;
 
-    const roundTripKm = selectedMaintenanceCommune.roundTripKm
+    const roundTripKm = selectedMaintenanceCommune.roundTripKm;
     const variableMobilityCostPerKm =
-      REFERENCE_FUEL_PRICE_CLP_PER_L / VEHICLE_EFFICIENCY_KM_PER_L + VEHICLE_WEAR_CLP_PER_KM
+      REFERENCE_FUEL_PRICE_CLP_PER_L / VEHICLE_EFFICIENCY_KM_PER_L +
+      VEHICLE_WEAR_CLP_PER_KM;
     const internalTravelEstimate =
-      roundTripKm * variableMobilityCostPerKm + selectedMaintenanceCommune.tolls
+      roundTripKm * variableMobilityCostPerKm +
+      selectedMaintenanceCommune.tolls;
 
-    const travelBlocks = Math.floor(Math.max(roundTripKm, 0) / TRAVEL_BLOCK_KM)
-    const commercialTravelFee = BASE_TRAVEL_FEE + travelBlocks * TRAVEL_BLOCK_FEE
-    const logisticsPerVisit = Math.max(internalTravelEstimate, commercialTravelFee)
+    const travelBlocks = Math.floor(Math.max(roundTripKm, 0) / TRAVEL_BLOCK_KM);
+    const commercialTravelFee =
+      BASE_TRAVEL_FEE + travelBlocks * TRAVEL_BLOCK_FEE;
+    const logisticsPerVisit = Math.max(
+      internalTravelEstimate,
+      commercialTravelFee,
+    );
 
-    const visitCost = baseVisitCost + logisticsPerVisit
-    const annualPlanCost = visitCost * Math.max(maintenanceVisitsPerYear, 1)
-    const minimumMonthlySavingsForRule = annualPlanCost / 12 / 0.2
-    const annualCoverageRatio = annualSavings / Math.max(annualPlanCost, 1)
-    const safeMargin = safeBudget - annualPlanCost
-    const protectedMargin = protectedValueObjective - annualPlanCost
+    const visitCost = baseVisitCost + logisticsPerVisit;
+    const annualPlanCost = visitCost * Math.max(maintenanceVisitsPerYear, 1);
+    const minimumMonthlySavingsForRule = annualPlanCost / 12 / 0.2;
+    const annualCoverageRatio = annualSavings / Math.max(annualPlanCost, 1);
+    const safeMargin = safeBudget - annualPlanCost;
+    const protectedMargin = protectedValueObjective - annualPlanCost;
 
-    let status = 'Recomendable'
-    if (annualPlanCost > safeBudget && annualPlanCost <= protectedValueObjective) {
-      status = 'Requiere revisión'
+    let status = "Recomendable";
+    if (
+      annualPlanCost > safeBudget &&
+      annualPlanCost <= protectedValueObjective
+    ) {
+      status = "Requiere revisión";
     }
     if (annualPlanCost > protectedValueObjective) {
-      status = 'Evaluación personalizada'
+      status = "Evaluación personalizada";
     }
 
     return {
@@ -824,122 +1127,256 @@ export default function SakiaraLandingPage() {
       safeMargin,
       protectedMargin,
       status,
-    }
+    };
   }, [
     maintenanceMonthlySavings,
     maintenanceSystemSize,
     maintenanceVisitsPerYear,
     selectedMaintenanceCommune,
-  ])
+  ]);
 
   const goToView = (view) => {
-    setActiveView(view)
+    setActiveView(view);
 
-    if (typeof window !== 'undefined') {
-      const nextPath = viewPathMap[view] || '/'
+    if (typeof window !== "undefined") {
+      const nextPath = viewPathMap[view] || "/";
       if (window.location.pathname !== nextPath) {
-        window.history.pushState({ view }, '', nextPath)
+        window.history.pushState({ view }, "", nextPath);
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }
+  };
 
-  const getInstallationSummaryItems = () => [
-    { label: 'Servicio', value: 'Cotización de instalación fotovoltaica' },
-    { label: 'Modalidad', value: installationMetrics.modeSummaryLabel },
-    { label: 'Monto boleta', value: formatCLP(installationMetrics.monthlyBill) },
-    {
-      label: 'Consumo mensual',
-      value: `${formatNumber(installationMetrics.monthlyConsumptionKWh)} kWh/mes`,
-    },
-    { label: 'Zona', value: zone },
-    { label: 'Perfil', value: selectedProfile.label },
-    {
-      label: 'Proyecto sugerido',
-      value: `${formatNumber(installationMetrics.estimatedPanels)} paneles Trina Solar 585 W`,
-    },
-    { label: 'Huawei sin batería', value: formatCLP(installationMetrics.projectCostHuaweiNoBattery) },
-    { label: 'Solis sin batería', value: formatCLP(installationMetrics.projectCostSolisNoBattery) },
-    {
-      label: 'Huawei con batería LUNA',
-      value: formatCLP(installationMetrics.projectCostHuaweiWithBattery),
-    },
-    { label: 'Solis con batería', value: formatCLP(installationMetrics.projectCostSolisWithBattery) },
-  ]
+  const getInstallationSummaryItems = () => {
+    const selectedOfferItems = selectedInstallationOfferData
+      ? [
+          { label: "Alternativa seleccionada", value: selectedInstallationOfferData.title },
+          { label: "Inversión referencial", value: selectedInstallationOfferData.price },
+          { label: "Ahorro estimado", value: selectedInstallationOfferData.savings },
+          {
+            label: "Compensación de la cuenta",
+            value: selectedInstallationOfferData.compensation,
+          },
+          { label: "Retorno estimado", value: selectedInstallationOfferData.payback },
+        ]
+      : [{ label: "Alternativa seleccionada", value: "Pendiente de selección" }];
+
+    return [
+      { label: "Servicio", value: "Cotización de instalación fotovoltaica" },
+      { label: "Modalidad", value: installationMetrics.modeSummaryLabel },
+      {
+        label: "Monto boleta",
+        value: formatCLP(installationMetrics.monthlyBill),
+      },
+      {
+        label: "Consumo mensual",
+        value: `${formatNumber(installationMetrics.monthlyConsumptionKWh)} kWh/mes`,
+      },
+      { label: "Ubicación", value: installationMetrics.locationLabel },
+      { label: "Perfil", value: selectedProfile.label },
+      {
+        label: "Proyecto sugerido",
+        value: `${formatNumber(installationMetrics.estimatedPanels)} paneles referenciales`,
+      },
+      ...selectedOfferItems,
+    ];
+  };
 
   const getMaintenanceSummaryItems = () => [
-    { label: 'Servicio', value: 'Cotización de mantenimiento fotovoltaico' },
-    { label: 'Potencia del sistema en kW', value: `${formatNumber(maintenanceSystemSize, 1)} kW` },
-    { label: 'Ahorro mensual actual en pesos', value: formatCLP(maintenanceMonthlySavings) },
-    { label: 'Región', value: selectedMaintenanceRegion.label },
-    { label: 'Comuna', value: selectedMaintenanceCommune.label },
-    { label: 'Visitas por año', value: formatNumber(maintenanceVisitsPerYear) },
-    { label: 'Valor por visita', value: formatCLP(maintenanceMetrics.visitCost) },
-    { label: 'Costo anual del plan', value: formatCLP(maintenanceMetrics.annualPlanCost) },
+    { label: "Servicio", value: "Cotización de mantenimiento fotovoltaico" },
     {
-      label: 'Presupuesto recomendado de mantención',
+      label: "Potencia del sistema en kW",
+      value: `${formatNumber(maintenanceSystemSize, 1)} kW`,
+    },
+    {
+      label: "Ahorro mensual actual en pesos",
+      value: formatCLP(maintenanceMonthlySavings),
+    },
+    { label: "Región", value: selectedMaintenanceRegion.label },
+    { label: "Comuna", value: selectedMaintenanceCommune.label },
+    { label: "Visitas por año", value: formatNumber(maintenanceVisitsPerYear) },
+    {
+      label: "Valor por visita",
+      value: formatCLP(maintenanceMetrics.visitCost),
+    },
+    {
+      label: "Costo anual del plan",
+      value: formatCLP(maintenanceMetrics.annualPlanCost),
+    },
+    {
+      label: "Presupuesto recomendado de mantención",
       value: formatCLP(maintenanceMetrics.safeBudget),
     },
-    { label: 'Resultado', value: maintenanceMetrics.status },
-  ]
+    { label: "Resultado", value: maintenanceMetrics.status },
+  ];
 
   const buildInstallationSummaryText = () =>
     getInstallationSummaryItems()
       .map((item) => `${item.label}: ${item.value}`)
-      .join('\n')
+      .join("\n");
 
   const buildMaintenanceSummaryText = () =>
     getMaintenanceSummaryItems()
       .map((item) => `${item.label}: ${item.value}`)
-      .join('\n')
+      .join("\n");
 
   const getSummaryItems = () =>
-    activeView === 'mantenimiento' ? getMaintenanceSummaryItems() : getInstallationSummaryItems()
+    activeView === "mantenimiento"
+      ? getMaintenanceSummaryItems()
+      : getInstallationSummaryItems();
 
   const buildSummaryText = () =>
     getSummaryItems()
       .map((item) => `${item.label}: ${item.value}`)
-      .join('\n')
+      .join("\n");
 
   const handleWhatsApp = () => {
     const intro =
-      activeView === 'mantenimiento'
-        ? 'Hola, quiero una evaluación personalizada para mantenimiento fotovoltaico.'
-        : 'Hola, quiero una evaluación personalizada para un proyecto solar.'
+      activeView === "mantenimiento"
+        ? "Hola, quiero evaluar el mantenimiento de mi sistema fotovoltaico."
+        : "Hola, quiero cotizar un proyecto fotovoltaico para mi propiedad.";
 
     const text = encodeURIComponent(
-      `${intro}\n\n${buildSummaryText()}\n\nNombre: ${name || '-'}\nTeléfono: ${phone || '-'}\nCorreo: ${email || '-'}\n\nMensaje: ${message || '-'}`
-    )
-    window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank')
-  }
+      `${intro}\n\n${buildSummaryText()}\n\nNombre: ${name || "-"}\nTeléfono: ${phone || "-"}\nCorreo: ${email || "-"}\n\nMensaje: ${message || "-"}`,
+    );
+    window.open(`https://wa.me/${whatsappNumber}?text=${text}`, "_blank");
+  };
 
   const scrollToSection = (sectionId) => {
-    if (typeof document === 'undefined') return
+    if (typeof document === "undefined") return;
 
-    const target = document.getElementById(sectionId)
+    const target = document.getElementById(sectionId);
     if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }
+  };
 
   const handleFloatingQuote = () => {
-    if (activeView === 'home') {
-      goToView('instalacion')
-      return
+    if (activeView === "home") {
+      goToView("instalacion");
+      return;
     }
 
-    scrollToSection('contacto')
-  }
+    if (activeView === "instalacion") {
+      setInstallationStep(5);
+      scrollToSection("wizard-instalacion");
+      return;
+    }
 
-  const floatingQuoteLabel = activeView === 'home' ? 'Cotiza ahora' : 'Ir a cotización'
+    if (activeView === "mantenimiento") {
+      setMaintenanceStep(5);
+      scrollToSection("wizard-mantenimiento");
+      return;
+    }
+  };
+
+  const floatingQuoteLabel = "Cotiza ahora";
+
+  const installationSteps = [
+    { id: 1, title: "Modalidad", description: "Cómo quieres cotizar" },
+    {
+      id: 2,
+      title: "Ubicación",
+      description: "Dónde se desarrollará el proyecto",
+    },
+    {
+      id: 3,
+      title: "Perfil",
+      description: "Cómo se comporta el consumo del hogar",
+    },
+    {
+      id: 4,
+      title: "Resultado",
+      description: "Alternativas claras para comparar",
+    },
+    {
+      id: 5,
+      title: "Contacto",
+      description: "Solicita tu propuesta personalizada",
+    },
+  ];
+
+
+  const maintenanceSteps = [
+    { id: 1, title: "Sistema", description: "Datos base del sistema" },
+    { id: 2, title: "Ubicación", description: "Dónde se encuentra el proyecto" },
+    { id: 3, title: "Frecuencia", description: "Cada cuánto mantener el sistema" },
+    { id: 4, title: "Resultado", description: "Resumen claro del servicio" },
+    { id: 5, title: "Contacto", description: "Solicita tu evaluación personalizada" },
+  ];
+
+  const maintenanceNextLabel = "Siguiente";
+
+  const installationOfferOptions = [
+    {
+      key: "huaweiNoBattery",
+      title: "Huawei sin batería",
+      subtitle: "Alternativa premium base para una solución on-grid.",
+      badge: "Línea Huawei",
+      price: formatCLP(installationMetrics.projectCostHuaweiNoBattery),
+      savings: formatCLP(installationMetrics.monthlySavingsNoBattery),
+      compensation: `${formatNumber(installationMetrics.compensationNoBattery)}%`,
+      payback: `${formatNumber(installationMetrics.paybackHuaweiNoBattery, 1)} años`,
+      variant: "huawei",
+    },
+    {
+      key: "solisNoBattery",
+      title: "Solis sin batería",
+      subtitle:
+        "Alternativa eficiente para una solución on-grid con otra línea de inversor.",
+      badge: "Línea Solis",
+      price: formatCLP(installationMetrics.projectCostSolisNoBattery),
+      savings: formatCLP(installationMetrics.monthlySavingsNoBattery),
+      compensation: `${formatNumber(installationMetrics.compensationNoBattery)}%`,
+      payback: `${formatNumber(installationMetrics.paybackSolisNoBattery, 1)} años`,
+      variant: "solis",
+    },
+    {
+      key: "huaweiWithBattery",
+      title: "Huawei con batería LUNA",
+      subtitle:
+        "Alternativa híbrida para sumar respaldo y mayor aprovechamiento energético.",
+      badge: "Huawei híbrido",
+      price: formatCLP(installationMetrics.projectCostHuaweiWithBattery),
+      savings: formatCLP(installationMetrics.monthlySavingsWithBattery),
+      compensation: `${formatNumber(installationMetrics.compensationWithBattery)}%`,
+      payback: `${formatNumber(installationMetrics.paybackHuaweiWithBattery, 1)} años`,
+      variant: "hybrid",
+    },
+    {
+      key: "solisWithBattery",
+      title: "Solis con batería",
+      subtitle:
+        "Alternativa híbrida referencial para priorizar respaldo y continuidad operativa.",
+      badge: "Solis híbrido",
+      price: formatCLP(installationMetrics.projectCostSolisWithBattery),
+      savings: formatCLP(installationMetrics.monthlySavingsWithBattery),
+      compensation: `${formatNumber(installationMetrics.compensationWithBattery)}%`,
+      payback: `${formatNumber(installationMetrics.paybackSolisWithBattery, 1)} años`,
+      variant: "solis hybrid",
+    },
+  ];
+
+  const selectedInstallationOfferData =
+    installationOfferOptions.find(
+      (offer) => offer.key === selectedInstallationOffer,
+    ) || null;
+  const canProceedToContact =
+    installationStep !== 4 || Boolean(selectedInstallationOfferData);
+  const installationNextLabel = "Siguiente";
 
   const renderHomeView = () => (
     <>
       <section className="section-card">
         <div className="hero-copy">
-          <h1 className="title">Energía solar para instalar, optimizar y mantener.</h1>
+          <h1 className="title">
+            <span className="title-line">Convierte tu consumo</span>
+            <span className="title-line">de electricidad en una inversión</span>
+          </h1>
+          <p className="hero-slogan">Ejecutamos proyectos, desarrollamos inversiones.</p>
           <p className="text">
-            En Sakiara desarrollamos soluciones fotovoltaicas con foco en inversión, ahorro y continuidad operativa. Elige si deseas cotizar una instalación nueva o evaluar el mantenimiento de un sistema existente, con una experiencia clara y profesional desde el primer paso.
+            En Sakiara diseñamos y ejecutamos soluciones fotovoltaicas para quienes buscan reducir su gasto en electricidad,
+            proyectar mejor su inversión y avanzar con una evaluación clara, profesional y fácil de entender desde el primer paso.
           </p>
         </div>
 
@@ -947,17 +1384,25 @@ export default function SakiaraLandingPage() {
           <div className="service-card">
             <div>
               <div className="offer-badge">Instalación</div>
-              <h2 className="service-title">Cotizador de instalación fotovoltaica</h2>
+              <h2 className="service-title">
+                Cotizador de instalación fotovoltaica
+              </h2>
               <p className="service-text">
-                Estima una propuesta referencial para tu hogar en base a boleta, consumo o una combinación de ambos datos. Compara alternativas y conoce una inversión clara, ordenada y pensada para generar valor en el tiempo.
+                Evalúa una solución fotovoltaica según tu boleta, tu consumo o ambos datos.
+                Compara alternativas, conoce ahorro estimado y avanza con una
+                propuesta clara para tu proyecto.
               </p>
             </div>
             <div className="service-points">
-              <div>Propuesta referencial según tu consumo</div>
-              <div>Estimación de ahorro y compensación</div>
+              <div>Alternativas simples de comparar</div>
+              <div>Ahorro y retorno estimado</div>
               <div>Valores IVA incluido</div>
             </div>
-            <button className="btn-primary" type="button" onClick={() => goToView('instalacion')}>
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={() => goToView("instalacion")}
+            >
               Cotizar instalación
             </button>
           </div>
@@ -965,17 +1410,25 @@ export default function SakiaraLandingPage() {
           <div className="service-card highlighted">
             <div>
               <div className="offer-badge">Mantenimiento</div>
-              <h2 className="service-title">Plan de mantenimiento fotovoltaico</h2>
+              <h2 className="service-title">
+                Plan de mantenimiento fotovoltaico
+              </h2>
               <p className="service-text">
-                Evalúa un servicio de mantenimiento pensado para proteger el rendimiento, la seguridad y la continuidad operativa de tu sistema. Calculamos una propuesta referencial según ubicación y tamaño de la instalación.
+                Conoce una evaluación inicial para mantener tu sistema en buen estado,
+                proteger su rendimiento y tomar decisiones a tiempo según la
+                ubicación y el tamaño de la instalación.
               </p>
             </div>
             <div className="service-points">
               <div>Limpieza técnica de módulos</div>
               <div>Revisión general del sistema</div>
-              <div>Verificaciones eléctricas y de seguridad</div>
+              <div>Frecuencia sugerida según el caso</div>
             </div>
-            <button className="btn-primary" type="button" onClick={() => goToView('mantenimiento')}>
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={() => goToView("mantenimiento")}
+            >
               Evaluar mantenimiento
             </button>
           </div>
@@ -985,9 +1438,13 @@ export default function SakiaraLandingPage() {
       <section className="section-card" id="proyectos">
         <div className="section-head">
           <p className="eyebrow">Proyectos realizados</p>
-          <h2 className="section-title">Instalaciones reales desarrolladas por Sakiara</h2>
+          <h2 className="section-title">
+            Instalaciones reales desarrolladas por Sakiara
+          </h2>
           <p className="section-text">
-            Una muestra de proyectos fotovoltaicos ejecutados en distintos formatos, con soluciones pensadas para aprovechar mejor la energía solar y presentar una instalación limpia, ordenada y profesional.
+            Una muestra de proyectos fotovoltaicos ejecutados en distintos
+            formatos, con soluciones pensadas para aprovechar mejor la energía
+            solar y presentar una instalación limpia, ordenada y profesional.
           </p>
         </div>
 
@@ -995,7 +1452,11 @@ export default function SakiaraLandingPage() {
           {projectShowcase.map((project) => (
             <article key={project.title} className="project-card">
               <div className="project-image-wrap">
-                <img className="project-image" src={project.image} alt={`Proyecto fotovoltaico en ${project.title}`} />
+                <img
+                  className="project-image"
+                  src={project.image}
+                  alt={`Proyecto fotovoltaico en ${project.title}`}
+                />
               </div>
 
               <div className="project-body">
@@ -1020,7 +1481,11 @@ export default function SakiaraLandingPage() {
                   </div>
                 </div>
 
-                <button className="btn-primary project-btn" type="button" onClick={() => goToView('instalacion')}>
+                <button
+                  className="btn-primary project-btn"
+                  type="button"
+                  onClick={() => goToView("instalacion")}
+                >
                   Quiero una evaluación similar
                 </button>
               </div>
@@ -1032,548 +1497,963 @@ export default function SakiaraLandingPage() {
       <section className="section-card">
         <div className="mini-grid">
           <div className="mini-card">
-            <p className="mini-title">Claro</p>
+            <p className="mini-title">Ahorro</p>
             <div className="mini-text">
-              Una experiencia simple para comparar alternativas y avanzar con mayor claridad.
+              Una instalación bien dimensionada puede ayudarte a reducir tu gasto
+              en electricidad desde los primeros meses.
             </div>
           </div>
           <div className="mini-card">
-            <p className="mini-title">Comercial</p>
+            <p className="mini-title">Inversión</p>
             <div className="mini-text">
-              La información se presenta con foco en decisión, claridad y confianza.
+              Compara alternativas con una lectura clara para evaluar retorno,
+              proyección y conveniencia económica.
             </div>
           </div>
           <div className="mini-card">
-            <p className="mini-title">Técnico</p>
+            <p className="mini-title">Respaldo</p>
             <div className="mini-text">
-              El servicio comunica respaldo técnico sin sobrecargar con complejidad innecesaria.
+              Una buena instalación y un mantenimiento oportuno ayudan a cuidar
+              la producción y proteger tu inversión en el tiempo.
             </div>
           </div>
         </div>
 
         <div className="seo-copy-box">
-          <h2 className="seo-copy-title">Instalación y mantenimiento fotovoltaico en Chile</h2>
+          <h2 className="seo-copy-title">
+            Soluciones fotovoltaicas claras, profesionales y bien ejecutadas
+          </h2>
           <p className="seo-copy-text">
-            Sakiara acompaña proyectos de energía solar residencial con una propuesta clara para
-            cotizar sistemas fotovoltaicos y evaluar mantenimiento técnico según ubicación,
-            consumo, rendimiento y continuidad operativa. Atendemos la Región Metropolitana y
-            otras regiones de Chile con un enfoque profesional, cercano y orientado a proteger la
-            inversión en el tiempo.
+            En Sakiara puedes cotizar una instalación nueva o evaluar el mantenimiento
+            de un sistema existente con una experiencia pensada para clientes,
+            enfocada en claridad, ahorro, inversión y protección del rendimiento.
           </p>
         </div>
       </section>
     </>
-  )
+  );
 
   const renderInstallationView = () => (
     <>
-      <section className="section-card">
-        <div className="hero-copy">
+      <section className="section-card" id="wizard-instalacion">
+        <div className="section-head wizard-section-head compact">
           <div className="back-row">
-            <button className="btn-secondary" type="button" onClick={() => goToView('home')}>
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => goToView("home")}
+            >
               ← Volver al inicio
             </button>
           </div>
-          <h1 className="title">Energía solar residencial diseñada para generar valor.</h1>
-          <p className="text">
-            Desarrollamos propuestas solares residenciales con foco en inversión, ahorro y escalabilidad. Puedes cotizar con el valor de tu boleta, con tu consumo mensual o usar ambos datos para obtener una lectura más precisa del proyecto.
-          </p>
-          <div className="cta-row">
-            <a className="action-link primary" href="#contacto">Solicitar propuesta</a>
-            <a className="action-link secondary" href="#propuesta">Ver alternativas</a>
-            <button className="action-link secondary" type="button" onClick={() => {
-              setMaintenanceMonthlySavingsInput(String(Math.round(installationMetrics.monthlySavingsNoBattery)))
-              setMaintenanceSystemSizeInput(String(Number(installationMetrics.estimatedSystemSizeKwp.toFixed(1)) || installationMetrics.estimatedSystemSizeKwp))
-              goToView('mantenimiento')
-            }}>
-              Evaluar este ahorro en mantenimiento
+          <div className="wizard-topbar">
+            <div className="pill">Cotización de instalación</div>
+            <div className="pill">Paso {installationStep} de 5</div>
+          </div>
+        </div>
+
+        <div className="wizard-progress">
+          {installationSteps.map((step) => (
+            <button
+              key={step.id}
+              className={`wizard-step ${installationStep === step.id ? "active" : ""} ${installationStep > step.id ? "completed" : ""}`}
+              type="button"
+              onClick={() => setInstallationStep(step.id)}
+            >
+              <span className="wizard-step-index">{step.id}</span>
+              <span className="wizard-step-copy">
+                <strong>{step.title}</strong>
+                <small>{step.description}</small>
+              </span>
             </button>
-          </div>
+          ))}
         </div>
 
-        <div className="mini-grid">
-          <div className="mini-card">
-            <p className="mini-title">Inversión</p>
-            <div className="mini-text">
-              Valor total IVA incluido presentado de forma clara, profesional y orientada a una buena decisión.
-            </div>
-          </div>
-          <div className="mini-card">
-            <p className="mini-title">Ahorro</p>
-            <div className="mini-text">
-              Proyección mensual basada en la información disponible de tu boleta o consumo.
-            </div>
-          </div>
-          <div className="mini-card">
-            <p className="mini-title">Escalable</p>
-            <div className="mini-text">
-              Desde una solución base on-grid hasta una alternativa con batería para mayor autonomía.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-card">
-        <div className="section-head">
-          <p className="eyebrow">Calculadora comercial</p>
-          <h2 className="section-title">Cotiza con tu boleta, con tu consumo o con ambos</h2>
-          <p className="section-text">
-            Elige la modalidad que prefieras e ingresa solo la información disponible. Si cuentas con ambos datos, la opción combinada entrega una lectura más precisa del proyecto. La propuesta se calcula con paneles Trina Solar 585 W.
-          </p>
-          <div className="pill">Propuesta referencial</div>
-        </div>
-
-        <div className="mode-card">
-          <label className="label">¿Cómo quieres cotizar?</label>
-          <div className="mode-buttons">
-            {Object.entries(installationInputModeOptions).map(([value, option]) => (
-              <button
-                key={value}
-                className={`mode-btn ${installationInputMode === value ? 'active' : ''}`}
-                type="button"
-                onClick={() => setInstallationInputMode(value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <div className="hint">{installationInputModeOptions[installationInputMode].helper}</div>
-        </div>
-
-        <div className="fields-grid">
-          {installationInputMode !== 'consumption' && (
-            <div className="field">
-              <label className="label">Monto mensual aproximado</label>
-              <input
-                className="input"
-                type="text"
-                inputMode="numeric"
-                value={monthlyBillInput}
-                onChange={(e) => setMonthlyBillInput(sanitizeIntegerInput(e.target.value))}
-                placeholder="Ejemplo: 250000"
-              />
-              <div className="hint">Puedes ingresar solo el valor de tu boleta mensual.</div>
-            </div>
-          )}
-
-          {installationInputMode !== 'bill' && (
-            <div className="field">
-              <label className="label">Consumo mensual</label>
-              <input
-                className="input"
-                type="text"
-                inputMode="numeric"
-                value={billConsumptionInput}
-                onChange={(e) => setBillConsumptionInput(sanitizeIntegerInput(e.target.value))}
-                placeholder="Ejemplo: 900"
-              />
-              <div className="hint">Dato visible en la boleta, expresado en kWh por mes.</div>
-            </div>
-          )}
-
-          <div className="field">
-            <label className="label">Zona del proyecto</label>
-            <select className="select" value={zone} onChange={(e) => setZone(e.target.value)}>
-              <option value="norte">Norte</option>
-              <option value="centro">Centro</option>
-              <option value="sur">Sur</option>
-            </select>
-            <div className="hint">
-              Ajusta la producción referencial según la zona geográfica del proyecto.
-            </div>
-          </div>
-
-          <div className="profile-row">
-            <div className="profile-head">
-              <div>
-                <label className="label">Perfil del hogar</label>
-                <div className="hint">Selecciona el hábito de consumo que más se parezca a tu hogar.</div>
+        <div className="wizard-panel">
+          {installationStep === 1 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Elige cómo quieres cotizar</h3>
+                <p className="wizard-text">
+                  Puedes cotizar con tu boleta, con tu consumo o usar ambos
+                  datos para obtener una propuesta clara y fácil de comparar.
+                </p>
               </div>
 
-              <div className="profile-buttons">
+              <div className="mode-card">
+                <label className="label">¿Cómo quieres cotizar?</label>
+                <div className="mode-buttons">
+                  {Object.entries(installationInputModeOptions).map(
+                    ([value, option]) => (
+                      <button
+                        key={value}
+                        className={`mode-btn ${installationInputMode === value ? "active" : ""}`}
+                        type="button"
+                        onClick={() => setInstallationInputMode(value)}
+                      >
+                        {option.label}
+                      </button>
+                    ),
+                  )}
+                </div>
+                <div className="hint">
+                  {installationInputModeOptions[installationInputMode].helper}
+                </div>
+              </div>
+
+              <div className="fields-grid wizard-fields">
+                {installationInputMode !== "consumption" && (
+                  <div className="field">
+                    <label className="label">Monto mensual aproximado</label>
+                    <input
+                      className="input"
+                      type="text"
+                      inputMode="numeric"
+                      value={monthlyBillInput}
+                      onChange={(e) =>
+                        setMonthlyBillInput(
+                          sanitizeIntegerInput(e.target.value),
+                        )
+                      }
+                      placeholder="Ejemplo: 250000"
+                    />
+                    <div className="hint">
+                      Puedes ingresar solo el valor de tu boleta mensual.
+                    </div>
+                  </div>
+                )}
+
+                {installationInputMode !== "bill" && (
+                  <div className="field">
+                    <label className="label">Consumo mensual</label>
+                    <input
+                      className="input"
+                      type="text"
+                      inputMode="numeric"
+                      value={billConsumptionInput}
+                      onChange={(e) =>
+                        setBillConsumptionInput(
+                          sanitizeIntegerInput(e.target.value),
+                        )
+                      }
+                      placeholder="Ejemplo: 900"
+                    />
+                    <div className="hint">
+                      Dato visible en la boleta, expresado en kWh por mes.
+                    </div>
+                  </div>
+                )}
+
+                <div className="field">
+                  <label className="label">Modalidad seleccionada</label>
+                  <input
+                    className="input"
+                    type="text"
+                    readOnly
+                    value={installationMetrics.modeSummaryLabel}
+                  />
+                  <div className="hint">
+                    Puedes avanzar con una estimación inicial y afinarla
+                    después.
+                  </div>
+                </div>
+              </div>
+
+              <div className="mode-note">
+                <strong>{installationMetrics.modeSummaryLabel}:</strong>{" "}
+                {installationMetrics.modeSummaryHint}
+              </div>
+            </>
+          )}
+
+          {installationStep === 2 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">
+                  Define la ubicación del proyecto
+                </h3>
+                <p className="wizard-text">
+                  La ubicación nos ayuda a ajustar la evaluación de tu proyecto
+                  de forma más realista, sin agregar complejidad innecesaria.
+                </p>
+              </div>
+
+              <div className="fields-grid wizard-fields step-location-grid">
+                <div className="field">
+                  <label className="label">Región del proyecto</label>
+                  <select
+                    className="select"
+                    value={installationRegion}
+                    onChange={(e) => {
+                      const nextRegion = e.target.value;
+                      const nextCommune = Object.keys(
+                        maintenanceRegionData[nextRegion].communes,
+                      )[0];
+                      setInstallationRegion(nextRegion);
+                      setInstallationCommune(nextCommune);
+                    }}
+                  >
+                    {maintenanceRegionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="hint">
+                    Selecciona la región donde se desarrollará el proyecto.
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label className="label">Comuna del proyecto</label>
+                  <select
+                    className="select"
+                    value={installationCommune}
+                    onChange={(e) => setInstallationCommune(e.target.value)}
+                  >
+                    {installationCommuneOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="hint">
+                    La ubicación se integra de forma interna al cálculo.
+                  </div>
+                </div>
+
+                <div className="field location-summary-field">
+                  <label className="label">Ubicación evaluada</label>
+                  <input
+                    className="input"
+                    type="text"
+                    readOnly
+                    value={`${selectedInstallationRegion.label} · ${selectedInstallationCommune.label}`}
+                  />
+                  <div className="hint">
+                    Usaremos esta ubicación para ajustar internamente la evaluación.
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {installationStep === 3 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Selecciona el perfil del hogar</h3>
+                <p className="wizard-text">
+                  Elige el comportamiento de consumo que mejor represente tu hogar.
+                  La descripción y el gráfico ejemplar te ayudan a elegir rápido y de forma simple.
+                </p>
+              </div>
+
+              <div className="profile-options-grid wizard-fields">
+                <ProfileOptionCard
+                  option={profileMap.outside}
+                  isSelected={profile === "outside"}
+                  onSelect={() => setProfile("outside")}
+                />
+                <ProfileOptionCard
+                  option={profileMap.mixed}
+                  isSelected={profile === "mixed"}
+                  onSelect={() => setProfile("mixed")}
+                />
+                <ProfileOptionCard
+                  option={profileMap.home}
+                  isSelected={profile === "home"}
+                  onSelect={() => setProfile("home")}
+                />
+              </div>
+            </>
+          )}
+
+          {installationStep === 4 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">
+                  Revisa tus alternativas
+                </h3>
+                <p className="wizard-text">
+                  Abre el detalle de cada alternativa, compáralas con calma y
+                  selecciona la que mejor se ajuste a tu proyecto antes de continuar.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard
+                  label="Ubicación"
+                  value={selectedInstallationCommune.label}
+                  sub={selectedInstallationRegion.label}
+                />
+                <SummaryCard
+                  label="Proyecto sugerido"
+                  value={formatNumber(installationMetrics.estimatedPanels)}
+                  sub={`${formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
+                />
+                <SummaryCard
+                  label="Ahorro estimado desde"
+                  value={formatCLP(installationMetrics.monthlySavingsNoBattery)}
+                  sub="mensual estimado"
+                />
+              </div>
+
+              <div className="summary-grid compact-grid">
+                <SummaryCard
+                  label={
+                    installationInputMode === "consumption"
+                      ? "Boleta estimada"
+                      : "Monto evaluado"
+                  }
+                  value={formatCLP(installationMetrics.monthlyBill)}
+                  sub="según datos ingresados"
+                />
+                <SummaryCard
+                  label="Consumo mensual"
+                  value={formatNumber(
+                    installationMetrics.monthlyConsumptionKWh,
+                  )}
+                  sub="kWh por mes"
+                />
+                <SummaryCard
+                  label="Alternativa elegida"
+                  value={selectedInstallationOfferData?.title || "Selecciona una alternativa"}
+                  sub={selectedInstallationOfferData?.badge || "antes de continuar"}
+                />
+              </div>
+
+              <div className="cards-grid offer-stack single-column-grid">
+                {installationOfferOptions.map((offer) => (
+                  <OfferCard
+                    key={offer.key}
+                    title={offer.title}
+                    subtitle={offer.subtitle}
+                    badge={offer.badge}
+                    price={offer.price}
+                    savings={offer.savings}
+                    compensation={offer.compensation}
+                    payback={offer.payback}
+                    variant={offer.variant}
+                    collapsible
+                    selectable
+                    isOpen={expandedInstallationOffer === offer.key}
+                    onToggle={() =>
+                      setExpandedInstallationOffer((current) =>
+                        current === offer.key ? "" : offer.key,
+                      )
+                    }
+                    isSelected={selectedInstallationOffer === offer.key}
+                    onSelect={() => setSelectedInstallationOffer(offer.key)}
+                  />
+                ))}
+              </div>
+
+              <div className="note">
+                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote}
+              </div>
+            </>
+          )}
+
+          {installationStep === 5 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Completa tus datos</h3>
+                <p className="wizard-text">
+                  Ya tienes una alternativa elegida. Completa el formulario o
+                  escríbenos por WhatsApp y seguiremos con la evaluación usando
+                  exactamente la propuesta que seleccionaste.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard
+                  label="Ubicación"
+                  value={selectedInstallationCommune.label}
+                  sub={selectedInstallationRegion.label}
+                />
+                <SummaryCard
+                  label="Alternativa seleccionada"
+                  value={selectedInstallationOfferData?.title || "Pendiente"}
+                  sub={selectedInstallationOfferData?.badge || "elige una alternativa"}
+                />
+                <SummaryCard
+                  label="Inversión estimada"
+                  value={selectedInstallationOfferData?.price || "-"}
+                  sub="IVA incluido"
+                />
+              </div>
+
+              <form className="wizard-contact-form" action={formEndpoint} method="POST">
+                <input
+                  type="hidden"
+                  name="_subject"
+                  value="Nueva solicitud de evaluación solar - Sakiara"
+                />
+                <input type="hidden" name="_captcha" value="false" />
+                <input type="hidden" name="_template" value="table" />
+                {getSummaryItems().map((item, index) => (
+                  <input
+                    key={`${item.label}-${index}`}
+                    type="hidden"
+                    name={item.label
+                      .toLowerCase()
+                      .normalize("NFD")
+                      .replace(/[̀-ͯ]/g, "")
+                      .replace(/[^a-z0-9]+/g, "_")
+                      .replace(/^_|_$/g, "")}
+                    value={item.value}
+                  />
+                ))}
+
+                <div className="contact-grid">
+                  <div className="contact-box">
+                    <label className="label">Nombre</label>
+                    <input
+                      className="input"
+                      name="nombre"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Tu nombre"
+                      required
+                    />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Teléfono</label>
+                    <input
+                      className="input"
+                      name="telefono"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+56..."
+                      required
+                    />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Correo</label>
+                    <input
+                      className="input"
+                      type="email"
+                      name="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                      required
+                    />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Mensaje</label>
+                    <textarea
+                      className="textarea"
+                      name="mensaje"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Cuéntanos brevemente tu proyecto o necesidad"
+                    />
+                  </div>
+                </div>
+
+                <div className="contact-actions wizard-actions">
+                  <button className="full-btn" type="submit">
+                    Solicitar propuesta
+                  </button>
+                  <button
+                    className="wa-btn"
+                    type="button"
+                    onClick={handleWhatsApp}
+                  >
+                    Hablar por WhatsApp
+                  </button>
+                </div>
+              </form>
+
+              <div className="wizard-maintenance-action">
                 <button
-                  className={`profile-btn ${profile === 'outside' ? 'active' : ''}`}
+                  className="action-link secondary"
                   type="button"
-                  onClick={() => setProfile('outside')}
+                  onClick={() => {
+                    setMaintenanceMonthlySavingsInput(
+                      String(Math.round(installationMetrics.monthlySavingsNoBattery)),
+                    );
+                    setMaintenanceSystemSizeInput(
+                      String(
+                        Number(
+                          installationMetrics.estimatedSystemSizeKwp.toFixed(1),
+                        ) || installationMetrics.estimatedSystemSizeKwp,
+                      ),
+                    );
+                    setMaintenanceRegion(installationRegion);
+                    setMaintenanceCommune(installationCommune);
+                    setMaintenanceStep(1);
+                    goToView("mantenimiento");
+                  }}
                 >
-                  Peak AM y PM
-                </button>
-                <button
-                  className={`profile-btn ${profile === 'mixed' ? 'active' : ''}`}
-                  type="button"
-                  onClick={() => setProfile('mixed')}
-                >
-                  Mixto
-                </button>
-                <button
-                  className={`profile-btn ${profile === 'home' ? 'active' : ''}`}
-                  type="button"
-                  onClick={() => setProfile('home')}
-                >
-                  Peak sostenido
+                  Evaluar este ahorro en mantenimiento
                 </button>
               </div>
-            </div>
-
-            <div className="hint" style={{ marginTop: 12 }}>
-              Perfil seleccionado: <strong>{selectedProfile.label}</strong>
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
-        <div className="profile-legend">
-          <div className="profile-legend-card">
-            <h3>Peak AM y PM</h3>
-            <p>{profileMap.outside.description}</p>
-          </div>
-          <div className="profile-legend-card">
-            <h3>Mixto</h3>
-            <p>{profileMap.mixed.description}</p>
-          </div>
-          <div className="profile-legend-card">
-            <h3>Peak sostenido</h3>
-            <p>{profileMap.home.description}</p>
-          </div>
-        </div>
-
-        <div className="summary-grid">
-          <SummaryCard
-            label={
-              installationInputMode === 'bill'
-                ? 'Consumo referencial'
-                : installationInputMode === 'consumption'
-                  ? 'Boleta referencial'
-                  : 'Consumo mensual'
+        <div className="wizard-nav">
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={() =>
+              setInstallationStep((current) => Math.max(1, current - 1))
             }
-            value={
-              installationInputMode === 'consumption'
-                ? formatCLP(installationMetrics.monthlyBill)
-                : formatNumber(installationMetrics.monthlyConsumptionKWh)
-            }
-            sub={
-              installationInputMode === 'consumption'
-                ? 'estimada con tarifa referencial'
-                : installationInputMode === 'bill'
-                  ? 'kWh por mes estimados'
-                  : 'kWh por mes'
-            }
-          />
-          <SummaryCard
-            label="Proyecto sugerido"
-            value={formatNumber(installationMetrics.estimatedPanels)}
-            sub="paneles Trina Solar 585 W"
-          />
-          <SummaryCard
-            label="Ahorro estimado desde"
-            value={formatCLP(installationMetrics.monthlySavingsNoBattery)}
-            sub="mensual referencial"
-          />
+            disabled={installationStep === 1}
+          >
+            Atrás
+          </button>
+
+          {installationStep < installationSteps.length ? (
+            <button
+              className="btn-primary"
+              type="button"
+              disabled={!canProceedToContact}
+              onClick={() =>
+                setInstallationStep((current) =>
+                  Math.min(installationSteps.length, current + 1),
+                )
+              }
+            >
+              {installationNextLabel}
+            </button>
+          ) : null}
         </div>
-
-        <div className="mode-note">
-          <strong>{installationMetrics.modeSummaryLabel}:</strong> {installationMetrics.modeSummaryHint}
-        </div>
-      </section>
-
-      <section className="section-card" id="propuesta">
-        <div className="section-head">
-          <p className="eyebrow">Alternativas de proyecto</p>
-          <h2 className="section-title">Compara soluciones resumidas</h2>
-          <p className="section-text">
-            Cada alternativa muestra un valor total IVA incluido, ahorro estimado, compensación de la
-            cuenta y retorno para apoyar tu decisión comercial, calculando la cantidad de módulos con
-            paneles Trina Solar de 585 W.
-          </p>
-        </div>
-
-        <div className="cards-grid">
-          <OfferCard
-            title="Huawei sin batería"
-            subtitle="Alternativa premium base para una solución on-grid."
-            badge="Línea Huawei"
-            price={formatCLP(installationMetrics.projectCostHuaweiNoBattery)}
-            savings={formatCLP(installationMetrics.monthlySavingsNoBattery)}
-            compensation={`${formatNumber(installationMetrics.compensationNoBattery)}%`}
-            payback={`${formatNumber(installationMetrics.paybackHuaweiNoBattery, 1)} años`}
-            variant="huawei"
-          />
-
-          <OfferCard
-            title="Solis sin batería"
-            subtitle="Alternativa eficiente con inversor de mayor costo en la versión sin batería."
-            badge="Línea Solis"
-            price={formatCLP(installationMetrics.projectCostSolisNoBattery)}
-            savings={formatCLP(installationMetrics.monthlySavingsNoBattery)}
-            compensation={`${formatNumber(installationMetrics.compensationNoBattery)}%`}
-            payback={`${formatNumber(installationMetrics.paybackSolisNoBattery, 1)} años`}
-            variant="solis"
-          />
-
-          <OfferCard
-            title="Huawei con batería LUNA"
-            subtitle="Primera batería LUNA 5 kWh con módulo y backup box."
-            badge="Huawei híbrido"
-            price={formatCLP(installationMetrics.projectCostHuaweiWithBattery)}
-            savings={formatCLP(installationMetrics.monthlySavingsWithBattery)}
-            compensation={`${formatNumber(installationMetrics.compensationWithBattery)}%`}
-            payback={`${formatNumber(installationMetrics.paybackHuaweiWithBattery, 1)} años`}
-            variant="hybrid"
-          />
-
-          <OfferCard
-            title="Solis con batería"
-            subtitle="Batería genérica de 15 kWh como referencia comercial."
-            badge="Solis híbrido"
-            price={formatCLP(installationMetrics.projectCostSolisWithBattery)}
-            savings={formatCLP(installationMetrics.monthlySavingsWithBattery)}
-            compensation={`${formatNumber(installationMetrics.compensationWithBattery)}%`}
-            payback={`${formatNumber(installationMetrics.paybackSolisWithBattery, 1)} años`}
-            variant="solis hybrid"
-          />
-        </div>
-
-        <div className="note">Los valores son referenciales IVA incluido.</div>
       </section>
     </>
-  )
+  );
+
 
   const renderMaintenanceView = () => (
     <>
-      <section className="section-card">
-        <div className="hero-copy">
+      <section className="section-card" id="wizard-mantenimiento">
+        <div className="section-head wizard-section-head compact">
           <div className="back-row">
-            <button className="btn-secondary" type="button" onClick={() => goToView('home')}>
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => goToView("home")}
+            >
               ← Volver al inicio
             </button>
           </div>
-          <h1 className="title">Plan de mantenimiento para sistemas fotovoltaicos.</h1>
-          <p className="text">
-            Mantener un sistema solar no solo ayuda a conservar su desempeño. También permite cuidar la inversión, reducir pérdidas evitables y operar con mayor seguridad. Esta evaluación entrega un valor referencial según la ubicación del proyecto y la capacidad del sistema.
-          </p>
-          <div className="cta-row">
-            <a className="action-link primary" href="#contacto">Solicitar propuesta</a>
-            <a className="action-link secondary" href="#detalle-mantencion">Ver evaluación</a>
+          <div className="wizard-topbar">
+            <div className="pill">Evaluación de mantenimiento</div>
+            <div className="pill">Paso {maintenanceStep} de 5</div>
           </div>
         </div>
 
-        <div className="mini-grid">
-          <div className="mini-card">
-            <p className="mini-title">Rendimiento</p>
-            <div className="mini-text">
-              Ayuda a sostener el desempeño del sistema y a reducir pérdidas evitables en el tiempo.
-            </div>
-          </div>
-          <div className="mini-card">
-            <p className="mini-title">Seguridad</p>
-            <div className="mini-text">
-              Considera revisión técnica, mediciones eléctricas y control general de componentes clave.
-            </div>
-          </div>
-          <div className="mini-card">
-            <p className="mini-title">Conveniencia</p>
-            <div className="mini-text">
-              La propuesta considera ubicación, frecuencia y alcance del servicio de forma simple y ordenada.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-card" id="detalle-mantencion">
-        <div className="section-head">
-          <p className="eyebrow">Propuesta de mantenimiento</p>
-          <h2 className="section-title">Evalúa una propuesta referencial para tu sistema</h2>
-          <p className="section-text">
-            Ingresa el tamaño del sistema, el ahorro mensual estimado y la ubicación del proyecto. La propuesta entrega un valor referencial por visita y una lectura clara del plan anual.
-          </p>
-          <div className="pill">Propuesta referencial</div>
-        </div>
-
-        <div className="fields-grid">
-          <div className="field">
-            <label className="label">Potencia aproximada del sistema en kW</label>
-            <input
-              className="input"
-              type="text"
-              inputMode="decimal"
-              value={maintenanceSystemSizeInput}
-              onChange={(e) => setMaintenanceSystemSizeInput(e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
-              placeholder="Ejemplo: 8"
-            />
-            <div className="hint">Hasta 8 kW considera un valor base desde $150.000 por visita en la Región Metropolitana.</div>
-          </div>
-
-          <div className="field">
-            <label className="label">Ahorro mensual estimado o actual en pesos</label>
-            <input
-              className="input"
-              type="text"
-              inputMode="numeric"
-              value={maintenanceMonthlySavingsInput}
-              onChange={(e) => setMaintenanceMonthlySavingsInput(sanitizeIntegerInput(e.target.value))}
-              placeholder="Ejemplo: 120000"
-            />
-            <div className="hint">Este dato nos permite revisar la conveniencia económica del plan de mantenimiento.</div>
-          </div>
-
-          <div className="field">
-            <label className="label">Región del proyecto</label>
-            <select
-              className="select"
-              value={maintenanceRegion}
-              onChange={(e) => {
-                const nextRegion = e.target.value
-                const nextCommune = Object.keys(maintenanceRegionData[nextRegion].communes)[0]
-                setMaintenanceRegion(nextRegion)
-                setMaintenanceCommune(nextCommune)
-              }}
+        <div className="wizard-progress">
+          {maintenanceSteps.map((step) => (
+            <button
+              key={step.id}
+              className={`wizard-step ${maintenanceStep === step.id ? "active" : ""} ${maintenanceStep > step.id ? "completed" : ""}`}
+              type="button"
+              onClick={() => setMaintenanceStep(step.id)}
             >
-              {maintenanceRegionOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <div className="hint">Selecciona la región donde se encuentra tu sistema fotovoltaico.</div>
-          </div>
+              <span className="wizard-step-index">{step.id}</span>
+              <span className="wizard-step-copy">
+                <strong>{step.title}</strong>
+                <small>{step.description}</small>
+              </span>
+            </button>
+          ))}
+        </div>
 
-          <div className="field">
-            <label className="label">Comuna del proyecto</label>
-            <select
-              className="select"
-              value={maintenanceCommune}
-              onChange={(e) => setMaintenanceCommune(e.target.value)}
+        <div className="wizard-panel">
+          {maintenanceStep === 1 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Cuéntanos sobre tu sistema</h3>
+                <p className="wizard-text">
+                  Con estos datos base estimamos una propuesta de mantenimiento clara,
+                  útil y fácil de entender para tu sistema fotovoltaico.
+                </p>
+              </div>
+
+              <div className="fields-grid wizard-fields">
+                <div className="field">
+                  <label className="label">
+                    Potencia aproximada del sistema en kW
+                  </label>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="decimal"
+                    value={maintenanceSystemSizeInput}
+                    onChange={(e) =>
+                      setMaintenanceSystemSizeInput(
+                        e.target.value
+                          .replace(/[^\d.]/g, "")
+                          .replace(/(\..*)\./g, "$1"),
+                      )
+                    }
+                    placeholder="Ejemplo: 8"
+                  />
+                  <div className="hint">
+                    Ingresar la potencia ayuda a estimar el alcance y la valorización del servicio.
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label className="label">
+                    Ahorro mensual estimado o actual en pesos
+                  </label>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    value={maintenanceMonthlySavingsInput}
+                    onChange={(e) =>
+                      setMaintenanceMonthlySavingsInput(
+                        sanitizeIntegerInput(e.target.value),
+                      )
+                    }
+                    placeholder="Ejemplo: 120000"
+                  />
+                  <div className="hint">
+                    Este dato permite leer la conveniencia económica de mantener el sistema.
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {maintenanceStep === 2 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Define la ubicación del sistema</h3>
+                <p className="wizard-text">
+                  La ubicación nos ayuda a estimar el servicio de forma más realista
+                  y ordenada, sin recargar la experiencia.
+                </p>
+              </div>
+
+              <div className="fields-grid wizard-fields step-location-grid">
+                <div className="field">
+                  <label className="label">Región del proyecto</label>
+                  <select
+                    className="select"
+                    value={maintenanceRegion}
+                    onChange={(e) => {
+                      const nextRegion = e.target.value;
+                      const nextCommune = Object.keys(
+                        maintenanceRegionData[nextRegion].communes,
+                      )[0];
+                      setMaintenanceRegion(nextRegion);
+                      setMaintenanceCommune(nextCommune);
+                    }}
+                  >
+                    {maintenanceRegionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="hint">
+                    Selecciona la región donde se encuentra tu sistema fotovoltaico.
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label className="label">Comuna del proyecto</label>
+                  <select
+                    className="select"
+                    value={maintenanceCommune}
+                    onChange={(e) => setMaintenanceCommune(e.target.value)}
+                  >
+                    {maintenanceCommuneOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="hint">
+                    La ubicación se integra automáticamente en la propuesta.
+                  </div>
+                </div>
+
+                <div className="field location-summary-field">
+                  <label className="label">Ubicación evaluada</label>
+                  <input
+                    className="input"
+                    type="text"
+                    value={`${selectedMaintenanceRegion.label} · ${selectedMaintenanceCommune.label}`}
+                    readOnly
+                  />
+                  <div className="hint">
+                    Usaremos esta ubicación para ajustar internamente la evaluación.
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {maintenanceStep === 3 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Elige la frecuencia del servicio</h3>
+                <p className="wizard-text">
+                  Selecciona la cantidad de visitas por año que mejor se ajuste al uso,
+                  exposición y necesidad de seguimiento de tu sistema.
+                </p>
+              </div>
+
+              <div className="mode-card wizard-highlight-card">
+                <label className="label">Visitas por año</label>
+                <div className="mode-buttons">
+                  {[1, 2, 3, 4].map((visits) => (
+                    <button
+                      key={visits}
+                      className={`mode-btn ${maintenanceVisitsPerYear === visits ? "active" : ""}`}
+                      type="button"
+                      onClick={() => setMaintenanceVisitsPerYear(visits)}
+                    >
+                      {visits} {visits === 1 ? "visita" : "visitas"}
+                    </button>
+                  ))}
+                </div>
+                <div className="hint">
+                  En sistemas residenciales, 1 o 2 visitas al año suelen ser una buena referencia inicial.
+                </div>
+              </div>
+            </>
+          )}
+
+          {maintenanceStep === 4 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Revisa tu plan sugerido</h3>
+                <p className="wizard-text">
+                  Este resumen te permite entender rápido el valor del servicio,
+                  la frecuencia elegida y la conveniencia de mantener tu sistema.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard
+                  label="Valor por visita"
+                  value={formatCLP(maintenanceMetrics.visitCost)}
+                  sub="según ubicación y servicio"
+                />
+                <SummaryCard
+                  label="Plan anual estimado"
+                  value={formatCLP(maintenanceMetrics.annualPlanCost)}
+                  sub={`${formatNumber(maintenanceVisitsPerYear)} ${maintenanceVisitsPerYear === 1 ? "visita" : "visitas"} por año`}
+                />
+                <SummaryCard
+                  label="Resultado"
+                  value={maintenanceMetrics.status}
+                  sub="lectura inicial del plan"
+                  valueClassName="summary-value--text"
+                />
+              </div>
+
+              <div className="summary-grid compact-grid">
+                <SummaryCard
+                  label="Sistema evaluado"
+                  value={`${formatNumber(maintenanceSystemSize, 1)} kW`}
+                  sub={`${selectedMaintenanceCommune.label}, ${selectedMaintenanceRegion.label}`}
+                />
+                <SummaryCard
+                  label="Ahorro anual actual"
+                  value={formatCLP(maintenanceMetrics.annualSavings)}
+                  sub="según ahorro informado"
+                />
+                <SummaryCard
+                  label="Presupuesto recomendado"
+                  value={formatCLP(maintenanceMetrics.safeBudget)}
+                  sub="hasta 20% del ahorro anual"
+                />
+              </div>
+
+              <div className="cards-grid maintenance-cards-grid">
+                <div className="info-card">
+                  <h3 className="info-title">Qué incluye esta evaluación</h3>
+                  <p className="info-text">
+                    La propuesta considera mantenimiento preventivo, revisión técnica general,
+                    valorización según ubicación del proyecto y frecuencia anual del servicio.
+                  </p>
+                  <p className="info-text">
+                    El objetivo es cuidar rendimiento, seguridad y continuidad operativa
+                    sin cargar la experiencia con complejidad innecesaria.
+                  </p>
+                </div>
+
+                <div className="info-card">
+                  <h3 className="info-title">Cómo leer este resultado</h3>
+                  <p className="info-text">
+                    Cuando el plan anual se mantiene dentro de una proporción razonable del ahorro que hoy genera el sistema,
+                    la mantención suele verse mejor respaldada comercialmente.
+                  </p>
+                  <p className="info-text">
+                    Con los datos ingresados, esta propuesta se ve mejor respaldada cuando el sistema ahorra al menos
+                    <strong> {formatCLP(maintenanceMetrics.minimumMonthlySavingsForRule)}</strong> mensuales.
+                  </p>
+                </div>
+              </div>
+
+              <div className="note">
+                Los valores son estimados y pueden variar según ubicación, condiciones de acceso,
+                tamaño del sistema y requerimientos técnicos del servicio.
+              </div>
+            </>
+          )}
+
+          {maintenanceStep === 5 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Completa tus datos</h3>
+                <p className="wizard-text">
+                  Completa el formulario o escríbenos por WhatsApp y seguiremos con la evaluación
+                  usando el resumen de mantenimiento que acabas de revisar.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard
+                  label="Ubicación"
+                  value={selectedMaintenanceCommune.label}
+                  sub={selectedMaintenanceRegion.label}
+                />
+                <SummaryCard
+                  label="Valor por visita"
+                  value={formatCLP(maintenanceMetrics.visitCost)}
+                  sub="servicio estimado"
+                />
+                <SummaryCard
+                  label="Plan anual estimado"
+                  value={formatCLP(maintenanceMetrics.annualPlanCost)}
+                  sub={`${formatNumber(maintenanceVisitsPerYear)} ${maintenanceVisitsPerYear === 1 ? "visita" : "visitas"} por año`}
+                />
+              </div>
+
+              <form className="wizard-contact-form" action={formEndpoint} method="POST">
+                <input
+                  type="hidden"
+                  name="_subject"
+                  value="Nueva solicitud de mantenimiento fotovoltaico - Sakiara"
+                />
+                <input type="hidden" name="_captcha" value="false" />
+                <input type="hidden" name="_template" value="table" />
+                {getMaintenanceSummaryItems().map((item, index) => (
+                  <input
+                    key={`${item.label}-${index}`}
+                    type="hidden"
+                    name={item.label
+                      .toLowerCase()
+                      .normalize("NFD")
+                      .replace(/[̀-ͯ]/g, "")
+                      .replace(/[^a-z0-9]+/g, "_")
+                      .replace(/^_|_$/g, "")}
+                    value={item.value}
+                  />
+                ))}
+
+                <div className="contact-grid">
+                  <div className="contact-box">
+                    <label className="label">Nombre</label>
+                    <input
+                      className="input"
+                      name="nombre"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Tu nombre"
+                      required
+                    />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Teléfono</label>
+                    <input
+                      className="input"
+                      name="telefono"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+56..."
+                      required
+                    />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Correo</label>
+                    <input
+                      className="input"
+                      type="email"
+                      name="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                      required
+                    />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Mensaje</label>
+                    <textarea
+                      className="textarea"
+                      name="mensaje"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Cuéntanos el estado del sistema, observaciones o el tipo de servicio que necesitas"
+                    />
+                  </div>
+                </div>
+
+                <div className="contact-actions wizard-actions">
+                  <button className="full-btn" type="submit">
+                    Solicitar evaluación
+                  </button>
+                  <button
+                    className="wa-btn"
+                    type="button"
+                    onClick={handleWhatsApp}
+                  >
+                    Hablar por WhatsApp
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </div>
+
+        <div className="wizard-nav">
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={() =>
+              setMaintenanceStep((current) => Math.max(1, current - 1))
+            }
+            disabled={maintenanceStep === 1}
+          >
+            Atrás
+          </button>
+
+          {maintenanceStep < maintenanceSteps.length ? (
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={() =>
+                setMaintenanceStep((current) =>
+                  Math.min(maintenanceSteps.length, current + 1),
+                )
+              }
             >
-              {maintenanceCommuneOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <div className="hint">La propuesta considera automáticamente la ubicación del proyecto.</div>
-          </div>
-
-          <div className="field">
-            <label className="label">Visitas por año</label>
-            <select
-              className="select"
-              value={maintenanceVisitsPerYear}
-              onChange={(e) => setMaintenanceVisitsPerYear(Number(e.target.value) || 1)}
+              {maintenanceNextLabel}
+            </button>
+          ) : (
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={() => goToView("instalacion")}
             >
-              <option value={1}>1 visita al año</option>
-              <option value={2}>2 visitas al año</option>
-              <option value={3}>3 visitas al año</option>
-              <option value={4}>4 visitas al año</option>
-            </select>
-            <div className="hint">En sistemas residenciales, 1 o 2 visitas al año suelen ser una buena referencia.</div>
-          </div>
-
-          <div className="field">
-            <label className="label">Ubicación evaluada</label>
-            <input
-              className="input"
-              type="text"
-              value={`${selectedMaintenanceRegion.label} · ${selectedMaintenanceCommune.label}`}
-              readOnly
-            />
-            <div className="hint">Mostramos una propuesta clara y resumida según la ubicación seleccionada.</div>
-          </div>
-        </div>
-
-        <div className="summary-grid">
-          <SummaryCard
-            label="Valor por visita"
-            value={formatCLP(maintenanceMetrics.visitCost)}
-            sub="según ubicación y servicio"
-          />
-          <SummaryCard
-            label="Plan anual estimado"
-            value={formatCLP(maintenanceMetrics.annualPlanCost)}
-            sub="según frecuencia seleccionada"
-          />
-          <SummaryCard
-            label="Resultado"
-            value={maintenanceMetrics.status}
-            sub="lectura referencial del plan"
-          />
-        </div>
-
-        <div className="summary-grid compact-grid">
-          <SummaryCard
-            label="Ahorro anual actual"
-            value={formatCLP(maintenanceMetrics.annualSavings)}
-            sub="según ahorro informado"
-          />
-          <SummaryCard
-            label="Presupuesto recomendado"
-            value={formatCLP(maintenanceMetrics.safeBudget)}
-            sub="hasta 20% del ahorro anual"
-          />
-          <SummaryCard
-            label="Margen disponible"
-            value={formatCLP(maintenanceMetrics.safeMargin)}
-            sub="holgura estimada del plan"
-          />
-        </div>
-
-        <div className="cards-grid maintenance-cards-grid">
-          <div className="info-card">
-            <h3 className="info-title">Cómo interpretamos esta evaluación</h3>
-            <p className="info-text">
-              Consideramos saludable un plan cuando su costo anual se mantiene en una proporción razonable del valor energético que hoy genera el sistema. Con los datos ingresados, el plan anual estimado es de <strong> {formatCLP(maintenanceMetrics.annualPlanCost)}</strong>.
-            </p>
-            <p className="info-text">
-              Como referencia, esta propuesta se ve mejor respaldada cuando el sistema ahorra al menos <strong> {formatCLP(maintenanceMetrics.minimumMonthlySavingsForRule)}</strong> mensuales.
-            </p>
-          </div>
-
-          <div className="info-card">
-            <h3 className="info-title">Qué incluye la propuesta</h3>
-            <p className="info-text">
-              La propuesta incluye mantenimiento preventivo, revisión técnica y una valorización del servicio según ubicación, tamaño del sistema y frecuencia de visitas.
-            </p>
-            <p className="info-text">
-              El objetivo es entregar una lectura comercial clara, profesional y fácil de entender, manteniendo la complejidad operativa dentro de la evaluación y no en la experiencia del cliente.
-            </p>
-          </div>
-        </div>
-
-        <div className="note">
-          Los valores son referenciales y pueden variar según ubicación, condiciones de acceso, tamaño del sistema y requerimientos técnicos del servicio.
-        </div>
-      </section>
-
-      <section className="section-card">
-        <div className="section-head">
-          <p className="eyebrow">Alcance del servicio</p>
-          <h2 className="section-title">¿Qué considera el mantenimiento?</h2>
-          <p className="section-text">
-            Cada visita considera una revisión orientada a rendimiento, seguridad y continuidad operativa del sistema.
-          </p>
-        </div>
-
-        <div className="bottom-grid">
-          <div className="info-card">
-            <h3 className="info-title">Limpieza y revisión general</h3>
-            <p className="info-text">
-              Limpieza de módulos, inspección visual general y revisión de condiciones del entorno que puedan afectar el desempeño de la instalación.
-            </p>
-          </div>
-          <div className="info-card">
-            <h3 className="info-title">Mediciones y seguridad eléctrica</h3>
-            <p className="info-text">
-              Mediciones eléctricas, revisión de protecciones, conectores, cableado y comprobaciones generales para detectar desviaciones o desgaste prematuro.
-            </p>
-          </div>
-          <div className="info-card">
-            <h3 className="info-title">Monitoreo y actualización</h3>
-            <p className="info-text">
-              Revisión de inversor, monitoreo, alarmas y actualización de software cuando corresponda según fabricante y compatibilidad del sistema.
-            </p>
-          </div>
+              Evaluar una instalación nueva
+            </button>
+          )}
         </div>
       </section>
     </>
-  )
+  );
+
 
   return (
     <div className="sakiara-root">
@@ -1687,15 +2567,30 @@ export default function SakiaraLandingPage() {
         }
 
         .title {
-          margin: 0;
-          font-size: clamp(40px, 5.2vw, 76px);
-          line-height: 0.96;
-          letter-spacing: -0.05em;
-          color: #66666b;
+          margin: 0 auto;
+          max-width: 760px;
+          font-size: clamp(28px, 4.4vw, 56px);
+          line-height: 1.06;
+          letter-spacing: -0.03em;
+          color: #30323a;
+          font-weight: 680;
+        }
+
+        .title-line {
+          display: block;
+        }
+
+        .hero-slogan {
+          margin: 14px auto 0;
+          max-width: 720px;
+          font-size: clamp(16px, 2vw, 20px);
+          line-height: 1.45;
+          color: #7a6a2a;
+          font-weight: 600;
         }
 
         .text {
-          margin: 22px auto 0;
+          margin: 18px auto 0;
           max-width: 860px;
           font-size: 20px;
           line-height: 1.72;
@@ -1886,33 +2781,6 @@ export default function SakiaraLandingPage() {
           box-shadow: 0 10px 20px rgba(241, 212, 51, 0.18);
         }
 
-        .profile-legend {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 14px;
-          margin-top: 16px;
-        }
-
-        .profile-legend-card {
-          background: #ffffff;
-          border: 1px solid rgba(102, 102, 107, 0.10);
-          border-radius: 18px;
-          padding: 16px;
-        }
-
-        .profile-legend-card h3 {
-          margin: 0;
-          font-size: 18px;
-          line-height: 1.25;
-          color: #66666b;
-        }
-
-        .profile-legend-card p {
-          margin: 8px 0 0;
-          font-size: 14px;
-          line-height: 1.7;
-          color: #7a7a80;
-        }
 
         .mode-note {
           margin-top: 16px;
@@ -1924,6 +2792,311 @@ export default function SakiaraLandingPage() {
           line-height: 1.7;
           color: #66666b;
           text-align: center;
+        }
+
+        .wizard-progress {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 10px;
+          margin-top: 24px;
+        }
+
+        .wizard-step {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 14px;
+          border: 1px solid rgba(102, 102, 107, 0.12);
+          border-radius: 18px;
+          background: #fbfbfa;
+          color: #66666b;
+          cursor: pointer;
+          text-align: left;
+          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .wizard-step:hover {
+          transform: translateY(-1px);
+        }
+
+        .wizard-step.active {
+          border-color: #f1d433;
+          box-shadow: 0 12px 24px rgba(241, 212, 51, 0.16);
+          background: #fffef5;
+        }
+
+        .wizard-step.completed {
+          background: rgba(241, 212, 51, 0.10);
+        }
+
+        .wizard-step-index {
+          width: 36px;
+          height: 36px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+          border: 1px solid rgba(102, 102, 107, 0.12);
+          font-size: 14px;
+          font-weight: 800;
+          color: #66666b;
+          flex: 0 0 auto;
+        }
+
+        .wizard-step.active .wizard-step-index,
+        .wizard-step.completed .wizard-step-index {
+          background: #f1d433;
+          border-color: #f1d433;
+          color: #1f2328;
+        }
+
+        .wizard-step-copy {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
+        }
+
+        .wizard-step-copy strong {
+          font-size: 14px;
+          line-height: 1.2;
+          color: #66666b;
+        }
+
+        .wizard-step-copy small {
+          font-size: 12px;
+          line-height: 1.4;
+          color: #8b8b91;
+        }
+
+        .wizard-panel {
+          margin-top: 20px;
+          background: #fbfbfa;
+          border: 1px solid rgba(102, 102, 107, 0.10);
+          border-radius: 24px;
+          padding: 22px;
+          box-shadow: 0 14px 28px rgba(17, 24, 39, 0.04);
+        }
+
+        .wizard-copy {
+          text-align: center;
+          max-width: 760px;
+          margin: 0 auto;
+        }
+
+        .wizard-title {
+          margin: 0;
+          font-size: 30px;
+          line-height: 1.08;
+          color: #66666b;
+        }
+
+        .wizard-text {
+          margin: 10px auto 0;
+          font-size: 15px;
+          line-height: 1.72;
+          color: #7a7a80;
+          max-width: 680px;
+        }
+
+        .wizard-fields {
+          margin-top: 22px;
+        }
+
+        .wizard-highlight-card {
+          margin-top: 22px;
+          background: #fffef5;
+        }
+
+        .step-location-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .location-summary-field {
+          grid-column: 1 / -1;
+          max-width: 540px;
+          justify-self: center;
+        }
+
+        .profile-options-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+          margin-top: 22px;
+        }
+
+        .profile-option-card {
+          background: #ffffff;
+          border: 1px solid rgba(102, 102, 107, 0.10);
+          border-radius: 22px;
+          padding: 18px;
+          text-align: left;
+          cursor: pointer;
+          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .profile-option-card:hover {
+          transform: translateY(-1px);
+        }
+
+        .profile-option-card.selected {
+          border-color: #f1d433;
+          background: #fffef5;
+          box-shadow: 0 16px 28px rgba(241, 212, 51, 0.14);
+        }
+
+        .profile-option-top {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+        }
+
+        .profile-option-title {
+          font-size: 22px;
+          line-height: 1.12;
+          font-weight: 800;
+          color: #66666b;
+        }
+
+        .profile-option-description {
+          margin: 10px 0 0;
+          font-size: 14px;
+          line-height: 1.68;
+          color: #7a7a80;
+        }
+
+        .profile-option-check {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 36px;
+          padding: 0 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(102, 102, 107, 0.12);
+          background: #ffffff;
+          color: #66666b;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .profile-option-check.selected {
+          border-color: #f1d433;
+          background: #f1d433;
+          color: #1f2328;
+        }
+
+        .profile-example-chart {
+          margin-top: 18px;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          align-items: end;
+          min-height: 132px;
+        }
+
+        .profile-example-bar-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          min-height: 132px;
+        }
+
+        .profile-example-bar {
+          width: 100%;
+          max-width: 58px;
+          border-radius: 14px 14px 8px 8px;
+          background: linear-gradient(180deg, #f1d433 0%, #d8b90b 100%);
+          box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.22);
+        }
+
+        .wizard-section-head {
+          align-items: flex-start;
+        }
+
+        .wizard-section-head.compact {
+          gap: 0;
+        }
+
+        .wizard-topbar {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .wizard-contact-form {
+          margin-top: 20px;
+        }
+
+        .wizard-maintenance-action {
+          margin-top: 18px;
+          display: flex;
+          justify-content: flex-start;
+        }
+
+        .profile-example-bar-wrap span {
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #8b8b91;
+        }
+
+        .wizard-nav {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 20px;
+        }
+
+        .wizard-nav .btn-secondary[disabled],
+        .wizard-nav .btn-primary[disabled] {
+          opacity: 0.45;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .offer-stack {
+          margin-top: 20px;
+        }
+
+        .single-column-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .wizard-contact-box {
+          margin-top: 20px;
+          background: #fffef5;
+        }
+
+        .wizard-contact-copy h3 {
+          margin: 14px 0 0;
+          font-size: 26px;
+          line-height: 1.1;
+          color: #66666b;
+        }
+
+        .wizard-contact-copy p {
+          margin: 12px 0 0;
+          font-size: 15px;
+          line-height: 1.72;
+          color: #66666b;
+        }
+
+        .wizard-actions {
+          margin-top: 20px;
         }
 
         .mini-card,
@@ -2207,36 +3380,6 @@ export default function SakiaraLandingPage() {
           text-align: left;
         }
 
-        .profile-head {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          align-items: start;
-          flex-wrap: wrap;
-        }
-
-        .profile-buttons {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .profile-btn {
-          padding: 10px 12px;
-          background: #ffffff;
-          color: #66666b;
-          border: 1px solid rgba(102, 102, 107, 0.14);
-          font-size: 12px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-        }
-
-        .profile-btn.active {
-          background: #f1d433;
-          color: #1f2328;
-          border-color: #f1d433;
-        }
 
         .summary-card {
           min-height: 140px;
@@ -2258,11 +3401,22 @@ export default function SakiaraLandingPage() {
 
         .summary-value {
           margin-top: 10px;
-          font-size: 34px;
-          line-height: 1.05;
+          font-size: clamp(24px, 3vw, 34px);
+          line-height: 1.08;
           font-weight: 800;
           color: #66666b;
-          overflow-wrap: anywhere;
+          overflow-wrap: normal;
+          word-break: normal;
+          hyphens: none;
+        }
+
+        .summary-value--text {
+          font-size: 26px;
+          line-height: 1.15;
+          overflow-wrap: normal;
+          word-break: normal;
+          hyphens: none;
+          text-wrap: balance;
         }
 
         .summary-sub {
@@ -2305,6 +3459,83 @@ export default function SakiaraLandingPage() {
           justify-content: space-between;
           gap: 12px;
           align-items: start;
+        }
+
+        .offer-head-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 10px;
+        }
+
+        .offer-toggle {
+          padding: 10px 12px;
+          border-radius: 14px;
+          border: 1px solid rgba(102, 102, 107, 0.14);
+          background: #ffffff;
+          color: #66666b;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .offer-toggle:hover {
+          transform: translateY(-1px);
+        }
+
+        .offer-toggle.active {
+          border-color: #f1d433;
+          box-shadow: 0 10px 20px rgba(241, 212, 51, 0.14);
+        }
+
+        .offer-selection-row {
+          margin-top: 16px;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .offer-select-btn {
+          padding: 12px 16px;
+          border-radius: 14px;
+          border: 1px solid rgba(102, 102, 107, 0.14);
+          background: #ffffff;
+          color: #66666b;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .offer-select-btn:hover {
+          transform: translateY(-1px);
+        }
+
+        .offer-select-btn.selected {
+          background: #f1d433;
+          border-color: #f1d433;
+          color: #1f2328;
+          box-shadow: 0 12px 24px rgba(241, 212, 51, 0.18);
+        }
+
+        .offer-card.collapsible {
+          min-height: 0;
+        }
+
+        .offer-card.collapsible.expanded {
+          box-shadow: 0 18px 30px rgba(17, 24, 39, 0.06);
+        }
+
+        .offer-card.selected {
+          border-color: rgba(241, 212, 51, 0.9);
+          box-shadow: 0 18px 30px rgba(241, 212, 51, 0.14);
+          background: #fffef5;
         }
 
         .offer-title {
@@ -2439,8 +3670,9 @@ export default function SakiaraLandingPage() {
           .fields-grid,
           .service-grid,
           .project-grid,
-          .profile-legend,
-          .project-meta-grid {
+          .profile-options-grid,
+          .project-meta-grid,
+          .wizard-progress {
             grid-template-columns: 1fr;
           }
         }
@@ -2465,7 +3697,9 @@ export default function SakiaraLandingPage() {
           }
 
           .title {
-            font-size: 42px;
+            font-size: 29px;
+            line-height: 1.1;
+            max-width: 360px;
           }
 
           .section-title {
@@ -2477,9 +3711,19 @@ export default function SakiaraLandingPage() {
             font-size: 32px;
           }
 
+          .summary-value--text {
+            font-size: 24px;
+          }
+
           .cta-row,
           .contact-actions,
-          .service-nav {
+          .service-nav,
+          .wizard-topbar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .wizard-nav {
             flex-direction: column;
           }
 
@@ -2516,116 +3760,33 @@ export default function SakiaraLandingPage() {
         </div>
 
         <div className="stack">
-          {activeView === 'home' && renderHomeView()}
-          {activeView === 'instalacion' && renderInstallationView()}
-          {activeView === 'mantenimiento' && renderMaintenanceView()}
-
-          {activeView !== 'home' && (
-            <section className="section-card" id="contacto">
-              <div className="section-head">
-                <p className="eyebrow">Contacto</p>
-                <h2 className="section-title">Solicita una evaluación personalizada</h2>
-                <p className="section-text">
-                  Completa tus datos y solicita una evaluación personalizada. También puedes escribirnos por WhatsApp con el resumen de tu propuesta ya preparado.
-                </p>
-              </div>
-
-              <form action={formEndpoint} method="POST">
-                <input
-                  type="hidden"
-                  name="_subject"
-                  value={
-                    activeView === 'mantenimiento'
-                      ? 'Nueva solicitud de mantenimiento fotovoltaico - Sakiara'
-                      : 'Nueva solicitud de evaluación solar - Sakiara'
-                  }
-                />
-                <input type="hidden" name="_captcha" value="false" />
-                <input type="hidden" name="_template" value="table" />
-                {getSummaryItems().map((item, index) => (
-                  <input
-                    key={`${item.label}-${index}`}
-                    type="hidden"
-                    name={item.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}
-                    value={item.value}
-                  />
-                ))}
-
-                <div className="contact-grid">
-                  <div className="contact-box">
-                    <label className="label">Nombre</label>
-                    <input
-                      className="input"
-                      name="nombre"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Tu nombre"
-                      required
-                    />
-                  </div>
-                  <div className="contact-box">
-                    <label className="label">Teléfono</label>
-                    <input
-                      className="input"
-                      name="telefono"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+56..."
-                      required
-                    />
-                  </div>
-                  <div className="contact-box">
-                    <label className="label">Correo</label>
-                    <input
-                      className="input"
-                      type="email"
-                      name="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="correo@ejemplo.com"
-                      required
-                    />
-                  </div>
-                  <div className="contact-box">
-                    <label className="label">Mensaje</label>
-                    <textarea
-                      className="textarea"
-                      name="mensaje"
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder={
-                        activeView === 'mantenimiento'
-                          ? 'Cuéntanos el estado del sistema, observaciones o el tipo de servicio que necesitas'
-                          : 'Cuéntanos brevemente tu proyecto o necesidad'
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="contact-actions">
-                  <button className="full-btn" type="submit">
-                    {activeView === 'mantenimiento'
-                      ? 'Solicitar propuesta personalizada'
-                      : 'Solicitar propuesta'}
-                  </button>
-                  <button className="wa-btn" type="button" onClick={handleWhatsApp}>
-                    Hablar por WhatsApp
-                  </button>
-                </div>
-              </form>
-            </section>
-          )}
+          {activeView === "home" && renderHomeView()}
+          {activeView === "instalacion" && renderInstallationView()}
+          {activeView === "mantenimiento" && renderMaintenanceView()}
         </div>
       </div>
 
-      <div className="floating-cta-stack" aria-label="Accesos rápidos de contacto">
-        <button className="floating-cta-btn quote" type="button" onClick={handleFloatingQuote}>
-          <span className="floating-cta-copy">
-            <span>{floatingQuoteLabel}</span>
-            <small>{activeView === 'home' ? 'Ir al cotizador' : 'Bajar al formulario'}</small>
-          </span>
-        </button>
-        <button className="floating-cta-btn whatsapp" type="button" onClick={handleWhatsApp}>
+      <div
+        className="floating-cta-stack"
+        aria-label="Accesos rápidos de contacto"
+      >
+        {activeView === "home" && (
+          <button
+            className="floating-cta-btn quote"
+            type="button"
+            onClick={handleFloatingQuote}
+          >
+            <span className="floating-cta-copy">
+              <span>{floatingQuoteLabel}</span>
+              <small>Ir al cotizador</small>
+            </span>
+          </button>
+        )}
+        <button
+          className="floating-cta-btn whatsapp"
+          type="button"
+          onClick={handleWhatsApp}
+        >
           <span className="floating-cta-copy">
             <span>WhatsApp directo</span>
             <small>Habla conmigo ahora</small>
@@ -2633,5 +3794,5 @@ export default function SakiaraLandingPage() {
         </button>
       </div>
     </div>
-  )
+  );
 }
