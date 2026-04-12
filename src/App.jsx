@@ -1518,17 +1518,6 @@ export default function SakiaraLandingPage() {
             </div>
           </div>
         </div>
-
-        <div className="seo-copy-box">
-          <h2 className="seo-copy-title">
-            Soluciones fotovoltaicas claras, profesionales y bien ejecutadas
-          </h2>
-          <p className="seo-copy-text">
-            En Sakiara puedes cotizar una instalación nueva o evaluar el mantenimiento
-            de un sistema existente con una experiencia pensada para clientes,
-            enfocada en claridad, ahorro, inversión y protección del rendimiento.
-          </p>
-        </div>
       </section>
     </>
   );
