@@ -452,7 +452,7 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
   const pages = {
     home: {
       title:
-        "Sakiara | Instalación y mantenimiento de sistemas fotovoltaicos en Chile",
+        "Sakiara Solar | Instalación y mantenimiento de sistemas fotovoltaicos en Chile",
       description:
         "Cotiza una instalación fotovoltaica o evalúa el mantenimiento de tu sistema con una experiencia clara, profesional y orientada a ahorro, inversión y protección del rendimiento.",
       path: "/",
@@ -460,7 +460,7 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
       image: `${normalizedOrigin}${sakiaraLogo}`,
     },
     instalacion: {
-      title: "Cotizador de instalación fotovoltaica | Sakiara",
+      title: "Cotizador de instalación fotovoltaica | Sakiara Solar",
       description:
         "Cotiza tu sistema fotovoltaico con tu boleta, tu consumo o una opción combinada. Compara alternativas claras para tu proyecto y avanza con una evaluación inicial profesional.",
       path: "/instalacion",
@@ -468,7 +468,7 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
       image: `${normalizedOrigin}${sakiaraLogo}`,
     },
     mantenimiento: {
-      title: "Mantenimiento de paneles solares | Sakiara",
+      title: "Mantenimiento de paneles solares | Sakiara Solar",
       description:
         "Evalúa un plan de mantenimiento para tu sistema fotovoltaico según ubicación, potencia y frecuencia de servicio. Protege rendimiento, seguridad y continuidad del sistema.",
       path: "/mantenimiento",
@@ -484,14 +484,16 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      name: "Sakiara",
+      name: "Sakiara Solar",
+      alternateName: "Sakiara Inversiones SpA",
       url: normalizedOrigin,
       inLanguage: "es-CL",
     },
     {
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
-      name: "Sakiara",
+      name: "Sakiara Solar",
+      alternateName: "Sakiara Inversiones SpA",
       url: normalizedOrigin,
       logo: `${normalizedOrigin}${sakiaraLogo}`,
       image: `${normalizedOrigin}${sakiaraLogo}`,
@@ -531,7 +533,7 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
       description: currentPage.description,
       isPartOf: {
         "@type": "WebSite",
-        name: "Sakiara",
+        name: "Sakiara Solar",
         url: normalizedOrigin,
       },
     },
@@ -798,7 +800,7 @@ export default function SakiaraLandingPage() {
     ensureMetaTag("name", "robots", "index, follow, max-image-preview:large");
     ensureMetaTag("property", "og:type", "website");
     ensureMetaTag("property", "og:locale", "es_CL");
-    ensureMetaTag("property", "og:site_name", "Sakiara");
+    ensureMetaTag("property", "og:site_name", "Sakiara Solar");
     ensureMetaTag("property", "og:title", seoConfig.title);
     ensureMetaTag("property", "og:description", seoConfig.description);
     ensureMetaTag("property", "og:url", seoConfig.canonical);
@@ -1375,7 +1377,7 @@ export default function SakiaraLandingPage() {
           </h1>
           <p className="hero-slogan">Ejecutamos proyectos, desarrollamos inversiones.</p>
           <p className="text">
-            En Sakiara diseñamos y ejecutamos soluciones fotovoltaicas para quienes buscan reducir su gasto en electricidad,
+            En Sakiara Solar diseñamos y ejecutamos soluciones fotovoltaicas para quienes buscan reducir su gasto en electricidad,
             proyectar mejor su inversión y avanzar con una evaluación clara, profesional y fácil de entender desde el primer paso.
           </p>
         </div>
@@ -1439,7 +1441,7 @@ export default function SakiaraLandingPage() {
         <div className="section-head">
           <p className="eyebrow">Proyectos realizados</p>
           <h2 className="section-title">
-            Instalaciones reales desarrolladas por Sakiara
+            Instalaciones reales desarrolladas por Sakiara Solar
           </h2>
           <p className="section-text">
             Una muestra de proyectos fotovoltaicos ejecutados en distintos
@@ -1876,7 +1878,7 @@ export default function SakiaraLandingPage() {
                 <input
                   type="hidden"
                   name="_subject"
-                  value="Nueva solicitud de evaluación solar - Sakiara"
+                  value="Nueva solicitud de evaluación solar - Sakiara Solar"
                 />
                 <input type="hidden" name="_captcha" value="false" />
                 <input type="hidden" name="_template" value="table" />
@@ -2323,7 +2325,7 @@ export default function SakiaraLandingPage() {
                 <input
                   type="hidden"
                   name="_subject"
-                  value="Nueva solicitud de mantenimiento fotovoltaico - Sakiara"
+                  value="Nueva solicitud de mantenimiento fotovoltaico - Sakiara Solar"
                 />
                 <input type="hidden" name="_captcha" value="false" />
                 <input type="hidden" name="_template" value="table" />
@@ -2643,6 +2645,58 @@ export default function SakiaraLandingPage() {
           color: #ffffff;
           font-weight: 800;
           box-shadow: 0 12px 24px rgba(102, 102, 107, 0.18);
+        }
+
+        .site-legal {
+          width: min(1100px, calc(100% - 40px));
+          margin: 0 auto 120px;
+          padding: 0;
+          border: 1px solid rgba(102, 102, 107, 0.12);
+          border-radius: 24px;
+          background: #fbfbfc;
+          box-shadow: 0 18px 34px rgba(17, 24, 39, 0.06);
+          overflow: hidden;
+        }
+
+        .site-legal::before {
+          content: "";
+          display: block;
+          height: 4px;
+          background: linear-gradient(90deg, rgba(241, 212, 51, 0.98) 0%, rgba(241, 212, 51, 0.62) 100%);
+        }
+
+        .site-legal-inner {
+          padding: 20px 24px 22px;
+          text-align: center;
+        }
+
+        .site-legal-kicker {
+          margin: 0 0 10px;
+          font-size: 11px;
+          line-height: 1.2;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          font-weight: 800;
+          color: #8a8a90;
+        }
+
+        .site-legal-title {
+          margin: 0 0 8px;
+          color: #2f3138;
+          font-size: 1rem;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+        }
+
+        .site-legal-text {
+          margin: 0;
+          font-size: 0.93rem;
+          line-height: 1.65;
+          color: #54565d;
+        }
+
+        .site-legal-text + .site-legal-text {
+          margin-top: 4px;
         }
 
         .floating-cta-stack {
@@ -3716,6 +3770,28 @@ export default function SakiaraLandingPage() {
             flex-direction: column;
           }
 
+          .site-legal {
+            width: calc(100% - 24px);
+            margin: 0 auto 112px;
+          }
+
+          .site-legal-inner {
+            padding: 18px 18px 20px;
+          }
+
+          .site-legal-kicker {
+            font-size: 10px;
+            letter-spacing: 0.14em;
+          }
+
+          .site-legal-title {
+            font-size: 0.96rem;
+          }
+
+          .site-legal-text {
+            font-size: 0.88rem;
+          }
+
           .floating-cta-stack {
             left: 12px;
             right: 12px;
@@ -3737,13 +3813,13 @@ export default function SakiaraLandingPage() {
             <img
               className="brand-logo"
               src={sakiaraLogo}
-              alt="Sakiara Energía Solar"
+              alt="Sakiara Solar"
               onError={() => setLogoHidden(true)}
             />
           ) : (
             <div className="brand-fallback">
               <div className="brand-dot" />
-              <span>Sakiara Energía Solar</span>
+              <span>Sakiara Solar</span>
             </div>
           )}
         </div>
@@ -3752,6 +3828,15 @@ export default function SakiaraLandingPage() {
           {activeView === "home" && renderHomeView()}
           {activeView === "instalacion" && renderInstallationView()}
           {activeView === "mantenimiento" && renderMaintenanceView()}
+        </div>
+      </div>
+
+      <div className="site-legal" aria-label="Información legal y tributaria">
+        <div className="site-legal-inner">
+          <p className="site-legal-kicker">Información comercial y tributaria</p>
+          <p className="site-legal-title">Sakiara Solar</p>
+          <p className="site-legal-text">Sakiara Solar es una marca comercial de Sakiara Inversiones SpA.</p>
+          <p className="site-legal-text">La facturación y documentación tributaria se emiten a nombre de Sakiara Inversiones SpA.</p>
         </div>
       </div>
 
