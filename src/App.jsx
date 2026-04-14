@@ -1373,15 +1373,16 @@ export default function SakiaraLandingPage() {
         <div className="hero-banner-image" aria-hidden="true" />
         <div className="hero-banner-inner">
           <div className="hero-banner-copy">
+            <p className="hero-kicker">Cotización solar clara y rápida</p>
             <h1 className="hero-banner-title">
               <span>Convierte tu consumo</span>
               <span>en una inversión</span>
             </h1>
-            <p className="hero-banner-text">
-              Cotización solar clara, profesional y rápida.
-            </p>
             <p className="hero-banner-slogan">
               Ejecutamos proyectos, desarrollamos inversiones.
+            </p>
+            <p className="hero-banner-text">
+              Evalúa instalación o mantenimiento en pocos pasos.
             </p>
 
             <div className="hero-brand-block">
@@ -1392,12 +1393,12 @@ export default function SakiaraLandingPage() {
               <div className="hero-brand-row">
                 <img
                   className="hero-brand-logo huawei"
-                  src="/marcas/huawei-clean.png"
+                  src="/marcas/huawei.png"
                   alt="Huawei"
                 />
                 <img
                   className="hero-brand-logo solis"
-                  src="/marcas/solis-clean.png"
+                  src="/marcas/solis.png"
                   alt="Solis"
                 />
               </div>
@@ -2549,11 +2550,11 @@ export default function SakiaraLandingPage() {
 
         .hero-banner {
           position: relative;
-          min-height: 500px;
+          min-height: 460px;
           border-radius: 34px;
           overflow: hidden;
-          background: #111827;
-          box-shadow: 0 24px 50px rgba(17, 24, 39, 0.14);
+          background: #0f172a;
+          box-shadow: 0 28px 56px rgba(15, 23, 42, 0.16);
           isolation: isolate;
         }
 
@@ -2561,15 +2562,13 @@ export default function SakiaraLandingPage() {
           position: absolute;
           inset: 0;
           background-image:
-            linear-gradient(180deg, rgba(8, 14, 29, 0.26) 0%, rgba(8, 14, 29, 0.38) 100%),
-            linear-gradient(90deg, rgba(8, 14, 29, 0.68) 0%, rgba(8, 14, 29, 0.46) 26%, rgba(8, 14, 29, 0.20) 56%, rgba(8, 14, 29, 0.12) 100%),
-            linear-gradient(135deg, rgba(241, 212, 51, 0.18) 0%, rgba(241, 212, 51, 0.00) 38%),
-            radial-gradient(circle at 84% 22%, rgba(241, 180, 38, 0.62) 0%, rgba(241, 180, 38, 0.00) 20%),
-            url('/home/sakiara-hero-wide.jpg');
+            linear-gradient(180deg, rgba(9, 14, 26, 0.42) 0%, rgba(9, 14, 26, 0.18) 34%, rgba(9, 14, 26, 0.30) 100%),
+            linear-gradient(0deg, rgba(10, 16, 28, 0.16) 0%, rgba(10, 16, 28, 0.08) 100%),
+            radial-gradient(circle at 50% 34%, rgba(255, 204, 82, 0.22) 0%, rgba(255, 204, 82, 0.00) 26%),
+            url('/home/sakiara-hero-sunset-wide.jpg');
           background-size: cover;
-          background-position: center center;
-          transform: scale(1.04);
-          filter: saturate(1.08) contrast(1.02) brightness(0.92);
+          background-position: center 44%;
+          transform: scale(1.02);
         }
 
         .hero-banner::after {
@@ -2590,59 +2589,65 @@ export default function SakiaraLandingPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          min-height: 500px;
-          padding: 54px 40px 126px;
+          min-height: 460px;
+          padding: 58px 42px 126px;
         }
 
         .hero-banner-copy {
-          max-width: 940px;
+          max-width: 860px;
           width: 100%;
           text-align: center;
           margin: 0 auto;
         }
 
         .hero-kicker {
-          display: none;
+          margin: 0 0 12px;
+          font-size: 11px;
+          line-height: 1.2;
+          letter-spacing: 0.19em;
+          text-transform: uppercase;
+          font-weight: 800;
+          color: rgba(255, 255, 255, 0.80);
+          text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
         }
 
         .hero-banner-title {
           margin: 0 auto;
-          max-width: 860px;
-          font-size: clamp(52px, 7vw, 92px);
-          line-height: 0.94;
+          max-width: 920px;
+          font-size: clamp(46px, 6.3vw, 82px);
+          line-height: 0.96;
           letter-spacing: -0.055em;
-          font-weight: 860;
+          font-weight: 880;
           color: #ffffff;
           text-wrap: balance;
-          text-shadow: 0 8px 28px rgba(0, 0, 0, 0.26);
+          text-shadow: 0 6px 26px rgba(0, 0, 0, 0.32);
         }
 
         .hero-banner-title span {
           display: block;
         }
 
-        .hero-banner-text {
-          margin: 18px auto 0;
-          max-width: 700px;
-          font-size: clamp(20px, 2.3vw, 30px);
-          line-height: 1.22;
-          color: rgba(255, 255, 255, 0.96);
-          font-weight: 600;
-          text-shadow: 0 6px 22px rgba(0, 0, 0, 0.20);
-        }
-
         .hero-banner-slogan {
-          margin: 14px auto 0;
+          margin: 18px auto 0;
           max-width: 760px;
-          font-size: clamp(16px, 1.7vw, 21px);
-          line-height: 1.38;
+          font-size: clamp(18px, 2.2vw, 23px);
+          line-height: 1.34;
           color: #f1d433;
           font-weight: 700;
-          text-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+          text-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+        }
+
+        .hero-banner-text {
+          margin: 10px auto 0;
+          max-width: 560px;
+          font-size: 18px;
+          line-height: 1.55;
+          color: rgba(255, 255, 255, 0.93);
+          text-shadow: 0 3px 16px rgba(0, 0, 0, 0.28);
         }
 
         .hero-brand-block {
-          margin-top: 30px;
+          margin-top: 28px;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -2650,25 +2655,27 @@ export default function SakiaraLandingPage() {
         }
 
         .hero-brand-label {
-          font-size: 12px;
+          font-size: 11px;
           line-height: 1.2;
-          letter-spacing: 0.20em;
+          letter-spacing: 0.18em;
           text-transform: uppercase;
           font-weight: 800;
-          color: rgba(255, 255, 255, 0.78);
-          text-shadow: 0 3px 12px rgba(0, 0, 0, 0.16);
+          color: rgba(255, 255, 255, 0.74);
+          text-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
         }
 
         .hero-brand-row {
-          display: flex;
-          gap: 28px;
-          flex-wrap: wrap;
-          justify-content: center;
+          display: inline-flex;
           align-items: center;
-        }
-
-        .hero-brand-chip {
-          display: none;
+          justify-content: center;
+          gap: 26px;
+          flex-wrap: wrap;
+          padding: 12px 22px;
+          border-radius: 999px;
+          background: rgba(11, 18, 32, 0.18);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(4px);
+          box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
         }
 
         .hero-brand-logo {
@@ -2676,15 +2683,15 @@ export default function SakiaraLandingPage() {
           width: auto;
           max-width: 100%;
           object-fit: contain;
-          filter: drop-shadow(0 10px 18px rgba(8, 14, 29, 0.20));
+          filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.22));
         }
 
         .hero-brand-logo.huawei {
-          height: 54px;
+          height: 30px;
         }
 
         .hero-brand-logo.solis {
-          height: 42px;
+          height: 27px;
         }
 
         .home-services-wrap {
@@ -3893,8 +3900,8 @@ export default function SakiaraLandingPage() {
           }
 
           .hero-banner-image {
-            background-position: center center;
-            transform: scale(1.08);
+            background-position: center 46%;
+            transform: scale(1.05);
           }
 
           .hero-banner::after {
@@ -3906,7 +3913,7 @@ export default function SakiaraLandingPage() {
 
           .hero-banner-inner {
             min-height: 380px;
-            padding: 34px 18px 98px;
+            padding: 34px 20px 98px;
             align-items: center;
             justify-content: center;
           }
@@ -3917,30 +3924,31 @@ export default function SakiaraLandingPage() {
           }
 
           .hero-kicker {
-            display: none;
+            margin-bottom: 10px;
+            font-size: 10px;
+            letter-spacing: 0.15em;
           }
 
           .hero-banner-title {
-            font-size: 48px;
-            line-height: 0.95;
+            font-size: 46px;
+            line-height: 0.96;
             max-width: 340px;
             margin-left: auto;
             margin-right: auto;
           }
 
-          .hero-banner-text {
-            font-size: 17px;
-            line-height: 1.28;
+          .hero-banner-slogan {
+            margin-top: 14px;
+            font-size: 16px;
             max-width: 300px;
             margin-left: auto;
             margin-right: auto;
-            margin-top: 16px;
           }
 
-          .hero-banner-slogan {
-            margin-top: 12px;
+          .hero-banner-text {
             font-size: 15px;
-            max-width: 320px;
+            line-height: 1.5;
+            max-width: 280px;
             margin-left: auto;
             margin-right: auto;
           }
@@ -3950,25 +3958,17 @@ export default function SakiaraLandingPage() {
             align-items: center;
           }
 
-          .hero-brand-label {
-            font-size: 10px;
-            letter-spacing: 0.16em;
-          }
-
           .hero-brand-row {
-            gap: 16px;
-          }
-
-          .hero-brand-chip {
-            display: none;
+            gap: 18px;
+            padding: 10px 16px;
           }
 
           .hero-brand-logo.huawei {
-            height: 34px;
+            height: 24px;
           }
 
           .hero-brand-logo.solis {
-            height: 27px;
+            height: 22px;
           }
 
           .home-services-wrap {
