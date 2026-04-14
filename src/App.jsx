@@ -1369,20 +1369,50 @@ export default function SakiaraLandingPage() {
 
   const renderHomeView = () => (
     <>
-      <section className="section-card">
-        <div className="hero-copy">
-          <h1 className="title">
-            <span className="title-line">Convierte tu consumo</span>
-            <span className="title-line">de electricidad en una inversión</span>
-          </h1>
-          <p className="hero-slogan">Ejecutamos proyectos, desarrollamos inversiones.</p>
-          <p className="text">
-            En Sakiara Solar diseñamos y ejecutamos soluciones fotovoltaicas para quienes buscan reducir su gasto en electricidad,
-            proyectar mejor su inversión y avanzar con una evaluación clara, profesional y fácil de entender desde el primer paso.
-          </p>
-        </div>
+      <section className="hero-banner">
+        <div className="hero-banner-image" aria-hidden="true" />
+        <div className="hero-banner-inner">
+          <div className="hero-banner-copy">
+            <p className="hero-kicker">Cotización solar clara y rápida</p>
+            <h1 className="hero-banner-title">
+              <span>Cotiza tu proyecto solar</span>
+              <span>de forma simple y clara</span>
+            </h1>
+            <p className="hero-banner-slogan">
+              Ejecutamos proyectos, desarrollamos inversiones.
+            </p>
+            <p className="hero-banner-text">
+              Evalúa instalación o mantenimiento en pocos pasos.
+            </p>
 
-        <div className="service-grid" style={{ marginTop: 30 }}>
+            <div className="hero-brand-block">
+              <span className="hero-brand-label">
+                Tecnologías con las que trabajamos
+              </span>
+
+              <div className="hero-brand-row">
+                <div className="hero-brand-chip">
+                  <img
+                    className="hero-brand-logo huawei"
+                    src="/marcas/huawei.png"
+                    alt="Huawei"
+                  />
+                </div>
+                <div className="hero-brand-chip">
+                  <img
+                    className="hero-brand-logo solis"
+                    src="/marcas/solis.png"
+                    alt="Solis"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section-card home-services-wrap">
+        <div className="service-grid">
           <div className="service-card">
             <div>
               <div className="offer-badge">Instalación</div>
@@ -1390,14 +1420,12 @@ export default function SakiaraLandingPage() {
                 Cotizador de instalación fotovoltaica
               </h2>
               <p className="service-text">
-                Evalúa una solución fotovoltaica según tu boleta, tu consumo o ambos datos.
-                Compara alternativas, conoce ahorro estimado y avanza con una
-                propuesta clara para tu proyecto.
+                Cotiza con tu boleta, tu consumo o ambos datos.
               </p>
             </div>
             <div className="service-points">
-              <div>Alternativas simples de comparar</div>
-              <div>Ahorro y retorno estimado</div>
+              <div>Ahorro estimado</div>
+              <div>Retorno referencial</div>
               <div>Valores IVA incluido</div>
             </div>
             <button
@@ -1416,15 +1444,13 @@ export default function SakiaraLandingPage() {
                 Plan de mantenimiento fotovoltaico
               </h2>
               <p className="service-text">
-                Conoce una evaluación inicial para mantener tu sistema en buen estado,
-                proteger su rendimiento y tomar decisiones a tiempo según la
-                ubicación y el tamaño de la instalación.
+                Evalúa el estado y cuidado de tu sistema.
               </p>
             </div>
             <div className="service-points">
-              <div>Limpieza técnica de módulos</div>
-              <div>Revisión general del sistema</div>
-              <div>Frecuencia sugerida según el caso</div>
+              <div>Limpieza técnica</div>
+              <div>Revisión general</div>
+              <div>Frecuencia sugerida</div>
             </div>
             <button
               className="btn-primary"
@@ -1495,34 +1521,9 @@ export default function SakiaraLandingPage() {
           ))}
         </div>
       </section>
-
-      <section className="section-card">
-        <div className="mini-grid">
-          <div className="mini-card">
-            <p className="mini-title">Ahorro</p>
-            <div className="mini-text">
-              Una instalación bien dimensionada puede ayudarte a reducir tu gasto
-              en electricidad desde los primeros meses.
-            </div>
-          </div>
-          <div className="mini-card">
-            <p className="mini-title">Inversión</p>
-            <div className="mini-text">
-              Compara alternativas con una lectura clara para evaluar retorno,
-              proyección y conveniencia económica.
-            </div>
-          </div>
-          <div className="mini-card">
-            <p className="mini-title">Respaldo</p>
-            <div className="mini-text">
-              Una buena instalación y un mantenimiento oportuno ayudan a cuidar
-              la producción y proteger tu inversión en el tiempo.
-            </div>
-          </div>
-        </div>
-      </section>
     </>
   );
+
 
   const renderInstallationView = () => (
     <>
@@ -2549,6 +2550,157 @@ export default function SakiaraLandingPage() {
           text-align: center;
           max-width: 860px;
           margin: 0 auto;
+        }
+
+        .hero-banner {
+          position: relative;
+          min-height: 420px;
+          border-radius: 34px;
+          overflow: hidden;
+          background: #111827;
+          box-shadow: 0 24px 50px rgba(17, 24, 39, 0.14);
+          isolation: isolate;
+        }
+
+        .hero-banner-image {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(90deg, rgba(10, 18, 36, 0.82) 0%, rgba(10, 18, 36, 0.72) 28%, rgba(10, 18, 36, 0.34) 56%, rgba(10, 18, 36, 0.18) 100%),
+            linear-gradient(135deg, rgba(241, 212, 51, 0.28) 0%, rgba(241, 212, 51, 0.00) 38%),
+            url('/home/sakiara-hero-wide.jpg');
+          background-size: cover;
+          background-position: center center;
+          transform: scale(1.03);
+        }
+
+        .hero-banner::after {
+          content: "";
+          position: absolute;
+          left: -4%;
+          right: -4%;
+          bottom: -118px;
+          height: 200px;
+          background: #ffffff;
+          border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+          z-index: 1;
+        }
+
+        .hero-banner-inner {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 420px;
+          padding: 42px 42px 118px;
+        }
+
+        .hero-banner-copy {
+          max-width: 760px;
+          width: 100%;
+          text-align: center;
+          margin: 0 auto;
+        }
+
+        .hero-kicker {
+          margin: 0 0 14px;
+          font-size: 11px;
+          line-height: 1.2;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          font-weight: 800;
+          color: rgba(255, 255, 255, 0.76);
+        }
+
+        .hero-banner-title {
+          margin: 0;
+          max-width: 720px;
+          font-size: clamp(42px, 6vw, 74px);
+          line-height: 0.95;
+          letter-spacing: -0.05em;
+          font-weight: 860;
+          color: #ffffff;
+          text-wrap: balance;
+        }
+
+        .hero-banner-title span {
+          display: block;
+        }
+
+        .hero-banner-slogan {
+          margin: 20px 0 0;
+          font-size: clamp(17px, 2.2vw, 22px);
+          line-height: 1.35;
+          color: #f1d433;
+          font-weight: 700;
+        }
+
+        .hero-banner-text {
+          margin: 10px auto 0;
+          max-width: 520px;
+          font-size: 18px;
+          line-height: 1.55;
+          color: rgba(255, 255, 255, 0.90);
+        }
+
+        .hero-brand-block {
+          margin-top: 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .hero-brand-label {
+          font-size: 11px;
+          line-height: 1.2;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          font-weight: 800;
+          color: rgba(255, 255, 255, 0.62);
+        }
+
+        .hero-brand-row {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .hero-brand-chip {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 108px;
+          min-height: 54px;
+          padding: 10px 14px;
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(255, 255, 255, 0.24);
+          border-radius: 18px;
+          box-shadow: 0 14px 26px rgba(17, 24, 39, 0.12);
+          backdrop-filter: blur(8px);
+        }
+
+        .hero-brand-logo {
+          display: block;
+          width: auto;
+          max-width: 100%;
+          object-fit: contain;
+        }
+
+        .hero-brand-logo.huawei {
+          height: 26px;
+        }
+
+        .hero-brand-logo.solis {
+          height: 24px;
+        }
+
+        .home-services-wrap {
+          position: relative;
+          z-index: 3;
+          margin-top: -38px;
         }
 
         .back-row {
@@ -3743,6 +3895,93 @@ export default function SakiaraLandingPage() {
             font-size: 29px;
             line-height: 1.1;
             max-width: 360px;
+          }
+
+          .hero-banner {
+            min-height: 350px;
+            border-radius: 26px;
+          }
+
+          .hero-banner-image {
+            background-position: center center;
+            transform: scale(1.06);
+          }
+
+          .hero-banner::after {
+            left: -8%;
+            right: -8%;
+            bottom: -86px;
+            height: 150px;
+          }
+
+          .hero-banner-inner {
+            min-height: 350px;
+            padding: 28px 22px 94px;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .hero-banner-copy {
+            max-width: 100%;
+            text-align: center;
+          }
+
+          .hero-kicker {
+            margin-bottom: 10px;
+            font-size: 10px;
+            letter-spacing: 0.14em;
+          }
+
+          .hero-banner-title {
+            font-size: 42px;
+            line-height: 0.96;
+            max-width: 320px;
+            margin-left: auto;
+            margin-right: auto;
+          }
+
+          .hero-banner-slogan {
+            margin-top: 14px;
+            font-size: 16px;
+            max-width: 280px;
+            margin-left: auto;
+            margin-right: auto;
+          }
+
+          .hero-banner-text {
+            font-size: 15px;
+            line-height: 1.5;
+            max-width: 260px;
+            margin-left: auto;
+            margin-right: auto;
+          }
+
+          .hero-brand-block {
+            margin-top: 20px;
+            align-items: center;
+          }
+
+          .hero-brand-row {
+            gap: 10px;
+          }
+
+          .hero-brand-chip {
+            min-width: 96px;
+            min-height: 48px;
+            padding: 8px 12px;
+            border-radius: 16px;
+          }
+
+          .hero-brand-logo.huawei {
+            height: 22px;
+          }
+
+          .hero-brand-logo.solis {
+            height: 20px;
+          }
+
+          .home-services-wrap {
+            margin-top: -26px;
           }
 
           .section-title {
