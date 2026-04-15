@@ -8,7 +8,8 @@ const PANEL_POWER_KW = 0.585;
 const REFERENCE_TARIFF_CLP_PER_KWH = 278;
 const WINTER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
 const SUMMER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
-const PDF_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+const HTML2CANVAS_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+const JSPDF_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 
 const sanitizeIntegerInput = (value) => value.replace(/[^\d]/g, "");
 
@@ -875,44 +876,63 @@ function ProfileOptionCard({ option, isSelected, onSelect }) {
 }
 
 
-let html2PdfLoaderPromise = null;
+let pdfRuntimeLoaderPromise = null;
 
-const loadHtml2PdfLibrary = () => {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("PDF solo disponible en navegador."));
-  }
-
-  if (window.html2pdf) {
-    return Promise.resolve(window.html2pdf);
-  }
-
-  if (html2PdfLoaderPromise) {
-    return html2PdfLoaderPromise;
-  }
-
-  html2PdfLoaderPromise = new Promise((resolve, reject) => {
-    const existingScript = document.querySelector('script[data-sakiara-pdf="true"]');
+const loadExternalScript = (src, attributeName) =>
+  new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[${attributeName}="true"]`);
 
     if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(window.html2pdf));
-      existingScript.addEventListener("error", () =>
-        reject(new Error("No se pudo cargar la librería PDF."))
+      if (existingScript.dataset.loaded === "true") {
+        resolve();
+        return;
+      }
+
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error(`No se pudo cargar ${src}.`)),
+        { once: true },
       );
       return;
     }
 
     const script = document.createElement("script");
-    script.src = PDF_LIBRARY_URL;
+    script.src = src;
     script.async = true;
     script.crossOrigin = "anonymous";
-    script.dataset.sakiaraPdf = "true";
-    script.onload = () => resolve(window.html2pdf);
-    script.onerror = () =>
-      reject(new Error("No se pudo cargar la librería PDF."));
+    script.setAttribute(attributeName, "true");
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      resolve();
+    };
+    script.onerror = () => reject(new Error(`No se pudo cargar ${src}.`));
     document.head.appendChild(script);
   });
 
-  return html2PdfLoaderPromise;
+const loadPdfRuntime = () => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("PDF solo disponible en navegador."));
+  }
+
+  if (window.html2canvas && (window.jspdf?.jsPDF || window.jsPDF)) {
+    return Promise.resolve();
+  }
+
+  if (pdfRuntimeLoaderPromise) {
+    return pdfRuntimeLoaderPromise;
+  }
+
+  pdfRuntimeLoaderPromise = Promise.all([
+    loadExternalScript(HTML2CANVAS_LIBRARY_URL, "data-sakiara-html2canvas"),
+    loadExternalScript(JSPDF_LIBRARY_URL, "data-sakiara-jspdf"),
+  ]).then(() => {
+    if (!window.html2canvas || !(window.jspdf?.jsPDF || window.jsPDF)) {
+      throw new Error("No se cargaron correctamente html2canvas y jsPDF.");
+    }
+  });
+
+  return pdfRuntimeLoaderPromise;
 };
 
 const waitForNodeImages = (root) => {
@@ -2456,7 +2476,7 @@ export default function SakiaraLandingPage() {
     let reportContainer = null;
 
     try {
-      await loadHtml2PdfLibrary();
+      await loadPdfRuntime();
 
       const html2canvasLib = window.html2canvas;
       const JsPdfCtor = window.jspdf?.jsPDF || window.jsPDF;
@@ -2535,8 +2555,12 @@ export default function SakiaraLandingPage() {
       pdf.save(`${fileNameBase || "informe-sakiara"}.pdf`);
     } catch (error) {
       console.error(error);
+      const detail =
+        error instanceof Error && error.message
+          ? `\n\nDetalle técnico: ${error.message}`
+          : "";
       window.alert(
-        "No se pudo generar el informe PDF en este momento. Intenta nuevamente.",
+        `No se pudo generar el informe PDF en este momento. Intenta nuevamente.${detail}`,
       );
     } finally {
       if (reportContainer && reportContainer.parentNode) {
