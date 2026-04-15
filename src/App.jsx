@@ -1578,7 +1578,7 @@ const buildInstallationReportMarkup = ({
         page-break-inside: avoid;
       }
       .pdf-section--tight-top {
-        margin-top: 8mm;
+        margin-top: 5mm;
       }
       .pdf-section-head h3,
       .pdf-chart-card h3,
