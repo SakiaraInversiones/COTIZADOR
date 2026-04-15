@@ -6,6 +6,7 @@ const whatsappNumber = "56975807224";
 const formEndpoint = `https://formsubmit.co/${contactEmail}`;
 const PANEL_POWER_KW = 0.585;
 const REFERENCE_TARIFF_CLP_PER_KWH = 278;
+const WINTER_COVERAGE_OPTIONS = [80, 85, 90, 95, 100];
 
 const sanitizeIntegerInput = (value) => value.replace(/[^\d]/g, "");
 
@@ -731,6 +732,7 @@ export default function SakiaraLandingPage() {
   const [installationInputMode, setInstallationInputMode] =
     useState("combined");
   const [winterCoverageGoal, setWinterCoverageGoal] = useState(false);
+  const [winterCoverageTargetPercent, setWinterCoverageTargetPercent] = useState(100);
   const [monthlyBillInput, setMonthlyBillInput] = useState("250000");
   const [billConsumptionInput, setBillConsumptionInput] = useState("900");
   const [installationRegion, setInstallationRegion] = useState("metropolitana");
@@ -958,7 +960,7 @@ export default function SakiaraLandingPage() {
     );
 
     const targetCompensationRatio = winterCoverageGoal
-      ? 1
+      ? winterCoverageTargetPercent / 100
       : recommendedCoverageRatio;
 
     const requiredGenerationForOptimizedSizing =
@@ -966,7 +968,8 @@ export default function SakiaraLandingPage() {
       Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
 
     const requiredGenerationForWinterGoal =
-      normalizedMonthlyBill / Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
+      (normalizedMonthlyBill * targetCompensationRatio) /
+      Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
 
     const optimizedSystemSizeKwp = clamp(
       requiredGenerationForOptimizedSizing /
@@ -1114,11 +1117,11 @@ export default function SakiaraLandingPage() {
       : "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica y validación final del sitio.";
 
     const coverageObjectiveLabel = winterCoverageGoal
-      ? "Cobertura al 100% en invierno"
+      ? `Cobertura invernal objetivo ${formatNumber(winterCoverageTargetPercent)}%`
       : "Compensación optimizada";
 
     const coverageObjectiveHint = winterCoverageGoal
-      ? "Se dimensiona con un factor de producción invernal para empujar la compensación de la cuenta al 100% en los meses más exigentes."
+      ? `Se dimensiona con un factor de producción invernal para apuntar a una compensación de la cuenta cercana al ${formatNumber(winterCoverageTargetPercent)}% en los meses más exigentes.`
       : "Se dimensiona buscando una compensación alta con una inversión más contenida en meses promedio.";
 
     return {
@@ -1168,6 +1171,7 @@ export default function SakiaraLandingPage() {
       coverageObjectiveLabel,
       coverageObjectiveHint,
       winterCoverageGoal,
+      winterCoverageTargetPercent,
       winterGoalPanels,
       winterGoalSystemSizeKwp: winterGoalSystemSizeRoundedKwp,
       additionalPanelsForWinter,
@@ -1186,6 +1190,7 @@ export default function SakiaraLandingPage() {
     selectedInstallationRegion.label,
     selectedInstallationCommune.label,
     winterCoverageGoal,
+    winterCoverageTargetPercent,
   ]);
 
   const maintenanceMetrics = useMemo(() => {
@@ -1785,13 +1790,36 @@ export default function SakiaraLandingPage() {
                   <button
                     className={`mode-btn ${winterCoverageGoal ? "active" : ""}`}
                     type="button"
-                    onClick={() => setWinterCoverageGoal(true)}
+                    onClick={() => {
+                      setWinterCoverageTargetPercent(100);
+                      setWinterCoverageGoal(true);
+                    }}
                   >
-                    Quiero cobertura al 100% en invierno
+                    Ajustar cobertura en invierno
                   </button>
                 </div>
+                {winterCoverageGoal && (
+                  <div className="mode-card nested-mode-card">
+                    <label className="label">Meta de cobertura invernal</label>
+                    <div className="mode-buttons wrap">
+                      {WINTER_COVERAGE_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          className={`mode-btn ${winterCoverageTargetPercent === option ? "active" : ""}`}
+                          type="button"
+                          onClick={() => setWinterCoverageTargetPercent(option)}
+                        >
+                          {option}%
+                        </button>
+                      ))}
+                    </div>
+                    <div className="hint">
+                      Puedes ajustar la cobertura objetivo de invierno en tramos de 5%. A mayor porcentaje, mayor cantidad de paneles.
+                    </div>
+                  </div>
+                )}
                 <div className="hint">
-                  La opción invernal aumenta la cantidad de paneles para empujar la compensación de la cuenta al 100% en los meses de menor producción.
+                  La opción invernal aumenta la cantidad de paneles según la meta seleccionada para los meses de menor producción.
                 </div>
               </div>
 
@@ -1927,7 +1955,7 @@ export default function SakiaraLandingPage() {
                 />
                 <SummaryCard
                   label="Proyecto sugerido"
-                  value={formatNumber(installationMetrics.estimatedPanels)}
+                  value={`${formatNumber(installationMetrics.estimatedPanels)} paneles`}
                   sub={`${formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
                 />
                 <SummaryCard
@@ -1980,7 +2008,10 @@ export default function SakiaraLandingPage() {
                   <button
                     className="btn-secondary"
                     type="button"
-                    onClick={() => setWinterCoverageGoal(true)}
+                    onClick={() => {
+                      setWinterCoverageTargetPercent(100);
+                      setWinterCoverageGoal(true);
+                    }}
                   >
                     Usar cobertura al 100% en invierno
                   </button>
