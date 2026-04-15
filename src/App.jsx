@@ -1072,7 +1072,7 @@ const buildInstallationReportMarkup = ({
 
   return `
     <div class="pdf-report">
-      <section class="pdf-cover">
+      <section class="pdf-cover pdf-export-page">
         <div class="pdf-cover-top">
           <div class="pdf-brand-lockup">
             <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
@@ -1135,9 +1135,8 @@ const buildInstallationReportMarkup = ({
         </div>
       </section>
 
-      <div class="pdf-page-break"></div>
 
-      <section class="pdf-page pdf-page--content">
+      <section class="pdf-page pdf-page--content pdf-export-page">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Resumen técnico y comercial</div>
@@ -1192,9 +1191,8 @@ const buildInstallationReportMarkup = ({
         </section>
       </section>
 
-      <div class="pdf-page-break"></div>
 
-      <section class="pdf-page pdf-page--content">
+      <section class="pdf-page pdf-page--content pdf-export-page">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Contexto solar del proyecto</div>
@@ -1262,9 +1260,8 @@ const buildInstallationReportMarkup = ({
         </section>
       </section>
 
-      <div class="pdf-page-break"></div>
 
-      <section class="pdf-page pdf-page--content">
+      <section class="pdf-page pdf-page--content pdf-export-page">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Comparativo comercial</div>
@@ -1332,7 +1329,19 @@ const buildInstallationReportMarkup = ({
       .pdf-cover,
       .pdf-page {
         width: 210mm;
+        height: 297mm;
         min-height: 297mm;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+      .pdf-export-page {
+        width: 210mm;
+        height: 297mm;
+        min-height: 297mm;
+        max-height: 297mm;
+        box-sizing: border-box;
+        overflow: hidden;
+        position: relative;
       }
       .pdf-cover {
         padding: 14mm;
@@ -1521,6 +1530,7 @@ const buildInstallationReportMarkup = ({
         box-sizing: border-box;
       }
       .pdf-page--content {
+        height: 297mm;
         min-height: 297mm;
       }
       h2, h3, h4 {
@@ -2446,7 +2456,15 @@ export default function SakiaraLandingPage() {
     let reportContainer = null;
 
     try {
-      const html2pdf = await loadHtml2PdfLibrary();
+      await loadHtml2PdfLibrary();
+
+      const html2canvasLib = window.html2canvas;
+      const JsPdfCtor = window.jspdf?.jsPDF || window.jsPDF;
+
+      if (!html2canvasLib || !JsPdfCtor) {
+        throw new Error("No se cargaron correctamente los módulos de exportación PDF.");
+      }
+
       reportContainer = document.createElement("div");
       reportContainer.style.position = "fixed";
       reportContainer.style.left = "-200vw";
@@ -2471,6 +2489,14 @@ export default function SakiaraLandingPage() {
 
       await waitForNodeImages(reportContainer);
 
+      const pageNodes = Array.from(
+        reportContainer.querySelectorAll(".pdf-export-page"),
+      );
+
+      if (!pageNodes.length) {
+        throw new Error("No se encontraron páginas del informe para exportar.");
+      }
+
       const fileNameBase = `informe-sakiara-${selectedInstallationCommune.label}`
         .toLowerCase()
         .normalize("NFD")
@@ -2478,23 +2504,35 @@ export default function SakiaraLandingPage() {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
 
-      await html2pdf()
-        .set({
-          margin: [0, 0, 0, 0],
-          filename: `${fileNameBase || "informe-sakiara"}.pdf`,
-          image: { type: "jpeg", quality: 0.95 },
-          html2canvas: {
-            scale: 1.35,
-            useCORS: true,
-            backgroundColor: "#ffffff",
-            logging: false,
-            imageTimeout: 15000,
-          },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css"] },
-        })
-        .from(reportContainer.firstElementChild)
-        .save();
+      const pdf = new JsPdfCtor({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+        compress: true,
+      });
+
+      for (let pageIndex = 0; pageIndex < pageNodes.length; pageIndex += 1) {
+        const pageNode = pageNodes[pageIndex];
+        const canvas = await html2canvasLib(pageNode, {
+          scale: 1.45,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          imageTimeout: 15000,
+          windowWidth: pageNode.scrollWidth,
+          windowHeight: pageNode.scrollHeight,
+        });
+
+        const imageData = canvas.toDataURL("image/jpeg", 0.92);
+
+        if (pageIndex > 0) {
+          pdf.addPage("a4", "portrait");
+        }
+
+        pdf.addImage(imageData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+      }
+
+      pdf.save(`${fileNameBase || "informe-sakiara"}.pdf`);
     } catch (error) {
       console.error(error);
       window.alert(
