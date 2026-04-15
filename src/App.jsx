@@ -6,7 +6,9 @@ const whatsappNumber = "56975807224";
 const formEndpoint = `https://formsubmit.co/${contactEmail}`;
 const PANEL_POWER_KW = 0.585;
 const REFERENCE_TARIFF_CLP_PER_KWH = 278;
-const WINTER_COVERAGE_OPTIONS = [80, 85, 90, 95, 100];
+const WINTER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+const SUMMER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+const PDF_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
 
 const sanitizeIntegerInput = (value) => value.replace(/[^\d]/g, "");
 
@@ -69,10 +71,155 @@ const solarProductionCommuneOverrides = {
 };
 
 const getSolarProductionProfile = (regionKey, communeKey) => {
-  const communeOverride = solarProductionCommuneOverrides[regionKey]?.[communeKey];
-  if (communeOverride) return communeOverride;
-  return solarProductionProfilesByRegion[regionKey] || { annual: 125, winter: 78 };
+  const baseProfile =
+    solarProductionCommuneOverrides[regionKey]?.[communeKey] ||
+    solarProductionProfilesByRegion[regionKey] ||
+    { annual: 125, winter: 78 };
+
+  return {
+    ...baseProfile,
+    summer:
+      baseProfile.summer ||
+      Math.max(
+        Math.round(baseProfile.annual * 1.48),
+        baseProfile.annual + 18,
+      ),
+  };
 };
+
+const climateReferenceByRegion = {
+  aricaParinacota: {
+    summerTemp: 27,
+    winterTemp: 11,
+    cloudiness: 18,
+    sunHours: 8.8,
+    rainfall: "Muy baja",
+    seasonality: "Producción bastante estable durante el año.",
+  },
+  tarapaca: {
+    summerTemp: 28,
+    winterTemp: 12,
+    cloudiness: 16,
+    sunHours: 9.0,
+    rainfall: "Muy baja",
+    seasonality: "Alta radiación y muy baja variación estacional.",
+  },
+  antofagasta: {
+    summerTemp: 26,
+    winterTemp: 10,
+    cloudiness: 20,
+    sunHours: 8.9,
+    rainfall: "Muy baja",
+    seasonality: "Excelente recurso solar y alta continuidad anual.",
+  },
+  atacama: {
+    summerTemp: 29,
+    winterTemp: 9,
+    cloudiness: 22,
+    sunHours: 8.7,
+    rainfall: "Muy baja",
+    seasonality: "Buen desempeño anual con invierno aún favorable.",
+  },
+  coquimbo: {
+    summerTemp: 27,
+    winterTemp: 8,
+    cloudiness: 28,
+    sunHours: 8.3,
+    rainfall: "Baja",
+    seasonality: "Muy buen desempeño anual con baja nubosidad relativa.",
+  },
+  valparaiso: {
+    summerTemp: 25,
+    winterTemp: 7,
+    cloudiness: 34,
+    sunHours: 7.6,
+    rainfall: "Media",
+    seasonality: "Buena producción estival y baja importante en invierno.",
+  },
+  metropolitana: {
+    summerTemp: 29,
+    winterTemp: 4,
+    cloudiness: 32,
+    sunHours: 7.9,
+    rainfall: "Media",
+    seasonality: "Estacionalidad marcada, con invierno más exigente.",
+  },
+  ohiggins: {
+    summerTemp: 28,
+    winterTemp: 4,
+    cloudiness: 35,
+    sunHours: 7.5,
+    rainfall: "Media",
+    seasonality: "Buen verano y descenso visible durante invierno.",
+  },
+  maule: {
+    summerTemp: 27,
+    winterTemp: 3,
+    cloudiness: 38,
+    sunHours: 7.2,
+    rainfall: "Media/alta",
+    seasonality: "Estacionalidad clara, ideal revisar meta invernal.",
+  },
+  nuble: {
+    summerTemp: 26,
+    winterTemp: 3,
+    cloudiness: 40,
+    sunHours: 6.9,
+    rainfall: "Alta",
+    seasonality: "Menor producción invernal y más nubosidad.",
+  },
+  biobio: {
+    summerTemp: 24,
+    winterTemp: 4,
+    cloudiness: 44,
+    sunHours: 6.6,
+    rainfall: "Alta",
+    seasonality: "Diferencia relevante entre invierno y verano.",
+  },
+  araucania: {
+    summerTemp: 23,
+    winterTemp: 2,
+    cloudiness: 48,
+    sunHours: 6.2,
+    rainfall: "Alta",
+    seasonality: "Invierno exigente, conviene modelar cobertura objetivo.",
+  },
+  losRios: {
+    summerTemp: 21,
+    winterTemp: 3,
+    cloudiness: 52,
+    sunHours: 5.9,
+    rainfall: "Alta",
+    seasonality: "Mayor nubosidad y baja producción invernal.",
+  },
+  losLagos: {
+    summerTemp: 20,
+    winterTemp: 2,
+    cloudiness: 54,
+    sunHours: 5.7,
+    rainfall: "Alta",
+    seasonality: "Invierno muy exigente y verano más corto.",
+  },
+  aysen: {
+    summerTemp: 18,
+    winterTemp: 0,
+    cloudiness: 50,
+    sunHours: 5.8,
+    rainfall: "Media/alta",
+    seasonality: "Alto contraste estacional y menor radiación invernal.",
+  },
+  magallanes: {
+    summerTemp: 16,
+    winterTemp: -1,
+    cloudiness: 56,
+    sunHours: 5.4,
+    rainfall: "Media",
+    seasonality: "Producción muy estacional, con invierno extremadamente exigente.",
+  },
+};
+
+const getClimateReferenceProfile = (regionKey) =>
+  climateReferenceByRegion[regionKey] || climateReferenceByRegion.metropolitana;
 
 const profileMap = {
   outside: {
@@ -722,6 +869,604 @@ function ProfileOptionCard({ option, isSelected, onSelect }) {
   );
 }
 
+
+let html2PdfLoaderPromise = null;
+
+const loadHtml2PdfLibrary = () => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("PDF solo disponible en navegador."));
+  }
+
+  if (window.html2pdf) {
+    return Promise.resolve(window.html2pdf);
+  }
+
+  if (html2PdfLoaderPromise) {
+    return html2PdfLoaderPromise;
+  }
+
+  html2PdfLoaderPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector('script[data-sakiara-pdf="true"]');
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(window.html2pdf));
+      existingScript.addEventListener("error", () =>
+        reject(new Error("No se pudo cargar la librería PDF."))
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = PDF_LIBRARY_URL;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.dataset.sakiaraPdf = "true";
+    script.onload = () => resolve(window.html2pdf);
+    script.onerror = () =>
+      reject(new Error("No se pudo cargar la librería PDF."));
+    document.head.appendChild(script);
+  });
+
+  return html2PdfLoaderPromise;
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const buildReportBarChartMarkup = ({
+  title,
+  items,
+  formatter = (value) => String(value),
+}) => {
+  const safeItems = items.filter((item) => Number.isFinite(item.value));
+  const maxValue = Math.max(...safeItems.map((item) => item.value), 1);
+
+  return `
+    <section class="pdf-chart-card">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="pdf-chart-bars">
+        ${safeItems
+          .map(
+            (item) => `
+              <div class="pdf-chart-item">
+                <div class="pdf-chart-bar-wrap">
+                  <div class="pdf-chart-bar" style="height:${Math.max(
+                    (item.value / maxValue) * 148,
+                    16,
+                  ).toFixed(1)}px"></div>
+                </div>
+                <strong>${escapeHtml(item.label)}</strong>
+                <span>${escapeHtml(formatter(item.value))}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+};
+
+const buildInstallationReportMarkup = ({
+  metrics,
+  offers,
+  selectedOffer,
+  profileLabel,
+  profileDescription,
+  regionLabel,
+  communeLabel,
+  climateProfile,
+  name,
+  phone,
+  email,
+}) => {
+  const selectedBadge = selectedOffer ? " selected" : "";
+  const generatedDate = new Intl.DateTimeFormat("es-CL", {
+    dateStyle: "long",
+    timeStyle: "short",
+  }).format(new Date());
+
+  const reportTitle = selectedOffer
+    ? `Informe preliminar · ${selectedOffer.title}`
+    : "Informe preliminar de cotización solar";
+
+  const alternativesMarkup = offers
+    .map(
+      (offer) => `
+        <article class="pdf-offer-card${
+          selectedOffer?.key === offer.key ? " is-selected" : ""
+        }">
+          <div class="pdf-offer-top">
+            <div>
+              <div class="pdf-offer-badge">${escapeHtml(offer.badge)}</div>
+              <h4>${escapeHtml(offer.title)}</h4>
+              <p>${escapeHtml(offer.subtitle)}</p>
+            </div>
+            ${
+              selectedOffer?.key === offer.key
+                ? '<div class="pdf-selected-tag">Seleccionada</div>'
+                : ""
+            }
+          </div>
+          <div class="pdf-offer-grid">
+            <div><span>Valor</span><strong>${escapeHtml(offer.price)}</strong></div>
+            <div><span>Ahorro</span><strong>${escapeHtml(offer.savings)}</strong></div>
+            <div><span>Compensación</span><strong>${escapeHtml(offer.compensation)}</strong></div>
+            <div><span>Retorno</span><strong>${escapeHtml(offer.payback)}</strong></div>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+  const generationChart = buildReportBarChartMarkup({
+    title: "Generación mensual estimada por temporada",
+    items: [
+      { label: "Invierno", value: metrics.winterGenerationKWh },
+      { label: "Promedio", value: metrics.monthlyGenerationKWh },
+      { label: "Verano", value: metrics.summerGenerationKWh },
+    ],
+    formatter: (value) => `${formatNumber(value, 0)} kWh`,
+  });
+
+  const compensationChart = buildReportBarChartMarkup({
+    title: "Compensación estimada de la cuenta",
+    items: [
+      { label: "Invierno", value: metrics.winterCompensationNoBattery },
+      { label: "Promedio", value: metrics.compensationNoBattery },
+      { label: "Verano", value: metrics.summerCompensationNoBattery },
+    ],
+    formatter: (value) => `${formatNumber(value, 0)}%`,
+  });
+
+  const profileChart = buildReportBarChartMarkup({
+    title: "Perfil de consumo declarado",
+    items: [
+      { label: "AM", value: metrics.profileDistribution.morning },
+      { label: "Día", value: metrics.profileDistribution.day },
+      { label: "PM", value: metrics.profileDistribution.night },
+    ],
+    formatter: (value) => `${formatNumber(value, 0)}%`,
+  });
+
+  return `
+    <div class="pdf-page">
+      <header class="pdf-header">
+        <div>
+          <div class="pdf-kicker">Sakiara Solar · Informe autogenerado</div>
+          <h1>${escapeHtml(reportTitle)}</h1>
+          <p class="pdf-subtitle">
+            Evaluación preliminar para ${escapeHtml(communeLabel)}, ${escapeHtml(regionLabel)}.
+            Documento referencial generado desde el cotizador web.
+          </p>
+        </div>
+        <div class="pdf-brand-card${selectedBadge}">
+          <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+          <div>
+            <strong>Sakiara Solar</strong>
+            <span>Ejecutamos proyectos, desarrollamos inversiones.</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="pdf-grid pdf-grid--summary">
+        <article class="pdf-card">
+          <span>Cliente</span>
+          <strong>${escapeHtml(name || "Por completar")}</strong>
+          <small>${escapeHtml(phone || "-")} · ${escapeHtml(email || "-")}</small>
+        </article>
+        <article class="pdf-card">
+          <span>Proyecto sugerido</span>
+          <strong>${escapeHtml(formatNumber(metrics.estimatedPanels))} paneles</strong>
+          <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp estimados</small>
+        </article>
+        <article class="pdf-card">
+          <span>Objetivo</span>
+          <strong>${escapeHtml(metrics.coverageObjectiveLabel)}</strong>
+          <small>${escapeHtml(metrics.coverageObjectiveHint)}</small>
+        </article>
+        <article class="pdf-card">
+          <span>Generado</span>
+          <strong>${escapeHtml(generatedDate)}</strong>
+          <small>Base comercial inicial para revisión.</small>
+        </article>
+      </section>
+
+      <section class="pdf-section">
+        <div class="pdf-section-head">
+          <h2>Resumen técnico-comercial</h2>
+          <p>Valores orientativos con IVA incluido y supuestos de generación estacional.</p>
+        </div>
+        <div class="pdf-grid pdf-grid--metrics">
+          <article class="pdf-card">
+            <span>Boleta evaluada</span>
+            <strong>${escapeHtml(formatCLP(metrics.monthlyBill))}</strong>
+            <small>Consumo ${escapeHtml(formatNumber(metrics.monthlyConsumptionKWh, 0))} kWh/mes</small>
+          </article>
+          <article class="pdf-card">
+            <span>Compensación invierno</span>
+            <strong>${escapeHtml(formatNumber(metrics.winterCompensationNoBattery, 0))}%</strong>
+            <small>Sin batería</small>
+          </article>
+          <article class="pdf-card">
+            <span>Compensación verano</span>
+            <strong>${escapeHtml(formatNumber(metrics.summerCompensationNoBattery, 0))}%</strong>
+            <small>Sin batería</small>
+          </article>
+          <article class="pdf-card">
+            <span>Ahorro mensual referencial</span>
+            <strong>${escapeHtml(formatCLP(metrics.monthlySavingsNoBattery))}</strong>
+            <small>Línea base sin batería</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="pdf-section">
+        <div class="pdf-section-head">
+          <h2>Gráficos de generación y cobertura</h2>
+          <p>Se muestran valores estimados por temporada según ubicación y perfil de consumo.</p>
+        </div>
+        <div class="pdf-charts-grid">
+          ${generationChart}
+          ${compensationChart}
+          ${profileChart}
+        </div>
+      </section>
+
+      <section class="pdf-section">
+        <div class="pdf-section-head">
+          <h2>Datos meteorológicos y solares referenciales</h2>
+          <p>Lectura climática inicial para comunicar estacionalidad y credibilidad del proyecto.</p>
+        </div>
+        <div class="pdf-grid pdf-grid--climate">
+          <article class="pdf-card">
+            <span>Factor solar promedio</span>
+            <strong>${escapeHtml(formatNumber(metrics.annualProductionFactor, 0))} kWh/kWp/mes</strong>
+            <small>Promedio anual referencial</small>
+          </article>
+          <article class="pdf-card">
+            <span>Factor solar invierno</span>
+            <strong>${escapeHtml(formatNumber(metrics.winterProductionFactor, 0))} kWh/kWp/mes</strong>
+            <small>Meses más exigentes</small>
+          </article>
+          <article class="pdf-card">
+            <span>Factor solar verano</span>
+            <strong>${escapeHtml(formatNumber(metrics.summerProductionFactor, 0))} kWh/kWp/mes</strong>
+            <small>Meses de mayor producción</small>
+          </article>
+          <article class="pdf-card">
+            <span>Temperatura estival</span>
+            <strong>${escapeHtml(formatNumber(climateProfile.summerTemp, 0))} °C</strong>
+            <small>Promedio ambiente referencial</small>
+          </article>
+          <article class="pdf-card">
+            <span>Temperatura invernal</span>
+            <strong>${escapeHtml(formatNumber(climateProfile.winterTemp, 0))} °C</strong>
+            <small>Promedio ambiente referencial</small>
+          </article>
+          <article class="pdf-card">
+            <span>Nubosidad referencial</span>
+            <strong>${escapeHtml(formatNumber(climateProfile.cloudiness, 0))}%</strong>
+            <small>Cobertura media estimada</small>
+          </article>
+          <article class="pdf-card">
+            <span>Horas de sol útiles</span>
+            <strong>${escapeHtml(formatNumber(climateProfile.sunHours, 1))} h/día</strong>
+            <small>Promedio anual orientativo</small>
+          </article>
+          <article class="pdf-card">
+            <span>Lectura estacional</span>
+            <strong>${escapeHtml(climateProfile.rainfall)}</strong>
+            <small>${escapeHtml(climateProfile.seasonality)}</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="pdf-section">
+        <div class="pdf-section-head">
+          <h2>Alternativas evaluadas</h2>
+          <p>Comparación resumida de las líneas ofertadas para este caso.</p>
+        </div>
+        <div class="pdf-offer-stack">
+          ${alternativesMarkup}
+        </div>
+      </section>
+
+      <section class="pdf-section">
+        <div class="pdf-section-head">
+          <h2>Perfil y supuestos de diseño</h2>
+        </div>
+        <div class="pdf-note">
+          <strong>Perfil del hogar:</strong> ${escapeHtml(profileLabel)}. ${escapeHtml(profileDescription)}
+        </div>
+        <div class="pdf-note">
+          <strong>Ubicación evaluada:</strong> ${escapeHtml(regionLabel)} · ${escapeHtml(communeLabel)}.
+          <br />
+          <strong>Nota técnica:</strong> ${escapeHtml(metrics.projectExecutionNote)}
+          <br />
+          <strong>Descargo:</strong> Este documento es referencial y se ajusta con visita técnica,
+          ingeniería de detalle, tablero disponible, trazado efectivo, sombras y condiciones reales del sitio.
+        </div>
+      </section>
+
+      <footer class="pdf-footer">
+        <strong>Sakiara Solar</strong>
+        <span>Contacto: ${escapeHtml(contactEmail)} · +56 9 7580 7224</span>
+        <span>sakiarainversiones.com</span>
+      </footer>
+    </div>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #3d3d43;
+        background: #f7f7f8;
+      }
+      .pdf-page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 14mm;
+        background: #ffffff;
+      }
+      .pdf-header,
+      .pdf-section-head,
+      .pdf-offer-top,
+      .pdf-brand-card,
+      .pdf-grid,
+      .pdf-offer-grid,
+      .pdf-footer {
+        display: flex;
+      }
+      .pdf-header,
+      .pdf-section-head,
+      .pdf-offer-top,
+      .pdf-footer {
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .pdf-kicker {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: #8b8b93;
+        margin-bottom: 8px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.1;
+        color: #55555b;
+      }
+      .pdf-subtitle {
+        margin: 10px 0 0;
+        font-size: 13px;
+        line-height: 1.6;
+        max-width: 470px;
+      }
+      .pdf-brand-card {
+        min-width: 210px;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(241, 212, 51, 0.14);
+        border: 1px solid rgba(241, 212, 51, 0.4);
+      }
+      .pdf-brand-card img {
+        width: 52px;
+        height: 52px;
+        object-fit: cover;
+        border-radius: 12px;
+      }
+      .pdf-brand-card strong,
+      .pdf-brand-card span {
+        display: block;
+      }
+      .pdf-brand-card strong {
+        font-size: 14px;
+      }
+      .pdf-brand-card span {
+        margin-top: 4px;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .pdf-section {
+        margin-top: 18px;
+      }
+      .pdf-section-head h2 {
+        margin: 0;
+        font-size: 18px;
+        color: #55555b;
+      }
+      .pdf-section-head p {
+        margin: 0;
+        max-width: 320px;
+        font-size: 11px;
+        line-height: 1.6;
+        text-align: right;
+        color: #8b8b93;
+      }
+      .pdf-grid {
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .pdf-grid--summary .pdf-card { width: calc(25% - 8px); }
+      .pdf-grid--metrics .pdf-card { width: calc(25% - 8px); }
+      .pdf-grid--climate .pdf-card { width: calc(25% - 8px); }
+      .pdf-card {
+        min-height: 84px;
+        padding: 14px;
+        border-radius: 16px;
+        background: #f6f6f7;
+        border: 1px solid rgba(85, 85, 91, 0.08);
+      }
+      .pdf-card span {
+        display: block;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #8b8b93;
+      }
+      .pdf-card strong {
+        display: block;
+        margin-top: 10px;
+        font-size: 18px;
+        line-height: 1.2;
+        color: #55555b;
+      }
+      .pdf-card small {
+        display: block;
+        margin-top: 8px;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #6d6d74;
+      }
+      .pdf-charts-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .pdf-chart-card {
+        border-radius: 18px;
+        background: #f8f8f9;
+        border: 1px solid rgba(85, 85, 91, 0.08);
+        padding: 14px;
+      }
+      .pdf-chart-card h3 {
+        margin: 0 0 14px;
+        font-size: 14px;
+        line-height: 1.4;
+        color: #55555b;
+      }
+      .pdf-chart-bars {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        align-items: end;
+        min-height: 190px;
+      }
+      .pdf-chart-item {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        text-align: center;
+      }
+      .pdf-chart-bar-wrap {
+        width: 100%;
+        height: 150px;
+        display: flex;
+        align-items: end;
+      }
+      .pdf-chart-bar {
+        width: 100%;
+        border-radius: 14px 14px 8px 8px;
+        background: linear-gradient(180deg, #f1d433 0%, #d7aa1b 100%);
+      }
+      .pdf-chart-item strong {
+        margin-top: 10px;
+        font-size: 11px;
+      }
+      .pdf-chart-item span {
+        margin-top: 4px;
+        font-size: 10px;
+        color: #6d6d74;
+      }
+      .pdf-offer-stack {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .pdf-offer-card {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(85, 85, 91, 0.1);
+        background: #ffffff;
+      }
+      .pdf-offer-card.is-selected {
+        border-color: rgba(241, 212, 51, 0.7);
+        box-shadow: inset 0 0 0 1px rgba(241, 212, 51, 0.25);
+        background: rgba(241, 212, 51, 0.08);
+      }
+      .pdf-offer-badge,
+      .pdf-selected-tag {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(85, 85, 91, 0.08);
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #66666b;
+      }
+      .pdf-selected-tag {
+        background: rgba(241, 212, 51, 0.2);
+      }
+      .pdf-offer-card h4 {
+        margin: 10px 0 0;
+        font-size: 16px;
+      }
+      .pdf-offer-card p {
+        margin: 6px 0 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #6d6d74;
+      }
+      .pdf-offer-grid {
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .pdf-offer-grid > div {
+        width: calc(25% - 6px);
+        padding: 10px;
+        border-radius: 14px;
+        background: #f7f7f8;
+      }
+      .pdf-offer-grid span {
+        display: block;
+        font-size: 10px;
+        color: #8b8b93;
+      }
+      .pdf-offer-grid strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 14px;
+      }
+      .pdf-note {
+        margin-top: 12px;
+        border-radius: 16px;
+        padding: 14px;
+        background: rgba(241, 212, 51, 0.12);
+        border: 1px solid rgba(241, 212, 51, 0.35);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .pdf-footer {
+        margin-top: 18px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(85, 85, 91, 0.12);
+        font-size: 11px;
+        line-height: 1.6;
+        color: #6d6d74;
+      }
+      .pdf-footer strong,
+      .pdf-footer span {
+        display: block;
+      }
+    </style>
+  `;
+};
+
 export default function SakiaraLandingPage() {
   const [activeView, setActiveView] = useState(() =>
     getViewFromPath(
@@ -731,8 +1476,9 @@ export default function SakiaraLandingPage() {
 
   const [installationInputMode, setInstallationInputMode] =
     useState("combined");
-  const [winterCoverageGoal, setWinterCoverageGoal] = useState(false);
-  const [winterCoverageTargetPercent, setWinterCoverageTargetPercent] = useState(100);
+  const [coverageGoalMode, setCoverageGoalMode] = useState("optimized");
+  const [winterCoverageTargetPercent, setWinterCoverageTargetPercent] = useState(50);
+  const [summerCoverageTargetPercent, setSummerCoverageTargetPercent] = useState(80);
   const [monthlyBillInput, setMonthlyBillInput] = useState("250000");
   const [billConsumptionInput, setBillConsumptionInput] = useState("900");
   const [installationRegion, setInstallationRegion] = useState("metropolitana");
@@ -782,6 +1528,10 @@ export default function SakiaraLandingPage() {
   const installationLogisticsMetrics = useMemo(
     () => getInstallationProjectLogistics(selectedInstallationCommune),
     [selectedInstallationCommune],
+  );
+  const climateReferenceProfile = useMemo(
+    () => getClimateReferenceProfile(installationRegion),
+    [installationRegion],
   );
 
   const selectedMaintenanceRegion =
@@ -929,6 +1679,9 @@ export default function SakiaraLandingPage() {
     const exportRate = derivedTariff * 0.55;
     const annualProductionFactor = installationSolarProfile.annual;
     const winterProductionFactor = installationSolarProfile.winter;
+    const summerProductionFactor = installationSolarProfile.summer;
+    const isWinterGoal = coverageGoalMode === "winter";
+    const isSeasonalGoal = coverageGoalMode === "seasonal";
 
     const dayEquivalentUse =
       selectedProfile.day +
@@ -959,16 +1712,19 @@ export default function SakiaraLandingPage() {
       0.98,
     );
 
-    const targetCompensationRatio = winterCoverageGoal
-      ? winterCoverageTargetPercent / 100
-      : recommendedCoverageRatio;
+    const winterTargetCompensationRatio = winterCoverageTargetPercent / 100;
+    const summerTargetCompensationRatio = summerCoverageTargetPercent / 100;
 
     const requiredGenerationForOptimizedSizing =
       (normalizedMonthlyBill * recommendedCoverageRatio) /
       Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
 
     const requiredGenerationForWinterGoal =
-      (normalizedMonthlyBill * targetCompensationRatio) /
+      (normalizedMonthlyBill * winterTargetCompensationRatio) /
+      Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
+
+    const requiredGenerationForSummerGoal =
+      (normalizedMonthlyBill * summerTargetCompensationRatio) /
       Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
 
     const optimizedSystemSizeKwp = clamp(
@@ -985,9 +1741,23 @@ export default function SakiaraLandingPage() {
       30,
     );
 
-    const chosenSystemSizeKwp = winterCoverageGoal
+    const summerGoalSystemSizeKwp = clamp(
+      requiredGenerationForSummerGoal /
+        Math.max(summerProductionFactor, 1),
+      2.2,
+      30,
+    );
+
+    const seasonalGoalSystemSizeKwp = Math.max(
+      winterGoalSystemSizeKwp,
+      summerGoalSystemSizeKwp,
+    );
+
+    const chosenSystemSizeKwp = isWinterGoal
       ? winterGoalSystemSizeKwp
-      : optimizedSystemSizeKwp;
+      : isSeasonalGoal
+        ? seasonalGoalSystemSizeKwp
+        : optimizedSystemSizeKwp;
 
     const estimatedPanels = Math.max(
       4,
@@ -998,7 +1768,13 @@ export default function SakiaraLandingPage() {
       4,
       Math.ceil(winterGoalSystemSizeKwp / PANEL_POWER_KW),
     );
+    const summerGoalPanels = Math.max(
+      4,
+      Math.ceil(summerGoalSystemSizeKwp / PANEL_POWER_KW),
+    );
+    const seasonalGoalPanels = Math.max(winterGoalPanels, summerGoalPanels);
     const winterGoalSystemSizeRoundedKwp = winterGoalPanels * PANEL_POWER_KW;
+    const summerGoalSystemSizeRoundedKwp = summerGoalPanels * PANEL_POWER_KW;
     const additionalPanelsForWinter = Math.max(
       winterGoalPanels - estimatedPanels,
       0,
@@ -1007,6 +1783,7 @@ export default function SakiaraLandingPage() {
 
     const monthlyGenerationKWh = estimatedSystemSizeKwp * annualProductionFactor;
     const winterGenerationKWh = estimatedSystemSizeKwp * winterProductionFactor;
+    const summerGenerationKWh = estimatedSystemSizeKwp * summerProductionFactor;
 
     const selfConsumedNoBattery = Math.min(
       monthlyGenerationKWh * selfConsumptionNoBatteryRate,
@@ -1034,6 +1811,18 @@ export default function SakiaraLandingPage() {
       winterSelfConsumedNoBattery * derivedTariff +
       winterExportedNoBattery * exportRate;
 
+    const summerSelfConsumedNoBattery = Math.min(
+      summerGenerationKWh * selfConsumptionNoBatteryRate,
+      monthlyConsumptionKWh,
+    );
+    const summerExportedNoBattery = Math.max(
+      summerGenerationKWh - summerSelfConsumedNoBattery,
+      0,
+    );
+    const summerMonthlySavingsNoBattery =
+      summerSelfConsumedNoBattery * derivedTariff +
+      summerExportedNoBattery * exportRate;
+
     const selfConsumedWithBattery = Math.min(
       monthlyGenerationKWh * selfConsumptionWithBatteryRate,
       monthlyConsumptionKWh,
@@ -1060,6 +1849,18 @@ export default function SakiaraLandingPage() {
     const winterMonthlySavingsWithBattery =
       winterSelfConsumedWithBattery * derivedTariff +
       winterExportedWithBattery * exportRate;
+
+    const summerSelfConsumedWithBattery = Math.min(
+      summerGenerationKWh * selfConsumptionWithBatteryRate,
+      monthlyConsumptionKWh,
+    );
+    const summerExportedWithBattery = Math.max(
+      summerGenerationKWh - summerSelfConsumedWithBattery,
+      0,
+    );
+    const summerMonthlySavingsWithBattery =
+      summerSelfConsumedWithBattery * derivedTariff +
+      summerExportedWithBattery * exportRate;
 
     const fixedLogisticsNet = Math.max(
       workbookBaseLogisticsNet,
@@ -1111,18 +1912,32 @@ export default function SakiaraLandingPage() {
       0,
       100,
     );
+    const summerCompensationNoBattery = clamp(
+      (summerMonthlySavingsNoBattery / Math.max(normalizedMonthlyBill, 1)) * 100,
+      0,
+      100,
+    );
+    const summerCompensationWithBattery = clamp(
+      (summerMonthlySavingsWithBattery / Math.max(normalizedMonthlyBill, 1)) * 100,
+      0,
+      100,
+    );
 
     const projectExecutionNote = installationLogisticsMetrics.isRemoteProject
       ? "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica, alcance real del proyecto y validación final del sitio."
       : "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica y validación final del sitio.";
 
-    const coverageObjectiveLabel = winterCoverageGoal
+    const coverageObjectiveLabel = isWinterGoal
       ? `Cobertura invernal objetivo ${formatNumber(winterCoverageTargetPercent)}%`
-      : "Compensación optimizada";
+      : isSeasonalGoal
+        ? `Cobertura estacional · Invierno ${formatNumber(winterCoverageTargetPercent)}% / Verano ${formatNumber(summerCoverageTargetPercent)}%`
+        : "Compensación optimizada";
 
-    const coverageObjectiveHint = winterCoverageGoal
+    const coverageObjectiveHint = isWinterGoal
       ? `Se dimensiona con un factor de producción invernal para apuntar a una compensación de la cuenta cercana al ${formatNumber(winterCoverageTargetPercent)}% en los meses más exigentes.`
-      : "Se dimensiona buscando una compensación alta con una inversión más contenida en meses promedio.";
+      : isSeasonalGoal
+        ? `Se compara el objetivo de invierno y verano, y se usa el escenario más exigente para definir la cantidad final de paneles.`
+        : "Se dimensiona buscando una compensación alta con una inversión más contenida en meses promedio.";
 
     return {
       monthlyBill: normalizedMonthlyBill,
@@ -1145,6 +1960,8 @@ export default function SakiaraLandingPage() {
       compensationWithBattery,
       winterCompensationNoBattery,
       winterCompensationWithBattery,
+      summerCompensationNoBattery,
+      summerCompensationWithBattery,
       paybackHuaweiNoBattery:
         projectCostHuaweiNoBatteryGross / Math.max(annualSavingsNoBattery, 1),
       paybackHuaweiWithBattery:
@@ -1160,23 +1977,35 @@ export default function SakiaraLandingPage() {
       projectExecutionNote,
       annualProductionFactor,
       winterProductionFactor,
+      summerProductionFactor,
       monthlyGenerationKWh,
       winterGenerationKWh,
+      summerGenerationKWh,
       selfConsumptionNoBatteryRate,
       selfConsumptionWithBatteryRate,
       effectiveValuePerGeneratedKWhNoBattery,
       effectiveValuePerGeneratedKWhWithBattery,
       recommendedCoverageRatio,
-      targetCompensationRatio,
+      winterTargetCompensationRatio,
+      summerTargetCompensationRatio,
       coverageObjectiveLabel,
       coverageObjectiveHint,
-      winterCoverageGoal,
+      coverageGoalMode,
       winterCoverageTargetPercent,
+      summerCoverageTargetPercent,
       winterGoalPanels,
+      summerGoalPanels,
+      seasonalGoalPanels,
       winterGoalSystemSizeKwp: winterGoalSystemSizeRoundedKwp,
+      summerGoalSystemSizeKwp: summerGoalSystemSizeRoundedKwp,
       additionalPanelsForWinter,
+      profileDistribution: {
+        morning: selectedProfile.morning,
+        day: selectedProfile.day,
+        night: selectedProfile.night,
+      },
       suggestWinterCoverage:
-        !winterCoverageGoal &&
+        coverageGoalMode === "optimized" &&
         winterCompensationNoBattery < 99.5 &&
         winterGoalPanels > estimatedPanels,
     };
@@ -1189,8 +2018,9 @@ export default function SakiaraLandingPage() {
     installationLogisticsMetrics,
     selectedInstallationRegion.label,
     selectedInstallationCommune.label,
-    winterCoverageGoal,
+    coverageGoalMode,
     winterCoverageTargetPercent,
+    summerCoverageTargetPercent,
   ]);
 
   const maintenanceMetrics = useMemo(() => {
@@ -1310,6 +2140,14 @@ export default function SakiaraLandingPage() {
         label: "Proyecto sugerido",
         value: `${formatNumber(installationMetrics.estimatedPanels)} paneles referenciales`,
       },
+      {
+        label: "Cobertura invierno estimada",
+        value: `${formatNumber(installationMetrics.winterCompensationNoBattery)}%`,
+      },
+      {
+        label: "Cobertura verano estimada",
+        value: `${formatNumber(installationMetrics.summerCompensationNoBattery)}%`,
+      },
       ...selectedOfferItems,
     ];
   };
@@ -1372,6 +2210,60 @@ export default function SakiaraLandingPage() {
       `${intro}\n\n${buildSummaryText()}\n\nNombre: ${name || "-"}\nTeléfono: ${phone || "-"}\nCorreo: ${email || "-"}\n\nMensaje: ${message || "-"}`,
     );
     window.open(`https://wa.me/${whatsappNumber}?text=${text}`, "_blank");
+  };
+
+
+  const handleDownloadInstallationReport = async () => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const html2pdf = await loadHtml2PdfLibrary();
+      const reportContainer = document.createElement("div");
+      reportContainer.style.position = "fixed";
+      reportContainer.style.left = "-99999px";
+      reportContainer.style.top = "0";
+      reportContainer.style.width = "210mm";
+      reportContainer.innerHTML = buildInstallationReportMarkup({
+        metrics: installationMetrics,
+        offers: installationOfferOptions,
+        selectedOffer: selectedInstallationOfferData,
+        profileLabel: selectedProfile.label,
+        profileDescription: selectedProfile.description,
+        regionLabel: selectedInstallationRegion.label,
+        communeLabel: selectedInstallationCommune.label,
+        climateProfile: climateReferenceProfile,
+        name,
+        phone,
+        email,
+      });
+      document.body.appendChild(reportContainer);
+
+      const fileNameBase = `informe-sakiara-${selectedInstallationCommune.label}`
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      await html2pdf()
+        .set({
+          margin: [8, 8, 8, 8],
+          filename: `${fileNameBase || "informe-sakiara"}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"] },
+        })
+        .from(reportContainer.firstElementChild)
+        .save();
+
+      document.body.removeChild(reportContainer);
+    } catch (error) {
+      console.error(error);
+      window.alert(
+        "No se pudo generar el informe PDF en este momento. Intenta nuevamente.",
+      );
+    }
   };
 
   const scrollToSection = (sectionId) => {
@@ -1779,26 +2671,31 @@ export default function SakiaraLandingPage() {
 
               <div className="mode-card wizard-highlight-card">
                 <label className="label">Objetivo del dimensionamiento</label>
-                <div className="mode-buttons">
+                <div className="mode-buttons wrap">
                   <button
-                    className={`mode-btn ${!winterCoverageGoal ? "active" : ""}`}
+                    className={`mode-btn ${coverageGoalMode === "optimized" ? "active" : ""}`}
                     type="button"
-                    onClick={() => setWinterCoverageGoal(false)}
+                    onClick={() => setCoverageGoalMode("optimized")}
                   >
                     Compensación optimizada
                   </button>
                   <button
-                    className={`mode-btn ${winterCoverageGoal ? "active" : ""}`}
+                    className={`mode-btn ${coverageGoalMode === "winter" ? "active" : ""}`}
                     type="button"
-                    onClick={() => {
-                      setWinterCoverageTargetPercent(100);
-                      setWinterCoverageGoal(true);
-                    }}
+                    onClick={() => setCoverageGoalMode("winter")}
                   >
                     Ajustar cobertura en invierno
                   </button>
+                  <button
+                    className={`mode-btn ${coverageGoalMode === "seasonal" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => setCoverageGoalMode("seasonal")}
+                  >
+                    Cobertura estacional
+                  </button>
                 </div>
-                {winterCoverageGoal && (
+
+                {(coverageGoalMode === "winter" || coverageGoalMode === "seasonal") && (
                   <div className="mode-card nested-mode-card">
                     <label className="label">Meta de cobertura invernal</label>
                     <div className="mode-buttons wrap">
@@ -1814,12 +2711,34 @@ export default function SakiaraLandingPage() {
                       ))}
                     </div>
                     <div className="hint">
-                      Puedes ajustar la cobertura objetivo de invierno en tramos de 5%. A mayor porcentaje, mayor cantidad de paneles.
+                      Parte desde 50% para mantener una inversión más flexible. A mayor porcentaje, mayor cantidad de paneles.
                     </div>
                   </div>
                 )}
+
+                {coverageGoalMode === "seasonal" && (
+                  <div className="mode-card nested-mode-card">
+                    <label className="label">Meta de cobertura en verano</label>
+                    <div className="mode-buttons wrap">
+                      {SUMMER_COVERAGE_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          className={`mode-btn ${summerCoverageTargetPercent === option ? "active" : ""}`}
+                          type="button"
+                          onClick={() => setSummerCoverageTargetPercent(option)}
+                        >
+                          {option}%
+                        </button>
+                      ))}
+                    </div>
+                    <div className="hint">
+                      El sistema se dimensiona comparando el objetivo de invierno y verano, y usa el escenario más exigente.
+                    </div>
+                  </div>
+                )}
+
                 <div className="hint">
-                  La opción invernal aumenta la cantidad de paneles según la meta seleccionada para los meses de menor producción.
+                  Puedes optar por un criterio optimizado, priorizar invierno o definir una cobertura estacional más completa.
                 </div>
               </div>
 
@@ -1959,9 +2878,10 @@ export default function SakiaraLandingPage() {
                   sub={`${formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
                 />
                 <SummaryCard
-                  label="Compensación invernal"
-                  value={`${formatNumber(installationMetrics.winterCompensationNoBattery)}%`}
-                  sub={installationMetrics.coverageObjectiveLabel}
+                  label="Objetivo de cobertura"
+                  value={installationMetrics.coverageObjectiveLabel}
+                  sub="criterio de dimensionamiento"
+                  valueClassName="summary-value--text"
                 />
               </div>
 
@@ -1976,11 +2896,31 @@ export default function SakiaraLandingPage() {
                   sub="según datos ingresados"
                 />
                 <SummaryCard
+                  label="Compensación invierno"
+                  value={`${formatNumber(installationMetrics.winterCompensationNoBattery)}%`}
+                  sub="estimación sin batería"
+                />
+                <SummaryCard
+                  label="Compensación verano"
+                  value={`${formatNumber(installationMetrics.summerCompensationNoBattery)}%`}
+                  sub="estimación sin batería"
+                />
+              </div>
+
+              <div className="summary-grid compact-grid">
+                <SummaryCard
                   label="Consumo mensual"
                   value={formatNumber(
                     installationMetrics.monthlyConsumptionKWh,
                   )}
                   sub="kWh por mes"
+                />
+                <SummaryCard
+                  label="Generación promedio"
+                  value={formatNumber(
+                    installationMetrics.monthlyGenerationKWh,
+                  )}
+                  sub="kWh/mes estimados"
                 />
                 <SummaryCard
                   label="Alternativa elegida"
@@ -2010,7 +2950,7 @@ export default function SakiaraLandingPage() {
                     type="button"
                     onClick={() => {
                       setWinterCoverageTargetPercent(100);
-                      setWinterCoverageGoal(true);
+                      setCoverageGoalMode("winter");
                     }}
                   >
                     Usar cobertura al 100% en invierno
@@ -2044,8 +2984,21 @@ export default function SakiaraLandingPage() {
                 ))}
               </div>
 
+              <div className="report-actions">
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  onClick={handleDownloadInstallationReport}
+                >
+                  Descargar informe PDF
+                </button>
+                <div className="hint">
+                  Se descarga un informe autogenerado con gráficos, resumen técnico-comercial y datos meteorológicos referenciales.
+                </div>
+              </div>
+
               <div className="note">
-                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró un factor solar referencial de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio y {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno para {selectedInstallationCommune.label}.
+                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró un factor solar referencial de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio, {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno y {formatNumber(installationMetrics.summerProductionFactor, 0)} kWh/kWp/mes en verano para {selectedInstallationCommune.label}.
               </div>
             </>
           )}
@@ -2158,6 +3111,13 @@ export default function SakiaraLandingPage() {
                     onClick={handleWhatsApp}
                   >
                     Hablar por WhatsApp
+                  </button>
+                  <button
+                    className="wa-btn"
+                    type="button"
+                    onClick={handleDownloadInstallationReport}
+                  >
+                    Descargar informe PDF
                   </button>
                 </div>
               </form>
@@ -4044,6 +5004,18 @@ export default function SakiaraLandingPage() {
           padding: 16px 20px;
           font-weight: 800;
           box-shadow: 0 12px 24px rgba(17, 24, 39, 0.08);
+        }
+
+        .report-actions {
+          margin-top: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          align-items: flex-start;
+        }
+
+        .report-actions .hint {
+          max-width: 760px;
         }
 
         .info-card {
