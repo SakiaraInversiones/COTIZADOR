@@ -1309,7 +1309,7 @@ const buildInstallationReportMarkup = ({
           </div>
         </section>
 
-        <section class="pdf-section">
+        <section class="pdf-section pdf-section--tight-top">
           <div class="pdf-section-head">
             <h3>Perfil y supuestos de diseño</h3>
           </div>
@@ -1576,6 +1576,9 @@ const buildInstallationReportMarkup = ({
         margin-top: 10mm;
         break-inside: avoid;
         page-break-inside: avoid;
+      }
+      .pdf-section--tight-top {
+        margin-top: 8mm;
       }
       .pdf-section-head h3,
       .pdf-chart-card h3,
