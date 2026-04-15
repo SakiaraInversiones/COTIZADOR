@@ -915,6 +915,34 @@ const loadHtml2PdfLibrary = () => {
   return html2PdfLoaderPromise;
 };
 
+const waitForNodeImages = (root) => {
+  if (!root) return Promise.resolve();
+
+  const images = Array.from(root.querySelectorAll("img"));
+  if (!images.length) return Promise.resolve();
+
+  return Promise.all(
+    images.map(
+      (image) =>
+        new Promise((resolve) => {
+          if (image.complete && image.naturalWidth > 0) {
+            resolve();
+            return;
+          }
+
+          const done = () => {
+            image.removeEventListener("load", done);
+            image.removeEventListener("error", done);
+            resolve();
+          };
+
+          image.addEventListener("load", done, { once: true });
+          image.addEventListener("error", done, { once: true });
+        }),
+    ),
+  );
+};
+
 const escapeHtml = (value) =>
   String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -1045,72 +1073,71 @@ const buildInstallationReportMarkup = ({
   return `
     <div class="pdf-report">
       <section class="pdf-cover">
-        <img
-          class="pdf-cover-image"
-          src="/home/sakiara-hero-sunset-wide.jpg"
-          alt="Proyecto solar Sakiara"
-        />
-        <div class="pdf-cover-overlay"></div>
-
-        <div class="pdf-cover-content">
-          <div class="pdf-cover-top">
-            <div class="pdf-cover-brand">
-              <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
-              <div>
-                <strong>Sakiara Solar</strong>
-                <span>Ejecutamos proyectos, desarrollamos inversiones.</span>
-              </div>
+        <div class="pdf-cover-top">
+          <div class="pdf-brand-lockup">
+            <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+            <div>
+              <strong>Sakiara Solar</strong>
+              <span>Ejecutamos proyectos, desarrollamos inversiones.</span>
             </div>
-
-            <div class="pdf-cover-pill">Informe autogenerado</div>
           </div>
+          <div class="pdf-report-tag">Informe autogenerado</div>
+        </div>
 
-          <div class="pdf-cover-copy">
-            <div class="pdf-cover-kicker">Cotización fotovoltaica preliminar</div>
-            <h1>${escapeHtml(reportTitle)}</h1>
-            <p>
-              Propuesta referencial para ${escapeHtml(communeLabel)}, ${escapeHtml(regionLabel)}.
-              Este documento resume generación, desempeño estacional, alternativas y supuestos de diseño
-              con una presentación comercial lista para compartir.
-            </p>
+        <div class="pdf-cover-banner-wrap">
+          <img class="pdf-cover-banner" src="/home/sakiara-hero-sunset-wide.jpg" alt="Proyecto solar Sakiara" />
+        </div>
+
+        <div class="pdf-cover-copy">
+          <div class="pdf-kicker pdf-kicker--cover">Cotización fotovoltaica preliminar</div>
+          <h1>${escapeHtml(reportTitle)}</h1>
+          <p>
+            Propuesta referencial para ${escapeHtml(communeLabel)}, ${escapeHtml(regionLabel)}.
+            El informe resume generación esperada, lectura estacional, alternativa destacada y supuestos
+            de diseño con una presentación clara para compartir con el cliente.
+          </p>
+        </div>
+
+        <div class="pdf-cover-grid">
+          <article class="pdf-card pdf-card--cover">
+            <span>Proyecto sugerido</span>
+            <strong>${escapeHtml(formatNumber(metrics.estimatedPanels))} paneles</strong>
+            <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp estimados</small>
+          </article>
+          <article class="pdf-card pdf-card--cover">
+            <span>Alternativa destacada</span>
+            <strong>${escapeHtml(highlightedOfferLabel)}</strong>
+            <small>${escapeHtml(selectedOffer ? "Alternativa seleccionada" : "Comparativo listo para revisar")}</small>
+          </article>
+          <article class="pdf-card pdf-card--cover">
+            <span>Invierno</span>
+            <strong>${escapeHtml(formatNumber(metrics.winterCompensationNoBattery, 0))}%</strong>
+            <small>Compensación referencial sin batería</small>
+          </article>
+          <article class="pdf-card pdf-card--cover">
+            <span>Verano</span>
+            <strong>${escapeHtml(formatNumber(metrics.summerCompensationNoBattery, 0))}%</strong>
+            <small>Compensación referencial sin batería</small>
+          </article>
+        </div>
+
+        <div class="pdf-cover-footer">
+          <div class="pdf-client-box">
+            <span>Cliente</span>
+            <strong>${escapeHtml(name || "Por completar")}</strong>
+            <small>${escapeHtml(phone || "-")} · ${escapeHtml(email || "-")}</small>
           </div>
-
-          <div class="pdf-cover-chip-grid">
-            <article class="pdf-cover-chip">
-              <span>Proyecto sugerido</span>
-              <strong>${escapeHtml(formatNumber(metrics.estimatedPanels))} paneles</strong>
-              <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp estimados</small>
-            </article>
-            <article class="pdf-cover-chip">
-              <span>Alternativa destacada</span>
-              <strong>${escapeHtml(highlightedOfferLabel)}</strong>
-              <small>${escapeHtml(metrics.coverageObjectiveLabel)}</small>
-            </article>
-            <article class="pdf-cover-chip">
-              <span>Desempeño estimado</span>
-              <strong>Invierno ${escapeHtml(formatNumber(metrics.winterCompensationNoBattery, 0))}%</strong>
-              <small>Verano ${escapeHtml(formatNumber(metrics.summerCompensationNoBattery, 0))}% sin batería</small>
-            </article>
-          </div>
-
-          <div class="pdf-cover-bottom">
-            <div class="pdf-cover-client">
-              <span>Cliente</span>
-              <strong>${escapeHtml(name || "Por completar")}</strong>
-              <small>${escapeHtml(phone || "-")} · ${escapeHtml(email || "-")}</small>
-            </div>
-
-            <div class="pdf-cover-logos">
-              <img src="/marcas/huawei.png" alt="Huawei" />
-              <img src="/marcas/solis.png" alt="Solis" />
-            </div>
+          <div class="pdf-meta-box">
+            <span>Ubicación</span>
+            <strong>${escapeHtml(communeLabel)}</strong>
+            <small>${escapeHtml(regionLabel)} · ${escapeHtml(generatedDate)}</small>
           </div>
         </div>
       </section>
 
       <div class="pdf-page-break"></div>
 
-      <div class="pdf-page">
+      <section class="pdf-page">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Resumen técnico y comercial</div>
@@ -1120,7 +1147,7 @@ const buildInstallationReportMarkup = ({
               estacional para comunicar el proyecto de forma clara, creíble y profesional.
             </p>
           </div>
-          <div class="pdf-brand-card${selectedOffer ? " selected" : ""}">
+          <div class="pdf-header-brand">
             <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
             <div>
               <strong>Sakiara Solar</strong>
@@ -1141,44 +1168,15 @@ const buildInstallationReportMarkup = ({
             <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp estimados</small>
           </article>
           <article class="pdf-card">
-            <span>Objetivo de diseño</span>
-            <strong>${escapeHtml(metrics.coverageObjectiveLabel)}</strong>
-            <small>${escapeHtml(metrics.coverageObjectiveHint)}</small>
+            <span>Boleta evaluada</span>
+            <strong>${escapeHtml(formatCLP(metrics.monthlyBill))}</strong>
+            <small>Consumo ${escapeHtml(formatNumber(metrics.monthlyConsumptionKWh, 0))} kWh/mes</small>
           </article>
           <article class="pdf-card">
             <span>Alternativa destacada</span>
             <strong>${escapeHtml(highlightedOfferLabel)}</strong>
-            <small>${escapeHtml(selectedOffer ? "Seleccionada por el cliente" : "Comparativo listo para revisar")}</small>
+            <small>${escapeHtml(metrics.coverageObjectiveLabel)}</small>
           </article>
-        </section>
-
-        <section class="pdf-section">
-          <div class="pdf-section-head">
-            <h3>Resumen técnico-comercial</h3>
-            <p>Base económica inicial y compensación estimada en los meses más y menos exigentes del año.</p>
-          </div>
-          <div class="pdf-grid pdf-grid--metrics">
-            <article class="pdf-card">
-              <span>Boleta evaluada</span>
-              <strong>${escapeHtml(formatCLP(metrics.monthlyBill))}</strong>
-              <small>Consumo ${escapeHtml(formatNumber(metrics.monthlyConsumptionKWh, 0))} kWh/mes</small>
-            </article>
-            <article class="pdf-card">
-              <span>Generación promedio</span>
-              <strong>${escapeHtml(formatNumber(metrics.monthlyGenerationKWh, 0))} kWh</strong>
-              <small>Producción mensual estimada</small>
-            </article>
-            <article class="pdf-card">
-              <span>Invierno</span>
-              <strong>${escapeHtml(formatNumber(metrics.winterCompensationNoBattery, 0))}%</strong>
-              <small>Compensación referencial sin batería</small>
-            </article>
-            <article class="pdf-card">
-              <span>Verano</span>
-              <strong>${escapeHtml(formatNumber(metrics.summerCompensationNoBattery, 0))}%</strong>
-              <small>Compensación referencial sin batería</small>
-            </article>
-          </div>
         </section>
 
         <section class="pdf-section">
@@ -1256,16 +1254,17 @@ const buildInstallationReportMarkup = ({
           <div class="pdf-section-head">
             <h3>Perfil y supuestos de diseño</h3>
           </div>
-          <div class="pdf-note">
-            <strong>Perfil del hogar:</strong> ${escapeHtml(profileLabel)}. ${escapeHtml(profileDescription)}
-          </div>
-          <div class="pdf-note">
-            <strong>Ubicación evaluada:</strong> ${escapeHtml(regionLabel)} · ${escapeHtml(communeLabel)}.
-            <br />
-            <strong>Nota técnica:</strong> ${escapeHtml(metrics.projectExecutionNote)}
-            <br />
-            <strong>Descargo:</strong> Este documento es referencial y se ajusta con visita técnica,
-            ingeniería de detalle, tablero disponible, trazado efectivo, sombras y condiciones reales del sitio.
+          <div class="pdf-note-grid">
+            <div class="pdf-note">
+              <strong>Perfil del hogar:</strong> ${escapeHtml(profileLabel)}. ${escapeHtml(profileDescription)}
+            </div>
+            <div class="pdf-note">
+              <strong>Nota técnica:</strong> ${escapeHtml(metrics.projectExecutionNote)}
+            </div>
+            <div class="pdf-note pdf-note--full">
+              <strong>Descargo:</strong> Este documento es referencial y se ajusta con visita técnica,
+              ingeniería de detalle, tablero disponible, trazado efectivo, sombras y condiciones reales del sitio.
+            </div>
           </div>
         </section>
 
@@ -1274,14 +1273,14 @@ const buildInstallationReportMarkup = ({
           <span>Contacto: ${escapeHtml(contactEmail)} · +56 9 7580 7224</span>
           <span>sakiarainversiones.com</span>
         </footer>
-      </div>
+      </section>
     </div>
     <style>
       * { box-sizing: border-box; }
       body {
         margin: 0;
         font-family: Arial, Helvetica, sans-serif;
-        color: #3d3d43;
+        color: #36363c;
         background: #f4f5f7;
       }
       .pdf-report {
@@ -1294,198 +1293,179 @@ const buildInstallationReportMarkup = ({
         min-height: 297mm;
       }
       .pdf-cover {
-        position: relative;
-        overflow: hidden;
-        background: #0f172a;
-        color: #ffffff;
-      }
-      .pdf-cover-image {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        object-position: center 42%;
-        transform: scale(1.02);
-      }
-      .pdf-cover-overlay {
-        position: absolute;
-        inset: 0;
-        background:
-          linear-gradient(180deg, rgba(8, 12, 22, 0.52) 0%, rgba(8, 12, 22, 0.28) 28%, rgba(8, 12, 22, 0.84) 100%),
-          radial-gradient(circle at 50% 18%, rgba(241, 212, 51, 0.30) 0%, rgba(241, 212, 51, 0.00) 30%);
-      }
-      .pdf-cover-content {
-        position: relative;
-        z-index: 1;
-        min-height: 297mm;
-        padding: 16mm 16mm 14mm;
-        display: flex;
-        flex-direction: column;
+        padding: 14mm;
+        background: #ffffff;
       }
       .pdf-cover-top,
-      .pdf-cover-bottom,
-      .pdf-header,
-      .pdf-section-head,
-      .pdf-offer-top,
-      .pdf-brand-card,
-      .pdf-grid,
-      .pdf-offer-grid,
-      .pdf-footer {
-        display: flex;
-      }
-      .pdf-cover-top,
-      .pdf-cover-bottom,
+      .pdf-cover-footer,
       .pdf-header,
       .pdf-section-head,
       .pdf-offer-top,
       .pdf-footer {
+        display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 16px;
-      }
-      .pdf-cover-brand {
-        display: inline-flex;
-        align-items: center;
         gap: 12px;
-        padding: 10px 12px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.12);
-        backdrop-filter: blur(8px);
       }
-      .pdf-cover-brand img {
-        width: 54px;
-        height: 54px;
-        border-radius: 14px;
-        object-fit: cover;
+      .pdf-brand-lockup,
+      .pdf-header-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
       }
-      .pdf-cover-brand strong,
-      .pdf-cover-brand span {
+      .pdf-brand-lockup img,
+      .pdf-header-brand img {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
         display: block;
       }
-      .pdf-cover-brand strong {
-        font-size: 15px;
+      .pdf-brand-lockup strong,
+      .pdf-brand-lockup span,
+      .pdf-header-brand strong,
+      .pdf-header-brand span {
+        display: block;
       }
-      .pdf-cover-brand span {
+      .pdf-brand-lockup strong,
+      .pdf-header-brand strong {
+        font-size: 14px;
+        color: #1f2937;
+      }
+      .pdf-brand-lockup span,
+      .pdf-header-brand span {
         margin-top: 4px;
-        font-size: 11px;
-        line-height: 1.5;
-        color: rgba(255, 255, 255, 0.86);
+        font-size: 10px;
+        line-height: 1.45;
+        color: #6b7280;
       }
-      .pdf-cover-pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 9px 14px;
+      .pdf-report-tag {
+        padding: 8px 12px;
         border-radius: 999px;
-        background: rgba(241, 212, 51, 0.22);
-        border: 1px solid rgba(241, 212, 51, 0.48);
-        font-size: 11px;
-        font-weight: 700;
+        border: 1px solid #e5d26d;
+        background: #fff9d7;
+        color: #7a6411;
+        font-size: 10px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
+        font-weight: 700;
+      }
+      .pdf-cover-banner-wrap {
+        margin-top: 12mm;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        overflow: hidden;
+        background: #f3f4f6;
+      }
+      .pdf-cover-banner {
+        display: block;
+        width: 100%;
+        height: auto;
       }
       .pdf-cover-copy {
-        margin-top: 42mm;
-        max-width: 132mm;
+        margin-top: 12mm;
       }
-      .pdf-cover-kicker {
-        font-size: 12px;
+      .pdf-kicker {
+        font-size: 10px;
         text-transform: uppercase;
-        letter-spacing: 0.16em;
-        color: rgba(255, 255, 255, 0.82);
+        letter-spacing: 0.14em;
+        color: #8b8b93;
+      }
+      .pdf-kicker--cover {
+        color: #8a7b19;
       }
       .pdf-cover-copy h1 {
-        margin: 12px 0 0;
-        font-size: 33px;
-        line-height: 1.06;
-        color: #ffffff;
+        margin: 10px 0 0;
+        font-size: 30px;
+        line-height: 1.1;
+        color: #1f2937;
+      }
+      .pdf-cover-copy p,
+      .pdf-subtitle,
+      .pdf-section-head p,
+      .pdf-offer-card p,
+      .pdf-note,
+      .pdf-footer span {
+        color: #5b616e;
       }
       .pdf-cover-copy p {
-        margin: 14px 0 0;
-        font-size: 14px;
-        line-height: 1.8;
-        color: rgba(255, 255, 255, 0.92);
+        margin: 12px 0 0;
+        font-size: 13px;
+        line-height: 1.75;
       }
-      .pdf-cover-chip-grid {
+      .pdf-cover-grid,
+      .pdf-grid,
+      .pdf-offer-grid,
+      .pdf-note-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: 22mm;
+        gap: 10px;
       }
-      .pdf-cover-chip {
-        min-height: 82px;
-        padding: 14px;
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.13);
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        backdrop-filter: blur(8px);
+      .pdf-cover-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: 12mm;
       }
-      .pdf-cover-chip span,
+      .pdf-grid--summary {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .pdf-grid--climate {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .pdf-card,
+      .pdf-offer-card,
+      .pdf-note,
+      .pdf-client-box,
+      .pdf-meta-box,
+      .pdf-chart-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: #ffffff;
+      }
+      .pdf-card {
+        padding: 12px;
+      }
+      .pdf-card--cover {
+        background: #f8fafc;
+      }
+      .pdf-card--accent {
+        background: #fff9d7;
+        border-color: #ead675;
+      }
       .pdf-card span,
-      .pdf-offer-grid span {
+      .pdf-offer-grid span,
+      .pdf-client-box span,
+      .pdf-meta-box span {
         display: block;
-        font-size: 10px;
+        font-size: 9px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
+        color: #7b8090;
       }
-      .pdf-cover-chip span {
-        color: rgba(255, 255, 255, 0.76);
-      }
-      .pdf-cover-chip strong {
-        display: block;
-        margin-top: 10px;
-        font-size: 19px;
-        line-height: 1.2;
-      }
-      .pdf-cover-chip small {
-        display: block;
-        margin-top: 7px;
-        font-size: 11px;
-        line-height: 1.55;
-        color: rgba(255, 255, 255, 0.86);
-      }
-      .pdf-cover-bottom {
-        margin-top: auto;
-        align-items: flex-end;
-      }
-      .pdf-cover-client {
-        padding: 12px 14px;
-        border-radius: 18px;
-        background: rgba(10, 16, 28, 0.36);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-      }
-      .pdf-cover-client span {
-        display: block;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: rgba(255, 255, 255, 0.70);
-      }
-      .pdf-cover-client strong {
+      .pdf-card strong,
+      .pdf-cover-grid strong,
+      .pdf-client-box strong,
+      .pdf-meta-box strong {
         display: block;
         margin-top: 8px;
         font-size: 18px;
+        line-height: 1.2;
+        color: #1f2937;
       }
-      .pdf-cover-client small {
+      .pdf-card small,
+      .pdf-client-box small,
+      .pdf-meta-box small,
+      .pdf-offer-grid strong {
         display: block;
         margin-top: 6px;
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.86);
+        font-size: 10px;
+        line-height: 1.45;
+        color: #6b7280;
       }
-      .pdf-cover-logos {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 12px 14px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.10);
-        border: 1px solid rgba(255, 255, 255, 0.16);
+      .pdf-cover-footer {
+        margin-top: 12mm;
       }
-      .pdf-cover-logos img {
-        height: 24px;
-        width: auto;
-        object-fit: contain;
-        filter: brightness(1.1);
+      .pdf-client-box,
+      .pdf-meta-box {
+        flex: 1;
+        padding: 12px;
       }
       .pdf-page-break {
         page-break-after: always;
@@ -1493,240 +1473,168 @@ const buildInstallationReportMarkup = ({
       }
       .pdf-page {
         padding: 14mm;
-        background:
-          linear-gradient(180deg, rgba(241, 212, 51, 0.06) 0%, rgba(241, 212, 51, 0.00) 16%),
-          #ffffff;
-      }
-      .pdf-kicker {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        color: #8b8b93;
-        margin-bottom: 8px;
+        background: #ffffff;
       }
       h2, h3, h4 {
-        color: #55555b;
+        color: #1f2937;
       }
       h2 {
         margin: 0;
-        font-size: 25px;
+        font-size: 24px;
         line-height: 1.12;
       }
       .pdf-subtitle {
         margin: 10px 0 0;
-        font-size: 13px;
+        font-size: 12px;
         line-height: 1.7;
-        max-width: 480px;
+        max-width: 440px;
       }
-      .pdf-brand-card {
-        min-width: 210px;
-        align-items: center;
-        gap: 12px;
-        padding: 14px;
-        border-radius: 18px;
-        background: rgba(241, 212, 51, 0.14);
-        border: 1px solid rgba(241, 212, 51, 0.4);
-      }
-      .pdf-brand-card.selected {
-        background: rgba(241, 212, 51, 0.22);
-      }
-      .pdf-brand-card img {
-        width: 52px;
-        height: 52px;
-        object-fit: cover;
-        border-radius: 12px;
-      }
-      .pdf-brand-card strong,
-      .pdf-brand-card span {
-        display: block;
-      }
-      .pdf-brand-card strong {
-        font-size: 14px;
-      }
-      .pdf-brand-card span {
-        margin-top: 4px;
-        font-size: 11px;
-        line-height: 1.5;
+      .pdf-header-brand {
+        padding: 10px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
       }
       .pdf-section {
-        margin-top: 18px;
+        margin-top: 12mm;
       }
-      .pdf-section-head h3 {
+      .pdf-section-head h3,
+      .pdf-chart-card h3,
+      .pdf-offer-card h4 {
         margin: 0;
-        font-size: 18px;
       }
       .pdf-section-head p {
-        margin: 0;
-        max-width: 340px;
-        font-size: 11px;
+        margin: 5px 0 0;
+        font-size: 12px;
         line-height: 1.6;
-        text-align: right;
-        color: #8b8b93;
-      }
-      .pdf-grid {
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 12px;
-      }
-      .pdf-grid--summary .pdf-card { width: calc(25% - 8px); }
-      .pdf-grid--metrics .pdf-card { width: calc(25% - 8px); }
-      .pdf-grid--climate .pdf-card { width: calc(25% - 8px); }
-      .pdf-card {
-        min-height: 84px;
-        padding: 14px;
-        border-radius: 18px;
-        background: #f6f6f7;
-        border: 1px solid rgba(85, 85, 91, 0.08);
-      }
-      .pdf-card--accent {
-        background: rgba(241, 212, 51, 0.14);
-        border-color: rgba(241, 212, 51, 0.36);
-      }
-      .pdf-card span {
-        color: #8b8b93;
-      }
-      .pdf-card strong {
-        display: block;
-        margin-top: 10px;
-        font-size: 18px;
-        line-height: 1.2;
-        color: #55555b;
-      }
-      .pdf-card small {
-        display: block;
-        margin-top: 8px;
-        font-size: 11px;
-        line-height: 1.55;
-        color: #6d6d74;
+        max-width: 420px;
       }
       .pdf-charts-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: 12px;
+        gap: 10px;
+        margin-top: 10px;
       }
       .pdf-chart-card {
-        border-radius: 20px;
-        background: #f8f8f9;
-        border: 1px solid rgba(85, 85, 91, 0.08);
-        padding: 14px;
+        padding: 12px;
       }
       .pdf-chart-card h3 {
-        margin: 0 0 14px;
-        font-size: 14px;
-        line-height: 1.45;
+        font-size: 13px;
+        line-height: 1.4;
       }
       .pdf-chart-bars {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
         gap: 10px;
-        align-items: end;
-        min-height: 190px;
+        margin-top: 16px;
+        min-height: 168px;
       }
       .pdf-chart-item {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        align-items: center;
+        flex: 1;
         text-align: center;
       }
       .pdf-chart-bar-wrap {
-        width: 100%;
-        height: 150px;
+        height: 152px;
         display: flex;
-        align-items: end;
+        align-items: flex-end;
+        justify-content: center;
       }
       .pdf-chart-bar {
-        width: 100%;
-        border-radius: 14px 14px 8px 8px;
-        background: linear-gradient(180deg, #f1d433 0%, #d7aa1b 100%);
+        width: 34px;
+        border-radius: 12px 12px 0 0;
+        background: linear-gradient(180deg, #f1d433 0%, #d3a900 100%);
       }
       .pdf-chart-item strong {
-        margin-top: 10px;
+        display: block;
+        margin-top: 9px;
         font-size: 11px;
+        color: #1f2937;
       }
       .pdf-chart-item span {
+        display: block;
         margin-top: 4px;
         font-size: 10px;
-        color: #6d6d74;
+        line-height: 1.35;
+        color: #6b7280;
       }
       .pdf-offer-stack {
         display: grid;
         gap: 10px;
-        margin-top: 12px;
+        margin-top: 10px;
       }
       .pdf-offer-card {
-        padding: 14px;
-        border-radius: 18px;
-        border: 1px solid rgba(85, 85, 91, 0.1);
-        background: #ffffff;
+        padding: 12px;
       }
       .pdf-offer-card.is-selected {
-        border-color: rgba(241, 212, 51, 0.7);
-        box-shadow: inset 0 0 0 1px rgba(241, 212, 51, 0.25);
-        background: rgba(241, 212, 51, 0.08);
+        border-color: #ead675;
+        background: #fffced;
       }
       .pdf-offer-badge,
       .pdf-selected-tag {
         display: inline-flex;
-        padding: 6px 10px;
+        align-items: center;
+        justify-content: center;
+        padding: 5px 8px;
         border-radius: 999px;
-        background: rgba(85, 85, 91, 0.08);
-        font-size: 10px;
+        font-size: 9px;
+        line-height: 1;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #66666b;
+        letter-spacing: 0.08em;
+      }
+      .pdf-offer-badge {
+        color: #7a6411;
+        background: #fff9d7;
       }
       .pdf-selected-tag {
-        background: rgba(241, 212, 51, 0.2);
+        color: #166534;
+        background: #dcfce7;
       }
       .pdf-offer-card h4 {
-        margin: 10px 0 0;
-        font-size: 16px;
+        margin-top: 10px;
+        font-size: 18px;
       }
       .pdf-offer-card p {
         margin: 6px 0 0;
-        font-size: 11px;
-        line-height: 1.5;
-        color: #6d6d74;
+        font-size: 12px;
+        line-height: 1.6;
       }
       .pdf-offer-grid {
-        flex-wrap: wrap;
-        gap: 8px;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         margin-top: 12px;
       }
       .pdf-offer-grid > div {
-        width: calc(20% - 7px);
-        padding: 10px;
-        border-radius: 14px;
-        background: #f7f7f8;
+        padding-top: 10px;
+        border-top: 1px solid #eceff3;
       }
       .pdf-offer-grid strong {
-        display: block;
-        margin-top: 8px;
+        margin-top: 6px;
         font-size: 13px;
+        color: #1f2937;
+      }
+      .pdf-note-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: 10px;
       }
       .pdf-note {
-        margin-top: 12px;
-        border-radius: 16px;
-        padding: 14px;
-        background: rgba(241, 212, 51, 0.12);
-        border: 1px solid rgba(241, 212, 51, 0.35);
+        padding: 12px;
         font-size: 12px;
         line-height: 1.7;
       }
-      .pdf-footer {
-        margin-top: 18px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(85, 85, 91, 0.12);
-        font-size: 11px;
-        line-height: 1.6;
-        color: #6d6d74;
+      .pdf-note--full {
+        grid-column: 1 / -1;
       }
-      .pdf-footer strong,
+      .pdf-footer {
+        margin-top: 12mm;
+        padding-top: 10px;
+        border-top: 1px solid #e5e7eb;
+      }
+      .pdf-footer strong {
+        font-size: 12px;
+        color: #1f2937;
+      }
       .pdf-footer span {
-        display: block;
+        font-size: 10px;
       }
     </style>
   `;
@@ -2485,13 +2393,17 @@ export default function SakiaraLandingPage() {
   const handleDownloadInstallationReport = async () => {
     if (typeof window === "undefined") return;
 
+    let reportContainer = null;
+
     try {
       const html2pdf = await loadHtml2PdfLibrary();
-      const reportContainer = document.createElement("div");
+      reportContainer = document.createElement("div");
       reportContainer.style.position = "fixed";
-      reportContainer.style.left = "-99999px";
+      reportContainer.style.left = "-200vw";
       reportContainer.style.top = "0";
       reportContainer.style.width = "210mm";
+      reportContainer.style.opacity = "0";
+      reportContainer.style.pointerEvents = "none";
       reportContainer.innerHTML = buildInstallationReportMarkup({
         metrics: installationMetrics,
         offers: installationOfferOptions,
@@ -2507,6 +2419,8 @@ export default function SakiaraLandingPage() {
       });
       document.body.appendChild(reportContainer);
 
+      await waitForNodeImages(reportContainer);
+
       const fileNameBase = `informe-sakiara-${selectedInstallationCommune.label}`
         .toLowerCase()
         .normalize("NFD")
@@ -2518,20 +2432,28 @@ export default function SakiaraLandingPage() {
         .set({
           margin: [0, 0, 0, 0],
           filename: `${fileNameBase || "informe-sakiara"}.pdf`,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2.2, useCORS: true, backgroundColor: "#ffffff" },
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: {
+            scale: 1.35,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+            logging: false,
+            imageTimeout: 15000,
+          },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           pagebreak: { mode: ["css", "legacy"] },
         })
         .from(reportContainer.firstElementChild)
         .save();
-
-      document.body.removeChild(reportContainer);
     } catch (error) {
       console.error(error);
       window.alert(
         "No se pudo generar el informe PDF en este momento. Intenta nuevamente.",
       );
+    } finally {
+      if (reportContainer && reportContainer.parentNode) {
+        reportContainer.parentNode.removeChild(reportContainer);
+      }
     }
   };
 
