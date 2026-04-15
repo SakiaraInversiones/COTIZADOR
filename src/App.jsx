@@ -820,36 +820,19 @@ export default function SakiaraLandingPage() {
 
   const installationMetrics = useMemo(() => {
     const vatMultiplier = 1.19;
-    const fixedCertSec = 500000;
-    const fixedLogistics = installationLogisticsMetrics.logisticsTotal;
-    const moduleSellPerPanel = 88456.44;
-    const structurePerPanel = 4514.43;
-    const ccPerPanel = 22089.34;
-    const laborPerPanel = 56023.57;
 
-    const huaweiBatteryPackGross = 4000000;
-    const solisBatteryPackGross = 2000000;
-
-    const huaweiTiers = [
-      { maxPanels: 6, inverter: 460000, ac: 255000, ccBoard: 0 },
-      { maxPanels: 10, inverter: 620000, ac: 315000, ccBoard: 0 },
-      { maxPanels: 14, inverter: 780000, ac: 388000, ccBoard: 0 },
-      { maxPanels: 20, inverter: 980000, ac: 492104.58, ccBoard: 113352.94 },
-      { maxPanels: 24, inverter: 1080000, ac: 548000, ccBoard: 113352.94 },
-      { maxPanels: 30, inverter: 1220000, ac: 618000, ccBoard: 154000 },
-    ];
-
-    const solisTiers = [
-      { maxPanels: 6, inverter: 760000, ac: 255000, ccBoard: 0 },
-      { maxPanels: 10, inverter: 980000, ac: 315000, ccBoard: 0 },
-      { maxPanels: 14, inverter: 1210000, ac: 388000, ccBoard: 0 },
-      { maxPanels: 20, inverter: 1500000, ac: 492104.58, ccBoard: 113352.94 },
-      { maxPanels: 24, inverter: 1620000, ac: 548000, ccBoard: 113352.94 },
-      { maxPanels: 30, inverter: 1780000, ac: 618000, ccBoard: 154000 },
-    ];
-
-    const getTier = (tiers, panels) =>
-      tiers.find((tier) => panels <= tier.maxPanels) || tiers[tiers.length - 1];
+    const moduleSellPerPanel = 79610.79168509509;
+    const huaweiInverterNet = 823740.8226448474;
+    const solisInverterNet = 1318842.105263158;
+    const laborNet = 700000;
+    const certSecNet = 500000;
+    const workbookBaseLogisticsNet = 250000;
+    const ccCablingNet = 418534.8606811147;
+    const acBoardNet = 211518.20728291315;
+    const structureBlockNet = 85536.55904467049;
+    const huaweiSmartPowerSensorNet = 56208.757187085364;
+    const huaweiBatteryPackNet = 2854046.8819106594;
+    const solisBatteryPackNet = 1678947.3684210528;
 
     const enteredMonthlyBill = Number(monthlyBillInput || 0);
     const enteredMonthlyConsumptionKWh = Number(billConsumptionInput || 0);
@@ -938,10 +921,10 @@ export default function SakiaraLandingPage() {
 
     const estimatedPanels = Math.max(
       4,
-      Math.round(systemSizeKwp / PANEL_POWER_KW),
+      Math.ceil(systemSizeKwp / PANEL_POWER_KW),
     );
-    const huaweiTier = getTier(huaweiTiers, estimatedPanels);
-    const solisTier = getTier(solisTiers, estimatedPanels);
+    const estimatedSystemSizeKwp = estimatedPanels * PANEL_POWER_KW;
+    const structureBlocks = Math.max(1, Math.ceil(estimatedPanels / 4));
 
     const selfConsumptionNoBatteryRate = clamp(
       0.48 + dayEquivalentUse * 0.0068,
@@ -954,7 +937,7 @@ export default function SakiaraLandingPage() {
       0.97,
     );
 
-    const monthlyGenerationKWh = systemSizeKwp * productionFactor;
+    const monthlyGenerationKWh = estimatedSystemSizeKwp * productionFactor;
 
     const selfConsumedNoBattery = Math.min(
       monthlyGenerationKWh * selfConsumptionNoBatteryRate,
@@ -985,28 +968,35 @@ export default function SakiaraLandingPage() {
       selfConsumptionValueWithBattery + injectionCreditWithBattery;
     const annualSavingsWithBattery = monthlySavingsWithBattery * 12;
 
+    const fixedLogisticsNet = Math.max(
+      workbookBaseLogisticsNet,
+      installationLogisticsMetrics.logisticsTotal,
+    );
+
     const commonBaseNet =
       estimatedPanels * moduleSellPerPanel +
-      estimatedPanels * structurePerPanel +
-      estimatedPanels * ccPerPanel +
-      estimatedPanels * laborPerPanel +
-      fixedCertSec +
-      fixedLogistics;
+      laborNet +
+      fixedLogisticsNet +
+      ccCablingNet +
+      acBoardNet +
+      certSecNet +
+      structureBlocks * structureBlockNet;
 
     const projectCostHuaweiNoBatteryGross =
-      (commonBaseNet +
-        huaweiTier.inverter +
-        huaweiTier.ac +
-        huaweiTier.ccBoard) *
+      (commonBaseNet + huaweiInverterNet + huaweiSmartPowerSensorNet) *
       vatMultiplier;
     const projectCostSolisNoBatteryGross =
-      (commonBaseNet + solisTier.inverter + solisTier.ac + solisTier.ccBoard) *
-      vatMultiplier;
+      (commonBaseNet + solisInverterNet) * vatMultiplier;
 
     const projectCostHuaweiWithBatteryGross =
-      projectCostHuaweiNoBatteryGross + huaweiBatteryPackGross;
+      (commonBaseNet +
+        huaweiInverterNet +
+        huaweiSmartPowerSensorNet +
+        huaweiBatteryPackNet) *
+      vatMultiplier;
     const projectCostSolisWithBatteryGross =
-      projectCostSolisNoBatteryGross + solisBatteryPackGross;
+      (commonBaseNet + solisInverterNet + solisBatteryPackNet) *
+      vatMultiplier;
 
     const compensationNoBattery = clamp(
       (monthlySavingsNoBattery / Math.max(normalizedMonthlyBill, 1)) * 100,
@@ -1020,8 +1010,8 @@ export default function SakiaraLandingPage() {
     );
 
     const projectExecutionNote = installationLogisticsMetrics.isRemoteProject
-      ? "La propuesta considera condiciones base de ejecución con permanencia operativa referencial y puede ajustarse según evaluación técnica."
-      : "La propuesta considera condiciones base de ejecución y puede ajustarse según evaluación técnica.";
+      ? "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica y alcance real del proyecto."
+      : "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica.";
 
     return {
       monthlyBill: normalizedMonthlyBill,
@@ -1030,7 +1020,8 @@ export default function SakiaraLandingPage() {
       modeSummaryLabel,
       modeSummaryHint,
       estimatedPanels,
-      estimatedSystemSizeKwp: estimatedPanels * PANEL_POWER_KW,
+      estimatedSystemSizeKwp,
+      structureBlocks,
       monthlySavingsNoBattery,
       monthlySavingsWithBattery,
       annualSavingsNoBattery,
@@ -1053,7 +1044,7 @@ export default function SakiaraLandingPage() {
         Math.max(annualSavingsWithBattery, 1),
       locationLabel: `${selectedInstallationRegion.label} · ${selectedInstallationCommune.label}`,
       productionZone: installationZone,
-      logisticsTotal: installationLogisticsMetrics.logisticsTotal,
+      logisticsTotal: fixedLogisticsNet,
       projectExecutionNote,
     };
   }, [
