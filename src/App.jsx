@@ -1137,7 +1137,7 @@ const buildInstallationReportMarkup = ({
 
       <div class="pdf-page-break"></div>
 
-      <section class="pdf-page">
+      <section class="pdf-page pdf-page--content">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Resumen técnico y comercial</div>
@@ -1190,6 +1190,27 @@ const buildInstallationReportMarkup = ({
             ${compensationChart}
           </div>
         </section>
+      </section>
+
+      <div class="pdf-page-break"></div>
+
+      <section class="pdf-page pdf-page--content">
+        <header class="pdf-header">
+          <div>
+            <div class="pdf-kicker">Contexto solar del proyecto</div>
+            <h2>Datos meteorológicos y lectura de generación</h2>
+            <p class="pdf-subtitle">
+              Referencias estacionales iniciales para sostener la lectura técnica del dimensionamiento y la producción esperada.
+            </p>
+          </div>
+          <div class="pdf-header-brand">
+            <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+            <div>
+              <strong>Sakiara Solar</strong>
+              <span>${escapeHtml(communeLabel)} · ${escapeHtml(regionLabel)}</span>
+            </div>
+          </div>
+        </header>
 
         <section class="pdf-section">
           <div class="pdf-section-head">
@@ -1239,11 +1260,32 @@ const buildInstallationReportMarkup = ({
             </article>
           </div>
         </section>
+      </section>
+
+      <div class="pdf-page-break"></div>
+
+      <section class="pdf-page pdf-page--content">
+        <header class="pdf-header">
+          <div>
+            <div class="pdf-kicker">Comparativo comercial</div>
+            <h2>Alternativas y supuestos de diseño</h2>
+            <p class="pdf-subtitle">
+              Comparación resumida de líneas ofertadas con foco en valor, ahorro y lectura invierno/verano.
+            </p>
+          </div>
+          <div class="pdf-header-brand">
+            <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+            <div>
+              <strong>Sakiara Solar</strong>
+              <span>Informe autogenerado</span>
+            </div>
+          </div>
+        </header>
 
         <section class="pdf-section">
           <div class="pdf-section-head">
             <h3>Alternativas evaluadas</h3>
-            <p>Comparación resumida de líneas ofertadas con foco en valor, ahorro y lectura invierno/verano.</p>
+            <p>Comparación resumida de líneas ofertadas para una decisión más clara.</p>
           </div>
           <div class="pdf-offer-stack">
             ${alternativesMarkup}
@@ -1418,6 +1460,8 @@ const buildInstallationReportMarkup = ({
         border: 1px solid #e5e7eb;
         border-radius: 16px;
         background: #ffffff;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
       .pdf-card {
         padding: 12px;
@@ -1474,6 +1518,10 @@ const buildInstallationReportMarkup = ({
       .pdf-page {
         padding: 14mm;
         background: #ffffff;
+        box-sizing: border-box;
+      }
+      .pdf-page--content {
+        min-height: 297mm;
       }
       h2, h3, h4 {
         color: #1f2937;
@@ -1495,7 +1543,9 @@ const buildInstallationReportMarkup = ({
         border-radius: 14px;
       }
       .pdf-section {
-        margin-top: 12mm;
+        margin-top: 10mm;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
       .pdf-section-head h3,
       .pdf-chart-card h3,
@@ -2441,7 +2491,7 @@ export default function SakiaraLandingPage() {
             imageTimeout: 15000,
           },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"] },
+          pagebreak: { mode: ["css"] },
         })
         .from(reportContainer.firstElementChild)
         .save();
