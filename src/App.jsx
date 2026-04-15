@@ -24,10 +24,53 @@ const formatNumber = (value, digits = 0) =>
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-const zoneProduction = {
-  norte: 140,
-  centro: 125,
-  sur: 112,
+const solarProductionProfilesByRegion = {
+  aricaParinacota: { annual: 158, winter: 138 },
+  tarapaca: { annual: 164, winter: 142 },
+  antofagasta: { annual: 168, winter: 145 },
+  atacama: { annual: 160, winter: 132 },
+  coquimbo: { annual: 147, winter: 108 },
+  valparaiso: { annual: 132, winter: 86 },
+  metropolitana: { annual: 128, winter: 82 },
+  ohiggins: { annual: 123, winter: 77 },
+  maule: { annual: 118, winter: 71 },
+  nuble: { annual: 112, winter: 64 },
+  biobio: { annual: 108, winter: 60 },
+  araucania: { annual: 103, winter: 54 },
+  losRios: { annual: 98, winter: 47 },
+  losLagos: { annual: 93, winter: 43 },
+  aysen: { annual: 96, winter: 42 },
+  magallanes: { annual: 83, winter: 26 },
+};
+
+const solarProductionCommuneOverrides = {
+  metropolitana: {
+    colina: { annual: 130, winter: 84 },
+    lampa: { annual: 130, winter: 84 },
+    tiltil: { annual: 131, winter: 84 },
+    loBarnechea: { annual: 127, winter: 81 },
+    lasCondes: { annual: 126, winter: 80 },
+    vitacura: { annual: 126, winter: 80 },
+    sanJoseDeMaipo: { annual: 123, winter: 75 },
+  },
+  valparaiso: {
+    concon: { annual: 134, winter: 88 },
+    vinaDelMar: { annual: 133, winter: 87 },
+    valparaiso: { annual: 132, winter: 86 },
+    losAndes: { annual: 136, winter: 90 },
+    sanFelipe: { annual: 137, winter: 91 },
+  },
+  coquimbo: {
+    laSerena: { annual: 149, winter: 111 },
+    coquimbo: { annual: 148, winter: 110 },
+    ovalle: { annual: 150, winter: 113 },
+  },
+};
+
+const getSolarProductionProfile = (regionKey, communeKey) => {
+  const communeOverride = solarProductionCommuneOverrides[regionKey]?.[communeKey];
+  if (communeOverride) return communeOverride;
+  return solarProductionProfilesByRegion[regionKey] || { annual: 125, winter: 78 };
 };
 
 const profileMap = {
@@ -123,27 +166,6 @@ const INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM = 100;
 const INSTALLATION_OVERNIGHT_CLP_PER_NIGHT = 100000;
 const INSTALLATION_LOCAL_LOGISTICS_CLP_PER_DAY = 20000;
 
-const installationZoneMap = {
-  aricaParinacota: "norte",
-  tarapaca: "norte",
-  antofagasta: "norte",
-  atacama: "norte",
-  coquimbo: "norte",
-  valparaiso: "centro",
-  metropolitana: "centro",
-  ohiggins: "centro",
-  maule: "centro",
-  nuble: "sur",
-  biobio: "sur",
-  araucania: "sur",
-  losRios: "sur",
-  losLagos: "sur",
-  aysen: "sur",
-  magallanes: "sur",
-};
-
-const getZoneFromRegion = (regionKey) =>
-  installationZoneMap[regionKey] || "centro";
 
 const getTravelLogisticsBase = (roundTripKm, tolls = 0) => {
   const variableMobilityCostPerKm =
@@ -708,6 +730,7 @@ export default function SakiaraLandingPage() {
 
   const [installationInputMode, setInstallationInputMode] =
     useState("combined");
+  const [winterCoverageGoal, setWinterCoverageGoal] = useState(false);
   const [monthlyBillInput, setMonthlyBillInput] = useState("250000");
   const [billConsumptionInput, setBillConsumptionInput] = useState("900");
   const [installationRegion, setInstallationRegion] = useState("metropolitana");
@@ -750,7 +773,10 @@ export default function SakiaraLandingPage() {
   const selectedInstallationCommune =
     selectedInstallationRegion.communes[installationCommune] ||
     selectedInstallationRegion.communes[fallbackInstallationCommuneKey];
-  const installationZone = getZoneFromRegion(installationRegion);
+  const installationSolarProfile = useMemo(
+    () => getSolarProductionProfile(installationRegion, installationCommune),
+    [installationRegion, installationCommune],
+  );
   const installationLogisticsMetrics = useMemo(
     () => getInstallationProjectLogistics(selectedInstallationCommune),
     [selectedInstallationCommune],
@@ -899,32 +925,13 @@ export default function SakiaraLandingPage() {
     }
 
     const exportRate = derivedTariff * 0.55;
-    const productionFactor = zoneProduction[installationZone];
+    const annualProductionFactor = installationSolarProfile.annual;
+    const winterProductionFactor = installationSolarProfile.winter;
 
     const dayEquivalentUse =
       selectedProfile.day +
       selectedProfile.morning * 0.35 +
       selectedProfile.night * 0.08;
-
-    const recommendedCoverage = clamp(
-      0.76 + dayEquivalentUse * 0.0022,
-      0.78,
-      0.96,
-    );
-
-    const systemSizeKwp = clamp(
-      (monthlyConsumptionKWh / Math.max(productionFactor, 1)) *
-        recommendedCoverage,
-      2.2,
-      18,
-    );
-
-    const estimatedPanels = Math.max(
-      4,
-      Math.ceil(systemSizeKwp / PANEL_POWER_KW),
-    );
-    const estimatedSystemSizeKwp = estimatedPanels * PANEL_POWER_KW;
-    const structureBlocks = Math.max(1, Math.ceil(estimatedPanels / 4));
 
     const selfConsumptionNoBatteryRate = clamp(
       0.48 + dayEquivalentUse * 0.0068,
@@ -937,7 +944,66 @@ export default function SakiaraLandingPage() {
       0.97,
     );
 
-    const monthlyGenerationKWh = estimatedSystemSizeKwp * productionFactor;
+    const effectiveValuePerGeneratedKWhNoBattery =
+      selfConsumptionNoBatteryRate * derivedTariff +
+      (1 - selfConsumptionNoBatteryRate) * exportRate;
+    const effectiveValuePerGeneratedKWhWithBattery =
+      selfConsumptionWithBatteryRate * derivedTariff +
+      (1 - selfConsumptionWithBatteryRate) * exportRate;
+
+    const recommendedCoverageRatio = clamp(
+      0.82 + dayEquivalentUse * 0.002,
+      0.84,
+      0.98,
+    );
+
+    const targetCompensationRatio = winterCoverageGoal
+      ? 1
+      : recommendedCoverageRatio;
+
+    const requiredGenerationForOptimizedSizing =
+      (normalizedMonthlyBill * recommendedCoverageRatio) /
+      Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
+
+    const requiredGenerationForWinterGoal =
+      normalizedMonthlyBill / Math.max(effectiveValuePerGeneratedKWhNoBattery, 1);
+
+    const optimizedSystemSizeKwp = clamp(
+      requiredGenerationForOptimizedSizing /
+        Math.max(annualProductionFactor, 1),
+      2.2,
+      30,
+    );
+
+    const winterGoalSystemSizeKwp = clamp(
+      requiredGenerationForWinterGoal /
+        Math.max(winterProductionFactor, 1),
+      2.2,
+      30,
+    );
+
+    const chosenSystemSizeKwp = winterCoverageGoal
+      ? winterGoalSystemSizeKwp
+      : optimizedSystemSizeKwp;
+
+    const estimatedPanels = Math.max(
+      4,
+      Math.ceil(chosenSystemSizeKwp / PANEL_POWER_KW),
+    );
+    const estimatedSystemSizeKwp = estimatedPanels * PANEL_POWER_KW;
+    const winterGoalPanels = Math.max(
+      4,
+      Math.ceil(winterGoalSystemSizeKwp / PANEL_POWER_KW),
+    );
+    const winterGoalSystemSizeRoundedKwp = winterGoalPanels * PANEL_POWER_KW;
+    const additionalPanelsForWinter = Math.max(
+      winterGoalPanels - estimatedPanels,
+      0,
+    );
+    const structureBlocks = Math.max(1, Math.ceil(estimatedPanels / 4));
+
+    const monthlyGenerationKWh = estimatedSystemSizeKwp * annualProductionFactor;
+    const winterGenerationKWh = estimatedSystemSizeKwp * winterProductionFactor;
 
     const selfConsumedNoBattery = Math.min(
       monthlyGenerationKWh * selfConsumptionNoBatteryRate,
@@ -953,6 +1019,18 @@ export default function SakiaraLandingPage() {
       selfConsumptionValueNoBattery + injectionCreditNoBattery;
     const annualSavingsNoBattery = monthlySavingsNoBattery * 12;
 
+    const winterSelfConsumedNoBattery = Math.min(
+      winterGenerationKWh * selfConsumptionNoBatteryRate,
+      monthlyConsumptionKWh,
+    );
+    const winterExportedNoBattery = Math.max(
+      winterGenerationKWh - winterSelfConsumedNoBattery,
+      0,
+    );
+    const winterMonthlySavingsNoBattery =
+      winterSelfConsumedNoBattery * derivedTariff +
+      winterExportedNoBattery * exportRate;
+
     const selfConsumedWithBattery = Math.min(
       monthlyGenerationKWh * selfConsumptionWithBatteryRate,
       monthlyConsumptionKWh,
@@ -967,6 +1045,18 @@ export default function SakiaraLandingPage() {
     const monthlySavingsWithBattery =
       selfConsumptionValueWithBattery + injectionCreditWithBattery;
     const annualSavingsWithBattery = monthlySavingsWithBattery * 12;
+
+    const winterSelfConsumedWithBattery = Math.min(
+      winterGenerationKWh * selfConsumptionWithBatteryRate,
+      monthlyConsumptionKWh,
+    );
+    const winterExportedWithBattery = Math.max(
+      winterGenerationKWh - winterSelfConsumedWithBattery,
+      0,
+    );
+    const winterMonthlySavingsWithBattery =
+      winterSelfConsumedWithBattery * derivedTariff +
+      winterExportedWithBattery * exportRate;
 
     const fixedLogisticsNet = Math.max(
       workbookBaseLogisticsNet,
@@ -1008,10 +1098,28 @@ export default function SakiaraLandingPage() {
       0,
       100,
     );
+    const winterCompensationNoBattery = clamp(
+      (winterMonthlySavingsNoBattery / Math.max(normalizedMonthlyBill, 1)) * 100,
+      0,
+      100,
+    );
+    const winterCompensationWithBattery = clamp(
+      (winterMonthlySavingsWithBattery / Math.max(normalizedMonthlyBill, 1)) * 100,
+      0,
+      100,
+    );
 
     const projectExecutionNote = installationLogisticsMetrics.isRemoteProject
-      ? "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica y alcance real del proyecto."
-      : "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica.";
+      ? "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica, alcance real del proyecto y validación final del sitio."
+      : "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica y validación final del sitio.";
+
+    const coverageObjectiveLabel = winterCoverageGoal
+      ? "Cobertura al 100% en invierno"
+      : "Compensación optimizada";
+
+    const coverageObjectiveHint = winterCoverageGoal
+      ? "Se dimensiona con un factor de producción invernal para empujar la compensación de la cuenta al 100% en los meses más exigentes."
+      : "Se dimensiona buscando una compensación alta con una inversión más contenida en meses promedio.";
 
     return {
       monthlyBill: normalizedMonthlyBill,
@@ -1032,6 +1140,8 @@ export default function SakiaraLandingPage() {
       projectCostSolisWithBattery: projectCostSolisWithBatteryGross,
       compensationNoBattery,
       compensationWithBattery,
+      winterCompensationNoBattery,
+      winterCompensationWithBattery,
       paybackHuaweiNoBattery:
         projectCostHuaweiNoBatteryGross / Math.max(annualSavingsNoBattery, 1),
       paybackHuaweiWithBattery:
@@ -1043,19 +1153,39 @@ export default function SakiaraLandingPage() {
         projectCostSolisWithBatteryGross /
         Math.max(annualSavingsWithBattery, 1),
       locationLabel: `${selectedInstallationRegion.label} · ${selectedInstallationCommune.label}`,
-      productionZone: installationZone,
       logisticsTotal: fixedLogisticsNet,
       projectExecutionNote,
+      annualProductionFactor,
+      winterProductionFactor,
+      monthlyGenerationKWh,
+      winterGenerationKWh,
+      selfConsumptionNoBatteryRate,
+      selfConsumptionWithBatteryRate,
+      effectiveValuePerGeneratedKWhNoBattery,
+      effectiveValuePerGeneratedKWhWithBattery,
+      recommendedCoverageRatio,
+      targetCompensationRatio,
+      coverageObjectiveLabel,
+      coverageObjectiveHint,
+      winterCoverageGoal,
+      winterGoalPanels,
+      winterGoalSystemSizeKwp: winterGoalSystemSizeRoundedKwp,
+      additionalPanelsForWinter,
+      suggestWinterCoverage:
+        !winterCoverageGoal &&
+        winterCompensationNoBattery < 99.5 &&
+        winterGoalPanels > estimatedPanels,
     };
   }, [
     installationInputMode,
     monthlyBillInput,
     billConsumptionInput,
-    installationZone,
+    installationSolarProfile,
     selectedProfile,
     installationLogisticsMetrics,
     selectedInstallationRegion.label,
     selectedInstallationCommune.label,
+    winterCoverageGoal,
   ]);
 
   const maintenanceMetrics = useMemo(() => {
@@ -1167,6 +1297,10 @@ export default function SakiaraLandingPage() {
       },
       { label: "Ubicación", value: installationMetrics.locationLabel },
       { label: "Perfil", value: selectedProfile.label },
+      {
+        label: "Objetivo de cobertura",
+        value: installationMetrics.coverageObjectiveLabel,
+      },
       {
         label: "Proyecto sugerido",
         value: `${formatNumber(installationMetrics.estimatedPanels)} paneles referenciales`,
@@ -1638,9 +1772,35 @@ export default function SakiaraLandingPage() {
                 </div>
               </div>
 
+              <div className="mode-card wizard-highlight-card">
+                <label className="label">Objetivo del dimensionamiento</label>
+                <div className="mode-buttons">
+                  <button
+                    className={`mode-btn ${!winterCoverageGoal ? "active" : ""}`}
+                    type="button"
+                    onClick={() => setWinterCoverageGoal(false)}
+                  >
+                    Compensación optimizada
+                  </button>
+                  <button
+                    className={`mode-btn ${winterCoverageGoal ? "active" : ""}`}
+                    type="button"
+                    onClick={() => setWinterCoverageGoal(true)}
+                  >
+                    Quiero cobertura al 100% en invierno
+                  </button>
+                </div>
+                <div className="hint">
+                  La opción invernal aumenta la cantidad de paneles para empujar la compensación de la cuenta al 100% en los meses de menor producción.
+                </div>
+              </div>
+
               <div className="mode-note">
                 <strong>{installationMetrics.modeSummaryLabel}:</strong>{" "}
                 {installationMetrics.modeSummaryHint}
+                <br />
+                <strong>{installationMetrics.coverageObjectiveLabel}:</strong>{" "}
+                {installationMetrics.coverageObjectiveHint}
               </div>
             </>
           )}
@@ -1771,9 +1931,9 @@ export default function SakiaraLandingPage() {
                   sub={`${formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
                 />
                 <SummaryCard
-                  label="Ahorro estimado desde"
-                  value={formatCLP(installationMetrics.monthlySavingsNoBattery)}
-                  sub="mensual estimado"
+                  label="Compensación invernal"
+                  value={`${formatNumber(installationMetrics.winterCompensationNoBattery)}%`}
+                  sub={installationMetrics.coverageObjectiveLabel}
                 />
               </div>
 
@@ -1800,6 +1960,32 @@ export default function SakiaraLandingPage() {
                   sub={selectedInstallationOfferData?.badge || "antes de continuar"}
                 />
               </div>
+
+              {installationMetrics.suggestWinterCoverage && (
+                <div className="info-card">
+                  <h3 className="info-title">Sugerencia para 100% en invierno</h3>
+                  <p className="info-text">
+                    Con los datos ingresados, para apuntar a una cobertura total en invierno conviene subir a
+                    <strong> {formatNumber(installationMetrics.winterGoalPanels)} paneles</strong>
+                    {installationMetrics.additionalPanelsForWinter > 0
+                      ? ` (+${formatNumber(installationMetrics.additionalPanelsForWinter)} paneles)`
+                      : ""}
+                    , equivalente a
+                    <strong> {formatNumber(installationMetrics.winterGoalSystemSizeKwp, 1)} kWp</strong>.
+                  </p>
+                  <p className="info-text">
+                    Ese ajuste usa un factor de producción invernal más exigente y lleva la compensación estimada en invierno a
+                    <strong> 100%</strong>.
+                  </p>
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => setWinterCoverageGoal(true)}
+                  >
+                    Usar cobertura al 100% en invierno
+                  </button>
+                </div>
+              )}
 
               <div className="cards-grid offer-stack single-column-grid">
                 {installationOfferOptions.map((offer) => (
@@ -1828,7 +2014,7 @@ export default function SakiaraLandingPage() {
               </div>
 
               <div className="note">
-                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote}
+                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró un factor solar referencial de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio y {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno para {selectedInstallationCommune.label}.
               </div>
             </>
           )}
