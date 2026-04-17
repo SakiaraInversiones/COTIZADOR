@@ -2478,6 +2478,19 @@ export default function SakiaraLandingPage() {
 
     let reportContainer = null;
 
+    const reportMetrics = { ...installationMetrics };
+    const reportOffers = createInstallationOfferOptions(reportMetrics);
+    const reportSelectedOffer =
+      reportOffers.find((offer) => offer.key === selectedInstallationOffer) || null;
+    const reportProfileLabel = selectedProfile.label;
+    const reportProfileDescription = selectedProfile.description;
+    const reportRegionLabel = selectedInstallationRegion.label;
+    const reportCommuneLabel = selectedInstallationCommune.label;
+    const reportClimateProfile = { ...climateReferenceProfile };
+    const reportName = name;
+    const reportPhone = phone;
+    const reportEmail = email;
+
     try {
       await loadPdfRuntime();
 
@@ -2496,17 +2509,17 @@ export default function SakiaraLandingPage() {
       reportContainer.style.opacity = "0";
       reportContainer.style.pointerEvents = "none";
       reportContainer.innerHTML = buildInstallationReportMarkup({
-        metrics: installationMetrics,
-        offers: installationOfferOptions,
-        selectedOffer: selectedInstallationOfferData,
-        profileLabel: selectedProfile.label,
-        profileDescription: selectedProfile.description,
-        regionLabel: selectedInstallationRegion.label,
-        communeLabel: selectedInstallationCommune.label,
-        climateProfile: climateReferenceProfile,
-        name,
-        phone,
-        email,
+        metrics: reportMetrics,
+        offers: reportOffers,
+        selectedOffer: reportSelectedOffer,
+        profileLabel: reportProfileLabel,
+        profileDescription: reportProfileDescription,
+        regionLabel: reportRegionLabel,
+        communeLabel: reportCommuneLabel,
+        climateProfile: reportClimateProfile,
+        name: reportName,
+        phone: reportPhone,
+        email: reportEmail,
       });
       document.body.appendChild(reportContainer);
 
@@ -2520,7 +2533,7 @@ export default function SakiaraLandingPage() {
         throw new Error("No se encontraron páginas del informe para exportar.");
       }
 
-      const fileNameBase = `informe-sakiara-${selectedInstallationCommune.label}`
+      const fileNameBase = `informe-sakiara-${reportCommuneLabel}`
         .toLowerCase()
         .normalize("NFD")
         .replace(/[̀-ͯ]/g, "")
@@ -2637,17 +2650,17 @@ export default function SakiaraLandingPage() {
 
   const maintenanceNextLabel = "Siguiente";
 
-  const installationOfferOptions = [
+  const createInstallationOfferOptions = (metrics) => [
     {
       key: "huaweiNoBattery",
       title: "Huawei sin batería",
       subtitle: "Alternativa premium base para una solución on-grid.",
       badge: "Línea Huawei",
-      price: formatCLP(installationMetrics.projectCostHuaweiNoBattery),
-      savings: formatCLP(installationMetrics.monthlySavingsNoBattery),
-      winterCompensation: `${formatNumber(installationMetrics.winterCompensationNoBattery)}%`,
-      summerCompensation: `${formatNumber(installationMetrics.summerCompensationNoBattery)}%`,
-      payback: `${formatNumber(installationMetrics.paybackHuaweiNoBattery, 1)} años`,
+      price: formatCLP(metrics.projectCostHuaweiNoBattery),
+      savings: formatCLP(metrics.monthlySavingsNoBattery),
+      winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
+      summerCompensation: `${formatNumber(metrics.summerCompensationNoBattery)}%`,
+      payback: `${formatNumber(metrics.paybackHuaweiNoBattery, 1)} años`,
       variant: "huawei",
     },
     {
@@ -2656,11 +2669,11 @@ export default function SakiaraLandingPage() {
       subtitle:
         "Alternativa eficiente para una solución on-grid con otra línea de inversor.",
       badge: "Línea Solis",
-      price: formatCLP(installationMetrics.projectCostSolisNoBattery),
-      savings: formatCLP(installationMetrics.monthlySavingsNoBattery),
-      winterCompensation: `${formatNumber(installationMetrics.winterCompensationNoBattery)}%`,
-      summerCompensation: `${formatNumber(installationMetrics.summerCompensationNoBattery)}%`,
-      payback: `${formatNumber(installationMetrics.paybackSolisNoBattery, 1)} años`,
+      price: formatCLP(metrics.projectCostSolisNoBattery),
+      savings: formatCLP(metrics.monthlySavingsNoBattery),
+      winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
+      summerCompensation: `${formatNumber(metrics.summerCompensationNoBattery)}%`,
+      payback: `${formatNumber(metrics.paybackSolisNoBattery, 1)} años`,
       variant: "solis",
     },
     {
@@ -2669,11 +2682,11 @@ export default function SakiaraLandingPage() {
       subtitle:
         "Alternativa híbrida para sumar respaldo y mayor aprovechamiento energético.",
       badge: "Huawei híbrido",
-      price: formatCLP(installationMetrics.projectCostHuaweiWithBattery),
-      savings: formatCLP(installationMetrics.monthlySavingsWithBattery),
-      winterCompensation: `${formatNumber(installationMetrics.winterCompensationWithBattery)}%`,
-      summerCompensation: `${formatNumber(installationMetrics.summerCompensationWithBattery)}%`,
-      payback: `${formatNumber(installationMetrics.paybackHuaweiWithBattery, 1)} años`,
+      price: formatCLP(metrics.projectCostHuaweiWithBattery),
+      savings: formatCLP(metrics.monthlySavingsWithBattery),
+      winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
+      summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
+      payback: `${formatNumber(metrics.paybackHuaweiWithBattery, 1)} años`,
       variant: "hybrid",
     },
     {
@@ -2682,14 +2695,18 @@ export default function SakiaraLandingPage() {
       subtitle:
         "Alternativa híbrida referencial para priorizar respaldo y continuidad operativa.",
       badge: "Solis híbrido",
-      price: formatCLP(installationMetrics.projectCostSolisWithBattery),
-      savings: formatCLP(installationMetrics.monthlySavingsWithBattery),
-      winterCompensation: `${formatNumber(installationMetrics.winterCompensationWithBattery)}%`,
-      summerCompensation: `${formatNumber(installationMetrics.summerCompensationWithBattery)}%`,
-      payback: `${formatNumber(installationMetrics.paybackSolisWithBattery, 1)} años`,
+      price: formatCLP(metrics.projectCostSolisWithBattery),
+      savings: formatCLP(metrics.monthlySavingsWithBattery),
+      winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
+      summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
+      payback: `${formatNumber(metrics.paybackSolisWithBattery, 1)} años`,
       variant: "solis hybrid",
     },
   ];
+
+  const installationOfferOptions = createInstallationOfferOptions(
+    installationMetrics,
+  );
 
   const selectedInstallationOfferData =
     installationOfferOptions.find(
@@ -2894,7 +2911,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Elige cómo quieres cotizar</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Puedes cotizar con tu boleta, con tu consumo o usar ambos
                   datos para obtener una propuesta clara y fácil de comparar.
                 </p>
@@ -2963,20 +2980,6 @@ export default function SakiaraLandingPage() {
                     </div>
                   </div>
                 )}
-
-                <div className="field">
-                  <label className="label">Modalidad seleccionada</label>
-                  <input
-                    className="input"
-                    type="text"
-                    readOnly
-                    value={installationMetrics.modeSummaryLabel}
-                  />
-                  <div className="hint">
-                    Puedes avanzar con una estimación inicial y afinarla
-                    después.
-                  </div>
-                </div>
               </div>
 
               <div className="mode-card wizard-highlight-card">
@@ -3052,7 +3055,7 @@ export default function SakiaraLandingPage() {
                 </div>
               </div>
 
-              <div className="mode-note">
+              <div className="mode-note mobile-essential-hide">
                 <strong>{installationMetrics.modeSummaryLabel}:</strong>{" "}
                 {installationMetrics.modeSummaryHint}
                 <br />
@@ -3068,7 +3071,7 @@ export default function SakiaraLandingPage() {
                 <h3 className="wizard-title">
                   Define la ubicación del proyecto
                 </h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   La ubicación nos ayuda a ajustar la evaluación de tu proyecto
                   de forma más realista, sin agregar complejidad innecesaria.
                 </p>
@@ -3118,18 +3121,6 @@ export default function SakiaraLandingPage() {
                   </div>
                 </div>
 
-                <div className="field location-summary-field">
-                  <label className="label">Ubicación evaluada</label>
-                  <input
-                    className="input"
-                    type="text"
-                    readOnly
-                    value={`${selectedInstallationRegion.label} · ${selectedInstallationCommune.label}`}
-                  />
-                  <div className="hint">
-                    Usaremos esta ubicación para ajustar internamente la evaluación.
-                  </div>
-                </div>
               </div>
             </>
           )}
@@ -3138,7 +3129,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Selecciona el perfil del hogar</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Elige el comportamiento de consumo que mejor represente tu hogar.
                   La descripción y el gráfico ejemplar te ayudan a elegir rápido y de forma simple.
                 </p>
@@ -3170,7 +3161,7 @@ export default function SakiaraLandingPage() {
                 <h3 className="wizard-title">
                   Revisa tus alternativas
                 </h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Abre el detalle de cada alternativa, compáralas con calma y
                   selecciona la que mejor se ajuste a tu proyecto antes de continuar.
                 </p>
@@ -3284,12 +3275,12 @@ export default function SakiaraLandingPage() {
                 >
                   Descargar informe PDF
                 </button>
-                <div className="hint">
+                <div className="hint mobile-essential-hide">
                   Se descarga un informe autogenerado con gráficos, resumen técnico-comercial y datos meteorológicos referenciales.
                 </div>
               </div>
 
-              <div className="note">
+              <div className="note mobile-essential-hide">
                 Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró un factor solar referencial de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio, {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno y {formatNumber(installationMetrics.summerProductionFactor, 0)} kWh/kWp/mes en verano para {selectedInstallationCommune.label}.
               </div>
             </>
@@ -3299,7 +3290,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Completa tus datos</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Ya tienes una alternativa elegida. Completa el formulario o
                   escríbenos por WhatsApp y seguiremos con la evaluación usando
                   exactamente la propuesta que seleccionaste.
@@ -3515,7 +3506,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Cuéntanos sobre tu sistema</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Con estos datos base estimamos una propuesta de mantenimiento clara,
                   útil y fácil de entender para tu sistema fotovoltaico.
                 </p>
@@ -3573,7 +3564,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Define la ubicación del sistema</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   La ubicación nos ayuda a estimar el servicio de forma más realista
                   y ordenada, sin recargar la experiencia.
                 </p>
@@ -3623,18 +3614,6 @@ export default function SakiaraLandingPage() {
                   </div>
                 </div>
 
-                <div className="field location-summary-field">
-                  <label className="label">Ubicación evaluada</label>
-                  <input
-                    className="input"
-                    type="text"
-                    value={`${selectedMaintenanceRegion.label} · ${selectedMaintenanceCommune.label}`}
-                    readOnly
-                  />
-                  <div className="hint">
-                    Usaremos esta ubicación para ajustar internamente la evaluación.
-                  </div>
-                </div>
               </div>
             </>
           )}
@@ -3643,7 +3622,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Elige la frecuencia del servicio</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Selecciona la cantidad de visitas por año que mejor se ajuste al uso,
                   exposición y necesidad de seguimiento de tu sistema.
                 </p>
@@ -3674,7 +3653,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Revisa tu plan sugerido</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Este resumen te permite entender rápido el valor del servicio,
                   la frecuencia elegida y la conveniencia de mantener tu sistema.
                 </p>
@@ -3717,7 +3696,7 @@ export default function SakiaraLandingPage() {
                 />
               </div>
 
-              <div className="cards-grid maintenance-cards-grid">
+              <div className="cards-grid maintenance-cards-grid mobile-essential-hide">
                 <div className="info-card">
                   <h3 className="info-title">Qué incluye esta evaluación</h3>
                   <p className="info-text">
@@ -3743,7 +3722,7 @@ export default function SakiaraLandingPage() {
                 </div>
               </div>
 
-              <div className="note">
+              <div className="note mobile-essential-hide">
                 Los valores son estimados y pueden variar según ubicación, condiciones de acceso,
                 tamaño del sistema y requerimientos técnicos del servicio.
               </div>
@@ -3754,7 +3733,7 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Completa tus datos</h3>
-                <p className="wizard-text">
+                <p className="wizard-text mobile-essential-hide">
                   Completa el formulario o escríbenos por WhatsApp y seguiremos con la evaluación
                   usando el resumen de mantenimiento que acabas de revisar.
                 </p>
@@ -5342,8 +5321,210 @@ export default function SakiaraLandingPage() {
         }
 
         @media (max-width: 760px) {
+          .mobile-essential-hide {
+            display: none !important;
+          }
+
+          .wizard-progress {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            margin-top: 14px;
+            padding-bottom: 4px;
+            scrollbar-width: none;
+          }
+
+          .wizard-progress::-webkit-scrollbar {
+            display: none;
+          }
+
+          .wizard-step {
+            flex: 0 0 auto;
+            min-width: 52px;
+            justify-content: center;
+            padding: 10px;
+            border-radius: 16px;
+          }
+
+          .wizard-step-copy {
+            display: none;
+          }
+
+          .wizard-step-index {
+            width: 30px;
+            height: 30px;
+            font-size: 12px;
+          }
+
+          .wizard-panel {
+            margin-top: 14px;
+            padding: 16px;
+            border-radius: 20px;
+          }
+
+          .wizard-copy {
+            text-align: left;
+            max-width: none;
+          }
+
+          .wizard-title {
+            font-size: 22px;
+            line-height: 1.12;
+          }
+
+          .wizard-fields {
+            margin-top: 14px;
+          }
+
+          .mode-card,
+          .wizard-highlight-card {
+            margin-top: 14px;
+            padding: 14px;
+            border-radius: 18px;
+          }
+
+          .mode-buttons {
+            gap: 8px;
+            margin-top: 10px;
+          }
+
+          .mode-btn {
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+          }
+
+          .fields-grid,
+          .profile-options-grid,
+          .summary-grid,
+          .compact-grid,
+          .contact-grid,
+          .cards-grid,
+          .bottom-grid,
+          .service-grid,
+          .project-grid,
+          .project-meta-grid {
+            gap: 10px;
+            margin-top: 14px;
+          }
+
+          .field,
+          .contact-box,
+          .summary-card,
+          .stat,
+          .offer-card,
+          .price-box {
+            padding: 12px;
+            border-radius: 18px;
+          }
+
+          .label {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+          }
+
+          .input,
+          .select,
+          .textarea {
+            margin-top: 8px;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 16px;
+          }
+
+          .hint {
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.45;
+          }
+
+          .profile-option-card {
+            padding: 14px;
+            border-radius: 18px;
+          }
+
+          .profile-option-title {
+            font-size: 18px;
+          }
+
+          .profile-option-description {
+            display: none;
+          }
+
+          .profile-option-check {
+            min-height: 30px;
+            padding: 0 10px;
+            font-size: 10px;
+          }
+
+          .profile-example-chart {
+            margin-top: 12px;
+            min-height: 92px;
+            gap: 8px;
+          }
+
+          .profile-example-bar-wrap {
+            min-height: 92px;
+            gap: 6px;
+          }
+
+          .summary-card {
+            min-height: 0;
+          }
+
+          .price-value,
+          .summary-value {
+            font-size: 28px;
+          }
+
+          .summary-sub {
+            margin-top: 4px;
+            font-size: 12px;
+          }
+
+          .offer-head {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .offer-head-actions {
+            width: 100%;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .offer-title {
+            font-size: 21px;
+          }
+
+          .offer-sub {
+            margin-top: 6px;
+            font-size: 13px;
+            line-height: 1.45;
+          }
+
+          .price-box {
+            margin-top: 12px;
+          }
+
           .stats-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+          }
+
+          .stat {
+            min-height: 0;
+          }
+
+          .stat-value {
+            font-size: 15px;
+            line-height: 1.3;
+          }
+
+          .report-actions {
+            margin-top: 14px;
           }
 
           .wrap {
