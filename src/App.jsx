@@ -3086,8 +3086,8 @@ export default function SakiaraLandingPage() {
               <div className="wizard-copy">
                 <h3 className="wizard-title">Elige cómo quieres cotizar</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Puedes cotizar con tu boleta, con tu consumo o usar ambos
-                  datos para obtener una propuesta clara y fácil de comparar.
+                  Completa solo los datos esenciales y te mostramos una propuesta
+                  clara, rápida y fácil de entender.
                 </p>
               </div>
 
@@ -3225,7 +3225,7 @@ export default function SakiaraLandingPage() {
                 )}
 
                 <div className="hint">
-                  Puedes optar por un criterio optimizado, priorizar invierno o definir una cobertura estacional más completa.
+                  Elige el criterio que mejor represente tu objetivo de inversión y uso real del sistema.
                 </div>
               </div>
 
@@ -4585,25 +4585,25 @@ export default function SakiaraLandingPage() {
         .mode-card {
           background: #fbfbfa;
           border: 1px solid rgba(102, 102, 107, 0.10);
-          border-radius: 22px;
-          padding: 18px;
-          margin-top: 20px;
-          box-shadow: 0 12px 24px rgba(17, 24, 39, 0.04);
+          border-radius: 20px;
+          padding: 14px;
+          margin-top: 16px;
+          box-shadow: 0 10px 20px rgba(17, 24, 39, 0.04);
         }
 
         .mode-buttons {
           display: flex;
-          gap: 10px;
+          gap: 8px;
           flex-wrap: wrap;
-          margin-top: 12px;
+          margin-top: 10px;
         }
 
         .mode-btn {
-          padding: 12px 14px;
+          padding: 11px 13px;
           background: #ffffff;
           color: #66666b;
           border: 1px solid rgba(102, 102, 107, 0.14);
-          border-radius: 16px;
+          border-radius: 14px;
           font: inherit;
           font-size: 13px;
           font-weight: 800;
@@ -4713,12 +4713,12 @@ export default function SakiaraLandingPage() {
         }
 
         .wizard-panel {
-          margin-top: 20px;
+          margin-top: 18px;
           background: #fbfbfa;
           border: 1px solid rgba(102, 102, 107, 0.10);
-          border-radius: 24px;
-          padding: 22px;
-          box-shadow: 0 14px 28px rgba(17, 24, 39, 0.04);
+          border-radius: 22px;
+          padding: 18px;
+          box-shadow: 0 12px 24px rgba(17, 24, 39, 0.04);
         }
 
         .wizard-copy {
@@ -4735,44 +4735,68 @@ export default function SakiaraLandingPage() {
         }
 
         .wizard-text {
-          margin: 10px auto 0;
-          font-size: 15px;
-          line-height: 1.72;
+          margin: 8px auto 0;
+          font-size: 14px;
+          line-height: 1.62;
           color: #7a7a80;
-          max-width: 680px;
+          max-width: 640px;
         }
 
         .wizard-fields {
-          margin-top: 22px;
+          margin-top: 16px;
         }
 
         .wizard-highlight-card {
-          margin-top: 22px;
+          margin-top: 16px;
           background: #fffef5;
         }
 
         .goal-card {
-          margin-top: 14px;
-          padding: 16px;
+          margin-top: 10px;
+          padding: 14px;
         }
 
         .goal-card .mode-buttons {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           margin-top: 8px;
           gap: 8px;
+          align-items: stretch;
         }
 
         .goal-card .mode-btn {
+          min-height: 46px;
           padding: 10px 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          line-height: 1.2;
         }
 
         .goal-card .hint {
-          margin-top: 6px;
+          margin-top: 8px;
+          font-size: 12px;
+          line-height: 1.45;
         }
 
         .goal-nested-card {
           margin-top: 8px;
-          padding: 12px;
-          border-radius: 16px;
+          padding: 10px;
+          border-radius: 14px;
+        }
+
+        .goal-nested-card .mode-buttons {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 6px;
+        }
+
+        .goal-nested-card .mode-btn {
+          min-height: 40px;
+          padding: 8px 10px;
+          justify-content: center;
+          text-align: center;
         }
 
         .step-location-grid {
@@ -5246,15 +5270,15 @@ export default function SakiaraLandingPage() {
         .fields-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-          margin-top: 20px;
+          gap: 12px;
+          margin-top: 16px;
         }
 
         .field,
         .profile-row,
         .contact-box {
-          border-radius: 20px;
-          padding: 16px;
+          border-radius: 18px;
+          padding: 14px;
         }
 
         .label {
@@ -5646,9 +5670,9 @@ export default function SakiaraLandingPage() {
           }
 
           .wizard-panel {
-            margin-top: 14px;
-            padding: 16px;
-            border-radius: 20px;
+            margin-top: 12px;
+            padding: 14px;
+            border-radius: 18px;
           }
 
           .wizard-copy {
@@ -5657,23 +5681,29 @@ export default function SakiaraLandingPage() {
           }
 
           .wizard-title {
-            font-size: 22px;
-            line-height: 1.12;
+            font-size: 21px;
+            line-height: 1.1;
+          }
+
+          .wizard-text {
+            margin-top: 6px;
+            font-size: 13px;
+            line-height: 1.5;
           }
 
           .wizard-fields {
-            margin-top: 14px;
+            margin-top: 12px;
           }
 
           .mode-card,
           .wizard-highlight-card {
-            margin-top: 14px;
-            padding: 14px;
-            border-radius: 18px;
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 16px;
           }
 
           .goal-card {
-            margin-top: 10px;
+            margin-top: 8px;
             padding: 10px;
           }
 
@@ -5684,8 +5714,8 @@ export default function SakiaraLandingPage() {
           }
 
           .mode-buttons {
-            gap: 8px;
-            margin-top: 10px;
+            gap: 6px;
+            margin-top: 8px;
           }
 
           .goal-card .mode-buttons {
@@ -5695,19 +5725,34 @@ export default function SakiaraLandingPage() {
             margin-top: 6px;
           }
 
+          .goal-nested-card .mode-buttons {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 5px;
+          }
+
           .mode-btn {
-            padding: 10px 12px;
-            border-radius: 14px;
+            padding: 9px 11px;
+            border-radius: 12px;
             font-size: 12px;
           }
 
           .goal-card .mode-btn {
             width: 100%;
-            padding: 7px 9px;
+            min-height: 42px;
+            padding: 8px 10px;
             border-radius: 11px;
             font-size: 11px;
             line-height: 1.18;
             text-align: left;
+            justify-content: flex-start;
+          }
+
+          .goal-nested-card .mode-btn {
+            min-height: 34px;
+            padding: 6px 8px;
+            font-size: 10px;
+            justify-content: center;
+            text-align: center;
           }
 
           .fields-grid,
@@ -5742,6 +5787,15 @@ export default function SakiaraLandingPage() {
             margin-top: 5px;
             font-size: 10px;
             line-height: 1.28;
+          }
+
+          .mode-note {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            line-height: 1.45;
+            text-align: left;
           }
 
           .submit-feedback {
