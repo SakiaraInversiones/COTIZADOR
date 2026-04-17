@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 const sakiaraLogo = "/sakiara-logo.jpg";
 const contactEmail = "rafael.vasquez844@gmail.com";
 const whatsappNumber = "56975807224";
-const formEndpoint = `https://formsubmit.co/${contactEmail}`;
 const PANEL_POWER_KW = 0.585;
 const REFERENCE_TARIFF_CLP_PER_KWH = 278;
 const WINTER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
@@ -11,7 +11,52 @@ const SUMMER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
 const HTML2CANVAS_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
 const JSPDF_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 
+const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
+const ALLOWED_UPLOAD_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+
+
 const sanitizeIntegerInput = (value) => value.replace(/[^\d]/g, "");
+
+const sanitizeFileName = (value) =>
+  String(value || "archivo")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase() || "archivo";
+
+const slugifyPathSegment = (value) =>
+  String(value || "general")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase() || "general";
+
+const bytesToHumanSize = (value) => {
+  if (!Number.isFinite(value) || value <= 0) return "0 MB";
+  const mb = value / (1024 * 1024);
+  return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
+};
+
+const extractFilesFromFormData = (formData) =>
+  [formData.get("adjunto_1"), formData.get("adjunto_2")].filter(
+    (file) => file instanceof File && file.size > 0,
+  );
+
+const isAllowedUploadType = (file) =>
+  !file?.type || ALLOWED_UPLOAD_TYPES.includes(file.type);
 
 const formatCLP = (value) =>
   new Intl.NumberFormat("es-CL", {
@@ -1760,6 +1805,16 @@ export default function SakiaraLandingPage() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [installationSubmitState, setInstallationSubmitState] = useState({
+    loading: false,
+    tone: "idle",
+    message: "",
+  });
+  const [maintenanceSubmitState, setMaintenanceSubmitState] = useState({
+    loading: false,
+    tone: "idle",
+    message: "",
+  });
 
   const selectedProfile = profileMap[profile];
   const selectedInstallationRegion =
@@ -2472,6 +2527,125 @@ export default function SakiaraLandingPage() {
     window.open(`https://wa.me/${whatsappNumber}?text=${text}`, "_blank");
   };
 
+
+  const setLeadSubmitState = (leadType, nextState) => {
+    if (leadType === "mantenimiento") {
+      setMaintenanceSubmitState((current) => ({ ...current, ...nextState }));
+      return;
+    }
+
+    setInstallationSubmitState((current) => ({ ...current, ...nextState }));
+  };
+
+  const uploadLeadFiles = async (files, leadType) => {
+    const safeLeadType = slugifyPathSegment(leadType);
+
+    return Promise.all(
+      files.map(async (file) => {
+        if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+          throw new Error(
+            `${file.name} supera el máximo permitido de ${bytesToHumanSize(MAX_UPLOAD_SIZE_BYTES)} por archivo.`,
+          );
+        }
+
+        if (!isAllowedUploadType(file)) {
+          throw new Error(
+            `${file.name} no tiene un formato permitido. Usa PDF, JPG, PNG, WEBP, DOC, DOCX, XLS o XLSX.`,
+          );
+        }
+
+        const safeName = sanitizeFileName(file.name);
+        const blob = await upload(
+          `leads/${safeLeadType}/${Date.now()}-${safeName}`,
+          file,
+          {
+            access: "public",
+            contentType: file.type || undefined,
+            handleUploadUrl: "/api/blob-upload",
+            multipart: file.size > 4_500_000,
+            clientPayload: JSON.stringify({ leadType: safeLeadType }),
+          },
+        );
+
+        return {
+          name: file.name,
+          url: blob.url,
+          downloadUrl: blob.downloadUrl || blob.url,
+          pathname: blob.pathname,
+          contentType: file.type || blob.contentType || "application/octet-stream",
+          size: file.size,
+        };
+      }),
+    );
+  };
+
+  const handleLeadSubmit = async (event, leadType) => {
+    event.preventDefault();
+
+    const summaryItems =
+      leadType === "mantenimiento"
+        ? getMaintenanceSummaryItems()
+        : getInstallationSummaryItems();
+
+    const files = extractFilesFromFormData(new FormData(event.currentTarget));
+
+    try {
+      setLeadSubmitState(leadType, {
+        loading: true,
+        tone: "info",
+        message:
+          files.length > 0
+            ? "Subiendo archivos y enviando tu solicitud..."
+            : "Enviando tu solicitud...",
+      });
+
+      const uploadedFiles = files.length > 0 ? await uploadLeadFiles(files, leadType) : [];
+
+      const response = await fetch("/api/send-contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leadType,
+          name,
+          phone,
+          email,
+          message,
+          summaryItems,
+          selectedOption:
+            leadType === "mantenimiento"
+              ? maintenanceMetrics.status
+              : selectedInstallationOfferData?.title || "Pendiente",
+          uploadedFiles,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result?.error || "No se pudo enviar la solicitud.");
+      }
+
+      setLeadSubmitState(leadType, {
+        loading: false,
+        tone: "success",
+        message:
+          uploadedFiles.length > 0
+            ? "Solicitud enviada correctamente. Tus archivos quedaron vinculados al correo mediante enlaces de descarga."
+            : "Solicitud enviada correctamente.",
+      });
+    } catch (error) {
+      setLeadSubmitState(leadType, {
+        loading: false,
+        tone: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Ocurrió un problema al enviar la solicitud.",
+      });
+    }
+  };
 
   const handleDownloadInstallationReport = async () => {
     if (typeof window === "undefined") return;
@@ -3317,30 +3491,8 @@ export default function SakiaraLandingPage() {
 
               <form
                 className="wizard-contact-form"
-                action={formEndpoint}
-                method="POST"
-                encType="multipart/form-data"
+                onSubmit={(event) => handleLeadSubmit(event, "instalacion")}
               >
-                <input
-                  type="hidden"
-                  name="_subject"
-                  value="Nueva solicitud de evaluación solar - Sakiara Solar"
-                />
-                <input type="hidden" name="_captcha" value="false" />
-                <input type="hidden" name="_template" value="table" />
-                {getSummaryItems().map((item, index) => (
-                  <input
-                    key={`${item.label}-${index}`}
-                    type="hidden"
-                    name={item.label
-                      .toLowerCase()
-                      .normalize("NFD")
-                      .replace(/[̀-ͯ]/g, "")
-                      .replace(/[^a-z0-9]+/g, "_")
-                      .replace(/^_|_$/g, "")}
-                    value={item.value}
-                  />
-                ))}
 
                 <div className="contact-grid">
                   <div className="contact-box">
@@ -3411,20 +3563,21 @@ export default function SakiaraLandingPage() {
                       accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
                     />
                     <div className="hint">
-                      Límite total del envío: hasta 10 MB entre ambos archivos.
+                      Hasta 25 MB por archivo. Se enviarán por enlaces seguros dentro del correo.
                     </div>
                   </div>
                 </div>
 
 
                 <div className="contact-actions wizard-actions">
-                  <button className="full-btn" type="submit">
-                    Solicitar propuesta
+                  <button className="full-btn" type="submit" disabled={installationSubmitState.loading}>
+                    {installationSubmitState.loading ? "Enviando solicitud..." : "Solicitar propuesta"}
                   </button>
                   <button
                     className="wa-btn"
                     type="button"
                     onClick={handleWhatsApp}
+                    disabled={installationSubmitState.loading}
                   >
                     Hablar por WhatsApp
                   </button>
@@ -3432,10 +3585,17 @@ export default function SakiaraLandingPage() {
                     className="wa-btn"
                     type="button"
                     onClick={handleDownloadInstallationReport}
+                    disabled={installationSubmitState.loading}
                   >
                     Descargar informe PDF
                   </button>
                 </div>
+
+                {installationSubmitState.message && (
+                  <div className={`submit-feedback ${installationSubmitState.tone}`}>
+                    {installationSubmitState.message}
+                  </div>
+                )}
               </form>
 
               <div className="wizard-maintenance-action">
@@ -3792,30 +3952,8 @@ export default function SakiaraLandingPage() {
 
               <form
                 className="wizard-contact-form"
-                action={formEndpoint}
-                method="POST"
-                encType="multipart/form-data"
+                onSubmit={(event) => handleLeadSubmit(event, "mantenimiento")}
               >
-                <input
-                  type="hidden"
-                  name="_subject"
-                  value="Nueva solicitud de mantenimiento fotovoltaico - Sakiara Solar"
-                />
-                <input type="hidden" name="_captcha" value="false" />
-                <input type="hidden" name="_template" value="table" />
-                {getMaintenanceSummaryItems().map((item, index) => (
-                  <input
-                    key={`${item.label}-${index}`}
-                    type="hidden"
-                    name={item.label
-                      .toLowerCase()
-                      .normalize("NFD")
-                      .replace(/[̀-ͯ]/g, "")
-                      .replace(/[^a-z0-9]+/g, "_")
-                      .replace(/^_|_$/g, "")}
-                    value={item.value}
-                  />
-                ))}
 
                 <div className="contact-grid">
                   <div className="contact-box">
@@ -3886,23 +4024,30 @@ export default function SakiaraLandingPage() {
                       accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
                     />
                     <div className="hint">
-                      Límite total del envío: hasta 10 MB entre ambos archivos.
+                      Hasta 25 MB por archivo. Se enviarán por enlaces seguros dentro del correo.
                     </div>
                   </div>
                 </div>
 
                 <div className="contact-actions wizard-actions">
-                  <button className="full-btn" type="submit">
-                    Solicitar evaluación
+                  <button className="full-btn" type="submit" disabled={maintenanceSubmitState.loading}>
+                    {maintenanceSubmitState.loading ? "Enviando solicitud..." : "Solicitar evaluación"}
                   </button>
                   <button
                     className="wa-btn"
                     type="button"
                     onClick={handleWhatsApp}
+                    disabled={maintenanceSubmitState.loading}
                   >
                     Hablar por WhatsApp
                   </button>
                 </div>
+
+                {maintenanceSubmitState.message && (
+                  <div className={`submit-feedback ${maintenanceSubmitState.tone}`}>
+                    {maintenanceSubmitState.message}
+                  </div>
+                )}
               </form>
             </>
           )}
@@ -4607,22 +4752,27 @@ export default function SakiaraLandingPage() {
         }
 
         .goal-card {
-          margin-top: 16px;
+          margin-top: 14px;
+          padding: 16px;
         }
 
         .goal-card .mode-buttons {
-          margin-top: 10px;
+          margin-top: 8px;
           gap: 8px;
         }
 
+        .goal-card .mode-btn {
+          padding: 10px 12px;
+        }
+
         .goal-card .hint {
-          margin-top: 8px;
+          margin-top: 6px;
         }
 
         .goal-nested-card {
-          margin-top: 10px;
-          padding: 14px;
-          border-radius: 18px;
+          margin-top: 8px;
+          padding: 12px;
+          border-radius: 16px;
         }
 
         .step-location-grid {
@@ -4777,6 +4927,35 @@ export default function SakiaraLandingPage() {
           color: #1f2328;
           font-weight: 800;
           cursor: pointer;
+        }
+
+        .submit-feedback {
+          margin-top: 14px;
+          padding: 12px 14px;
+          border-radius: 16px;
+          font-size: 13px;
+          line-height: 1.55;
+          border: 1px solid rgba(102, 102, 107, 0.12);
+          background: #ffffff;
+          color: #66666b;
+        }
+
+        .submit-feedback.success {
+          background: rgba(34, 197, 94, 0.08);
+          border-color: rgba(34, 197, 94, 0.28);
+          color: #166534;
+        }
+
+        .submit-feedback.error {
+          background: rgba(239, 68, 68, 0.08);
+          border-color: rgba(239, 68, 68, 0.24);
+          color: #991b1b;
+        }
+
+        .submit-feedback.info {
+          background: rgba(241, 212, 51, 0.12);
+          border-color: rgba(241, 212, 51, 0.28);
+          color: #7a6411;
         }
 
         .wizard-maintenance-action {
@@ -5494,14 +5673,14 @@ export default function SakiaraLandingPage() {
           }
 
           .goal-card {
-            margin-top: 12px;
-            padding: 12px;
+            margin-top: 10px;
+            padding: 10px;
           }
 
           .goal-nested-card {
-            margin-top: 8px;
-            padding: 10px;
-            border-radius: 14px;
+            margin-top: 6px;
+            padding: 8px;
+            border-radius: 12px;
           }
 
           .mode-buttons {
@@ -5510,8 +5689,10 @@ export default function SakiaraLandingPage() {
           }
 
           .goal-card .mode-buttons {
-            gap: 6px;
-            margin-top: 8px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 5px;
+            margin-top: 6px;
           }
 
           .mode-btn {
@@ -5521,10 +5702,12 @@ export default function SakiaraLandingPage() {
           }
 
           .goal-card .mode-btn {
-            padding: 8px 10px;
-            border-radius: 12px;
+            width: 100%;
+            padding: 7px 9px;
+            border-radius: 11px;
             font-size: 11px;
-            line-height: 1.2;
+            line-height: 1.18;
+            text-align: left;
           }
 
           .fields-grid,
@@ -5556,8 +5739,16 @@ export default function SakiaraLandingPage() {
           }
 
           .goal-card .hint {
-            font-size: 11px;
-            line-height: 1.35;
+            margin-top: 5px;
+            font-size: 10px;
+            line-height: 1.28;
+          }
+
+          .submit-feedback {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-size: 12px;
           }
 
           .label {
