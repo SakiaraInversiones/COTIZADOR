@@ -314,6 +314,21 @@ const installationInputModeOptions = {
   },
 };
 
+const coverageGoalModeOptions = {
+  optimized: {
+    label: "Compensación optimizada",
+    helper: "Dimensiona buscando una propuesta equilibrada entre inversión inicial y resultado esperado.",
+  },
+  winter: {
+    label: "Ajustar cobertura en invierno",
+    helper: "Prioriza el periodo más exigente del año para una lectura más conservadora.",
+  },
+  seasonal: {
+    label: "Cobertura estacional",
+    helper: "Permite definir metas distintas para invierno y verano según tu objetivo de uso.",
+  },
+};
+
 const projectShowcase = [
   {
     title: "Talagante",
@@ -1150,7 +1165,7 @@ const buildInstallationReportMarkup = ({
         </div>
 
         <div class="pdf-cover-banner-wrap">
-          <img class="pdf-cover-banner" src="/home/sakiara-hero-sunset-wide.jpg" alt="Proyecto solar Sakiara" />
+          <img class="pdf-cover-banner" src="/home/sakiara-hero-clientes.jpg" alt="Proyecto solar Sakiara" />
         </div>
 
         <div class="pdf-cover-copy">
@@ -3086,29 +3101,48 @@ export default function SakiaraLandingPage() {
               <div className="wizard-copy">
                 <h3 className="wizard-title">Elige cómo quieres cotizar</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Completa solo los datos esenciales y te mostramos una propuesta
-                  clara, rápida y fácil de entender.
+                  Puedes cotizar con tu boleta, con tu consumo o usar ambos
+                  datos para obtener una propuesta clara y fácil de comparar.
                 </p>
               </div>
 
-              <div className="mode-card">
-                <label className="label">¿Cómo quieres cotizar?</label>
-                <div className="mode-buttons">
-                  {Object.entries(installationInputModeOptions).map(
-                    ([value, option]) => (
-                      <button
-                        key={value}
-                        className={`mode-btn ${installationInputMode === value ? "active" : ""}`}
-                        type="button"
-                        onClick={() => setInstallationInputMode(value)}
-                      >
-                        {option.label}
-                      </button>
-                    ),
-                  )}
+              <div className="fields-grid wizard-fields step-one-compact-grid">
+                <div className="field compact-choice-field">
+                  <label className="label">¿Cómo quieres cotizar?</label>
+                  <select
+                    className="select compact-select"
+                    value={installationInputMode}
+                    onChange={(e) => setInstallationInputMode(e.target.value)}
+                  >
+                    {Object.entries(installationInputModeOptions).map(
+                      ([value, option]) => (
+                        <option key={value} value={value}>
+                          {option.label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                  <div className="hint">
+                    {installationInputModeOptions[installationInputMode].helper}
+                  </div>
                 </div>
-                <div className="hint">
-                  {installationInputModeOptions[installationInputMode].helper}
+
+                <div className="field compact-choice-field">
+                  <label className="label">Objetivo del dimensionamiento</label>
+                  <select
+                    className="select compact-select"
+                    value={coverageGoalMode}
+                    onChange={(e) => setCoverageGoalMode(e.target.value)}
+                  >
+                    {Object.entries(coverageGoalModeOptions).map(([value, option]) => (
+                      <option key={value} value={value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="hint">
+                    {coverageGoalModeOptions[coverageGoalMode].helper}
+                  </div>
                 </div>
               </div>
 
@@ -3156,76 +3190,63 @@ export default function SakiaraLandingPage() {
                 )}
               </div>
 
-              <div className="mode-card wizard-highlight-card goal-card">
-                <label className="label">Objetivo del dimensionamiento</label>
-                <div className="mode-buttons wrap">
-                  <button
-                    className={`mode-btn ${coverageGoalMode === "optimized" ? "active" : ""}`}
-                    type="button"
-                    onClick={() => setCoverageGoalMode("optimized")}
-                  >
-                    Compensación optimizada
-                  </button>
-                  <button
-                    className={`mode-btn ${coverageGoalMode === "winter" ? "active" : ""}`}
-                    type="button"
-                    onClick={() => setCoverageGoalMode("winter")}
-                  >
-                    Ajustar cobertura en invierno
-                  </button>
-                  <button
-                    className={`mode-btn ${coverageGoalMode === "seasonal" ? "active" : ""}`}
-                    type="button"
-                    onClick={() => setCoverageGoalMode("seasonal")}
-                  >
-                    Cobertura estacional
-                  </button>
+              <div className="mode-card wizard-highlight-card goal-compact-card">
+                <div className="goal-compact-header">
+                  <label className="label">Cobertura objetivo</label>
+                  <div className="goal-compact-tag">
+                    {coverageGoalModeOptions[coverageGoalMode].label}
+                  </div>
                 </div>
 
-                {(coverageGoalMode === "winter" || coverageGoalMode === "seasonal") && (
-                  <div className="mode-card nested-mode-card goal-nested-card">
-                    <label className="label">Meta de cobertura invernal</label>
-                    <div className="mode-buttons wrap">
-                      {WINTER_COVERAGE_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          className={`mode-btn ${winterCoverageTargetPercent === option ? "active" : ""}`}
-                          type="button"
-                          onClick={() => setWinterCoverageTargetPercent(option)}
-                        >
-                          {option}%
-                        </button>
-                      ))}
+                <div className={`goal-select-grid ${coverageGoalMode === "optimized" ? "is-single" : ""}`}>
+                  {(coverageGoalMode === "winter" || coverageGoalMode === "seasonal") && (
+                    <div className="field compact-choice-field compact-goal-field">
+                      <label className="label">Meta de cobertura invernal</label>
+                      <select
+                        className="select compact-select"
+                        value={winterCoverageTargetPercent}
+                        onChange={(e) =>
+                          setWinterCoverageTargetPercent(Number(e.target.value))
+                        }
+                      >
+                        {WINTER_COVERAGE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}%
+                          </option>
+                        ))}
+                      </select>
+                      <div className="hint">
+                        Parte desde 50% para mantener una inversión más flexible.
+                      </div>
                     </div>
-                    <div className="hint">
-                      Parte desde 50% para mantener una inversión más flexible. A mayor porcentaje, mayor cantidad de paneles.
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {coverageGoalMode === "seasonal" && (
-                  <div className="mode-card nested-mode-card goal-nested-card">
-                    <label className="label">Meta de cobertura en verano</label>
-                    <div className="mode-buttons wrap">
-                      {SUMMER_COVERAGE_OPTIONS.map((option) => (
-                        <button
-                          key={option}
-                          className={`mode-btn ${summerCoverageTargetPercent === option ? "active" : ""}`}
-                          type="button"
-                          onClick={() => setSummerCoverageTargetPercent(option)}
-                        >
-                          {option}%
-                        </button>
-                      ))}
+                  {coverageGoalMode === "seasonal" && (
+                    <div className="field compact-choice-field compact-goal-field">
+                      <label className="label">Meta de cobertura en verano</label>
+                      <select
+                        className="select compact-select"
+                        value={summerCoverageTargetPercent}
+                        onChange={(e) =>
+                          setSummerCoverageTargetPercent(Number(e.target.value))
+                        }
+                      >
+                        {SUMMER_COVERAGE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}%
+                          </option>
+                        ))}
+                      </select>
+                      <div className="hint">
+                        El sistema usa el escenario más exigente entre invierno y verano.
+                      </div>
                     </div>
-                    <div className="hint">
-                      El sistema se dimensiona comparando el objetivo de invierno y verano, y usa el escenario más exigente.
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                <div className="hint">
-                  Elige el criterio que mejor represente tu objetivo de inversión y uso real del sistema.
+                <div className="goal-compact-summary">
+                  <strong>{installationMetrics.coverageObjectiveLabel}:</strong>{" "}
+                  {installationMetrics.coverageObjectiveHint}
                 </div>
               </div>
 
@@ -4214,7 +4235,7 @@ export default function SakiaraLandingPage() {
             linear-gradient(180deg, rgba(9, 14, 26, 0.42) 0%, rgba(9, 14, 26, 0.18) 34%, rgba(9, 14, 26, 0.30) 100%),
             linear-gradient(0deg, rgba(10, 16, 28, 0.16) 0%, rgba(10, 16, 28, 0.08) 100%),
             radial-gradient(circle at 50% 34%, rgba(255, 204, 82, 0.22) 0%, rgba(255, 204, 82, 0.00) 26%),
-            url('/home/sakiara-hero-sunset-wide.jpg');
+            url('/home/sakiara-hero-clientes.jpg');
           background-size: cover;
           background-position: center 44%;
           transform: scale(1.02);
@@ -4585,25 +4606,25 @@ export default function SakiaraLandingPage() {
         .mode-card {
           background: #fbfbfa;
           border: 1px solid rgba(102, 102, 107, 0.10);
-          border-radius: 20px;
-          padding: 14px;
-          margin-top: 16px;
-          box-shadow: 0 10px 20px rgba(17, 24, 39, 0.04);
+          border-radius: 22px;
+          padding: 18px;
+          margin-top: 20px;
+          box-shadow: 0 12px 24px rgba(17, 24, 39, 0.04);
         }
 
         .mode-buttons {
           display: flex;
-          gap: 8px;
+          gap: 10px;
           flex-wrap: wrap;
-          margin-top: 10px;
+          margin-top: 12px;
         }
 
         .mode-btn {
-          padding: 11px 13px;
+          padding: 12px 14px;
           background: #ffffff;
           color: #66666b;
           border: 1px solid rgba(102, 102, 107, 0.14);
-          border-radius: 14px;
+          border-radius: 16px;
           font: inherit;
           font-size: 13px;
           font-weight: 800;
@@ -4713,12 +4734,12 @@ export default function SakiaraLandingPage() {
         }
 
         .wizard-panel {
-          margin-top: 18px;
+          margin-top: 20px;
           background: #fbfbfa;
           border: 1px solid rgba(102, 102, 107, 0.10);
-          border-radius: 22px;
-          padding: 18px;
-          box-shadow: 0 12px 24px rgba(17, 24, 39, 0.04);
+          border-radius: 24px;
+          padding: 22px;
+          box-shadow: 0 14px 28px rgba(17, 24, 39, 0.04);
         }
 
         .wizard-copy {
@@ -4735,68 +4756,118 @@ export default function SakiaraLandingPage() {
         }
 
         .wizard-text {
-          margin: 8px auto 0;
-          font-size: 14px;
-          line-height: 1.62;
+          margin: 10px auto 0;
+          font-size: 15px;
+          line-height: 1.72;
           color: #7a7a80;
-          max-width: 640px;
+          max-width: 680px;
         }
 
         .wizard-fields {
-          margin-top: 16px;
+          margin-top: 22px;
         }
 
         .wizard-highlight-card {
-          margin-top: 16px;
+          margin-top: 22px;
           background: #fffef5;
         }
 
         .goal-card {
-          margin-top: 10px;
-          padding: 14px;
+          margin-top: 14px;
+          padding: 16px;
         }
 
         .goal-card .mode-buttons {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
           margin-top: 8px;
           gap: 8px;
-          align-items: stretch;
         }
 
         .goal-card .mode-btn {
-          min-height: 46px;
           padding: 10px 12px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          line-height: 1.2;
         }
 
         .goal-card .hint {
-          margin-top: 8px;
-          font-size: 12px;
-          line-height: 1.45;
+          margin-top: 6px;
         }
 
         .goal-nested-card {
           margin-top: 8px;
-          padding: 10px;
-          border-radius: 14px;
+          padding: 12px;
+          border-radius: 16px;
         }
 
-        .goal-nested-card .mode-buttons {
-          display: grid;
-          grid-template-columns: repeat(6, minmax(0, 1fr));
-          gap: 6px;
+        .step-one-compact-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+          align-items: stretch;
         }
 
-        .goal-nested-card .mode-btn {
-          min-height: 40px;
-          padding: 8px 10px;
+        .compact-choice-field {
+          height: 100%;
+        }
+
+        .compact-choice-field .select {
+          margin-top: 8px;
+        }
+
+        .goal-compact-card {
+          margin-top: 14px;
+          padding: 14px 16px;
+          background: #fffef5;
+          border: 1px solid rgba(241, 212, 51, 0.18);
+        }
+
+        .goal-compact-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .goal-compact-tag {
+          display: inline-flex;
+          align-items: center;
           justify-content: center;
+          min-height: 34px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: rgba(241, 212, 51, 0.16);
+          color: #6d5910;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1.2;
           text-align: center;
+        }
+
+        .goal-select-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 12px;
+        }
+
+        .goal-select-grid.is-single {
+          display: none;
+        }
+
+        .compact-goal-field .hint {
+          margin-top: 6px;
+        }
+
+        .goal-compact-summary {
+          margin-top: 12px;
+          padding: 10px 12px;
+          border-radius: 14px;
+          background: #ffffff;
+          border: 1px solid rgba(102, 102, 107, 0.10);
+          font-size: 13px;
+          line-height: 1.55;
+          color: #6c6c73;
+          text-align: left;
+        }
+
+        .goal-compact-summary strong {
+          color: #4a4b50;
         }
 
         .step-location-grid {
@@ -5270,15 +5341,15 @@ export default function SakiaraLandingPage() {
         .fields-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-          margin-top: 16px;
+          gap: 14px;
+          margin-top: 20px;
         }
 
         .field,
         .profile-row,
         .contact-box {
-          border-radius: 18px;
-          padding: 14px;
+          border-radius: 20px;
+          padding: 16px;
         }
 
         .label {
@@ -5670,9 +5741,9 @@ export default function SakiaraLandingPage() {
           }
 
           .wizard-panel {
-            margin-top: 12px;
-            padding: 14px;
-            border-radius: 18px;
+            margin-top: 14px;
+            padding: 16px;
+            border-radius: 20px;
           }
 
           .wizard-copy {
@@ -5681,29 +5752,23 @@ export default function SakiaraLandingPage() {
           }
 
           .wizard-title {
-            font-size: 21px;
-            line-height: 1.1;
-          }
-
-          .wizard-text {
-            margin-top: 6px;
-            font-size: 13px;
-            line-height: 1.5;
+            font-size: 22px;
+            line-height: 1.12;
           }
 
           .wizard-fields {
-            margin-top: 12px;
+            margin-top: 14px;
           }
 
           .mode-card,
           .wizard-highlight-card {
-            margin-top: 12px;
-            padding: 12px;
-            border-radius: 16px;
+            margin-top: 14px;
+            padding: 14px;
+            border-radius: 18px;
           }
 
           .goal-card {
-            margin-top: 8px;
+            margin-top: 10px;
             padding: 10px;
           }
 
@@ -5713,9 +5778,44 @@ export default function SakiaraLandingPage() {
             border-radius: 12px;
           }
 
+          .step-one-compact-grid,
+          .goal-select-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .goal-compact-card {
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 16px;
+          }
+
+          .goal-compact-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+
+          .goal-compact-tag {
+            min-height: 30px;
+            padding: 5px 10px;
+            font-size: 11px;
+          }
+
+          .goal-compact-summary {
+            margin-top: 10px;
+            padding: 9px 10px;
+            font-size: 12px;
+            border-radius: 12px;
+          }
+
+          .compact-choice-field .select {
+            margin-top: 6px;
+          }
+
           .mode-buttons {
-            gap: 6px;
-            margin-top: 8px;
+            gap: 8px;
+            margin-top: 10px;
           }
 
           .goal-card .mode-buttons {
@@ -5725,34 +5825,19 @@ export default function SakiaraLandingPage() {
             margin-top: 6px;
           }
 
-          .goal-nested-card .mode-buttons {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 5px;
-          }
-
           .mode-btn {
-            padding: 9px 11px;
-            border-radius: 12px;
+            padding: 10px 12px;
+            border-radius: 14px;
             font-size: 12px;
           }
 
           .goal-card .mode-btn {
             width: 100%;
-            min-height: 42px;
-            padding: 8px 10px;
+            padding: 7px 9px;
             border-radius: 11px;
             font-size: 11px;
             line-height: 1.18;
             text-align: left;
-            justify-content: flex-start;
-          }
-
-          .goal-nested-card .mode-btn {
-            min-height: 34px;
-            padding: 6px 8px;
-            font-size: 10px;
-            justify-content: center;
-            text-align: center;
           }
 
           .fields-grid,
@@ -5787,15 +5872,6 @@ export default function SakiaraLandingPage() {
             margin-top: 5px;
             font-size: 10px;
             line-height: 1.28;
-          }
-
-          .mode-note {
-            margin-top: 10px;
-            padding: 10px 12px;
-            border-radius: 14px;
-            font-size: 12px;
-            line-height: 1.45;
-            text-align: left;
           }
 
           .submit-feedback {
