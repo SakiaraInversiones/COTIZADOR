@@ -2982,7 +2982,7 @@ export default function SakiaraLandingPage() {
                 )}
               </div>
 
-              <div className="mode-card wizard-highlight-card">
+              <div className="mode-card wizard-highlight-card goal-card">
                 <label className="label">Objetivo del dimensionamiento</label>
                 <div className="mode-buttons wrap">
                   <button
@@ -3009,7 +3009,7 @@ export default function SakiaraLandingPage() {
                 </div>
 
                 {(coverageGoalMode === "winter" || coverageGoalMode === "seasonal") && (
-                  <div className="mode-card nested-mode-card">
+                  <div className="mode-card nested-mode-card goal-nested-card">
                     <label className="label">Meta de cobertura invernal</label>
                     <div className="mode-buttons wrap">
                       {WINTER_COVERAGE_OPTIONS.map((option) => (
@@ -3030,7 +3030,7 @@ export default function SakiaraLandingPage() {
                 )}
 
                 {coverageGoalMode === "seasonal" && (
-                  <div className="mode-card nested-mode-card">
+                  <div className="mode-card nested-mode-card goal-nested-card">
                     <label className="label">Meta de cobertura en verano</label>
                     <div className="mode-buttons wrap">
                       {SUMMER_COVERAGE_OPTIONS.map((option) => (
@@ -3315,7 +3315,12 @@ export default function SakiaraLandingPage() {
                 />
               </div>
 
-              <form className="wizard-contact-form" action={formEndpoint} method="POST">
+              <form
+                className="wizard-contact-form"
+                action={formEndpoint}
+                method="POST"
+                encType="multipart/form-data"
+              >
                 <input
                   type="hidden"
                   name="_subject"
@@ -3383,6 +3388,34 @@ export default function SakiaraLandingPage() {
                     />
                   </div>
                 </div>
+
+                <div className="contact-grid attachments-grid">
+                  <div className="contact-box attachment-box">
+                    <label className="label">Adjunto 1</label>
+                    <input
+                      className="input file-input"
+                      type="file"
+                      name="adjunto_1"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                    />
+                    <div className="hint">
+                      Puedes adjuntar boleta, cotización, fotos o documentos técnicos.
+                    </div>
+                  </div>
+                  <div className="contact-box attachment-box">
+                    <label className="label">Adjunto 2</label>
+                    <input
+                      className="input file-input"
+                      type="file"
+                      name="adjunto_2"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                    />
+                    <div className="hint">
+                      Límite total del envío: hasta 10 MB entre ambos archivos.
+                    </div>
+                  </div>
+                </div>
+
 
                 <div className="contact-actions wizard-actions">
                   <button className="full-btn" type="submit">
@@ -3757,7 +3790,12 @@ export default function SakiaraLandingPage() {
                 />
               </div>
 
-              <form className="wizard-contact-form" action={formEndpoint} method="POST">
+              <form
+                className="wizard-contact-form"
+                action={formEndpoint}
+                method="POST"
+                encType="multipart/form-data"
+              >
                 <input
                   type="hidden"
                   name="_subject"
@@ -3823,6 +3861,33 @@ export default function SakiaraLandingPage() {
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="Cuéntanos el estado del sistema, observaciones o el tipo de servicio que necesitas"
                     />
+                  </div>
+                </div>
+
+                <div className="contact-grid attachments-grid">
+                  <div className="contact-box attachment-box">
+                    <label className="label">Adjunto 1</label>
+                    <input
+                      className="input file-input"
+                      type="file"
+                      name="adjunto_1"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                    />
+                    <div className="hint">
+                      Puedes adjuntar boleta, cotización, fotos o documentos técnicos.
+                    </div>
+                  </div>
+                  <div className="contact-box attachment-box">
+                    <label className="label">Adjunto 2</label>
+                    <input
+                      className="input file-input"
+                      type="file"
+                      name="adjunto_2"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                    />
+                    <div className="hint">
+                      Límite total del envío: hasta 10 MB entre ambos archivos.
+                    </div>
                   </div>
                 </div>
 
@@ -4541,6 +4606,25 @@ export default function SakiaraLandingPage() {
           background: #fffef5;
         }
 
+        .goal-card {
+          margin-top: 16px;
+        }
+
+        .goal-card .mode-buttons {
+          margin-top: 10px;
+          gap: 8px;
+        }
+
+        .goal-card .hint {
+          margin-top: 8px;
+        }
+
+        .goal-nested-card {
+          margin-top: 10px;
+          padding: 14px;
+          border-radius: 18px;
+        }
+
         .step-location-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -4667,6 +4751,32 @@ export default function SakiaraLandingPage() {
 
         .wizard-contact-form {
           margin-top: 20px;
+        }
+
+        .attachments-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .attachment-box {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .file-input {
+          padding: 10px 12px;
+          background: #ffffff;
+          cursor: pointer;
+        }
+
+        .file-input::file-selector-button {
+          margin-right: 10px;
+          padding: 8px 12px;
+          border: 0;
+          border-radius: 10px;
+          background: #f1d433;
+          color: #1f2328;
+          font-weight: 800;
+          cursor: pointer;
         }
 
         .wizard-maintenance-action {
@@ -5383,15 +5493,38 @@ export default function SakiaraLandingPage() {
             border-radius: 18px;
           }
 
+          .goal-card {
+            margin-top: 12px;
+            padding: 12px;
+          }
+
+          .goal-nested-card {
+            margin-top: 8px;
+            padding: 10px;
+            border-radius: 14px;
+          }
+
           .mode-buttons {
             gap: 8px;
             margin-top: 10px;
+          }
+
+          .goal-card .mode-buttons {
+            gap: 6px;
+            margin-top: 8px;
           }
 
           .mode-btn {
             padding: 10px 12px;
             border-radius: 14px;
             font-size: 12px;
+          }
+
+          .goal-card .mode-btn {
+            padding: 8px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            line-height: 1.2;
           }
 
           .fields-grid,
@@ -5416,6 +5549,15 @@ export default function SakiaraLandingPage() {
           .price-box {
             padding: 12px;
             border-radius: 18px;
+          }
+
+          .attachments-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .goal-card .hint {
+            font-size: 11px;
+            line-height: 1.35;
           }
 
           .label {
