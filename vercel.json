@@ -1,6 +1,8 @@
 {
   "rewrites": [
-    { "source": "/instalacion", "destination": "/index.html" },
-    { "source": "/mantenimiento", "destination": "/index.html" }
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
