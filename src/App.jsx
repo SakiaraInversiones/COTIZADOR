@@ -349,6 +349,74 @@ const projectShowcase = [
   },
 ];
 
+const homeDecisionDrivers = [
+  {
+    title: "Tu gasto eléctrico puede trabajar a tu favor",
+    text:
+      "La energía solar permite convertir parte de tu consumo mensual en una decisión patrimonial más inteligente, con compensación vía net billing y menor exposición a futuras alzas.",
+  },
+  {
+    title: "La clave no es instalar por instalar",
+    text:
+      "Un proyecto bien planteado parte por revisar consumo, ubicación, perfil del hogar y objetivo de cobertura antes de definir una alternativa técnica y económica.",
+  },
+  {
+    title: "Necesitas claridad para tomar una buena decisión",
+    text:
+      "Por eso Sakiara muestra una evaluación referencial clara, con inversión estimada, compensación proyectada y alternativas fáciles de comparar.",
+  },
+];
+
+const homeProcessSteps = [
+  {
+    step: "01",
+    title: "Revisamos tu punto de partida",
+    text:
+      "Puedes cotizar con boleta, consumo o ambos datos para construir una base simple y útil desde el primer minuto.",
+  },
+  {
+    step: "02",
+    title: "Modelamos el proyecto según tu ubicación y uso",
+    text:
+      "Ajustamos la evaluación con región, comuna y perfil del hogar para acercarnos mejor al comportamiento real del sistema.",
+  },
+  {
+    step: "03",
+    title: "Comparamos alternativas claras",
+    text:
+      "La propuesta muestra distintas configuraciones para que puedas decidir con criterio técnico y lectura económica, no a ciegas.",
+  },
+  {
+    step: "04",
+    title: "Te acompañamos hasta la ejecución",
+    text:
+      "Si el proyecto tiene sentido para tu propiedad, seguimos con evaluación comercial, definición final y ejecución profesional.",
+  },
+];
+
+const homeTrustPillars = [
+  {
+    title: "Criterio técnico antes que promesas vacías",
+    text:
+      "La propuesta busca ser entendible y comercial, pero sin dejar de lado el análisis técnico que realmente importa en un proyecto solar.",
+  },
+  {
+    title: "Valores referenciales claros",
+    text:
+      "Mostramos alternativas con IVA incluido para que el cliente entienda mejor la inversión desde el inicio.",
+  },
+  {
+    title: "Marcas y soluciones confiables",
+    text:
+      "Trabajamos con configuraciones basadas en equipos reconocidos y soluciones pensadas para proyectos residenciales bien ejecutados.",
+  },
+  {
+    title: "Postventa y mantenimiento",
+    text:
+      "Sakiara no se queda solo en la instalación: también evalúa el mantenimiento y continuidad operativa del sistema.",
+  },
+];
+
 const VEHICLE_EFFICIENCY_KM_PER_L = 8;
 const REFERENCE_FUEL_PRICE_CLP_PER_L = 1300;
 const VEHICLE_WEAR_CLP_PER_KM = 120;
@@ -1013,7 +1081,7 @@ const escapeHtml = (value) =>
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
 const buildReportBarChartMarkup = ({
@@ -2495,12 +2563,12 @@ export default function SakiaraLandingPage() {
     { label: "Resultado", value: maintenanceMetrics.status },
   ];
 
-  const buildInstallationSummaryText = () =>
+  const BUILDInstallationSummaryText = () =>
     getInstallationSummaryItems()
       .map((item) => `${item.label}: ${item.value}`)
       .join("\n");
 
-  const buildMaintenanceSummaryText = () =>
+  const BUILDMaintenanceSummaryText = () =>
     getMaintenanceSummaryItems()
       .map((item) => `${item.label}: ${item.value}`)
       .join("\n");
@@ -2516,13 +2584,29 @@ export default function SakiaraLandingPage() {
       .join("\n");
 
   const handleWhatsApp = () => {
+    if (activeView === "home") {
+      const text = encodeURIComponent(
+        "Hola, quiero evaluar una instalación solar para mi propiedad y revisar si tiene sentido técnico y económico.",
+      );
+      window.open(`https://wa.me/${whatsappNumber}?text=${text}`, "_blank");
+      return;
+    }
+
     const intro =
       activeView === "mantenimiento"
         ? "Hola, quiero evaluar el mantenimiento de mi sistema fotovoltaico."
         : "Hola, quiero cotizar un proyecto fotovoltaico para mi propiedad.";
 
     const text = encodeURIComponent(
-      `${intro}\n\n${buildSummaryText()}\n\nNombre: ${name || "-"}\nTeléfono: ${phone || "-"}\nCorreo: ${email || "-"}\n\nMensaje: ${message || "-"}`,
+      `${intro}
+
+${buildSummaryText()}
+
+Nombre: ${name || "-"}
+Teléfono: ${phone || "-"}
+Correo: ${email || "-"}
+
+Mensaje: ${message || "-"}`,
     );
     window.open(`https://wa.me/${whatsappNumber}?text=${text}`, "_blank");
   };
@@ -2896,17 +2980,51 @@ export default function SakiaraLandingPage() {
         <div className="hero-banner-image" aria-hidden="true" />
         <div className="hero-banner-inner">
           <div className="hero-banner-copy">
-            <p className="hero-kicker">Cotización solar clara y rápida</p>
+            <p className="hero-kicker">Energía solar residencial con enfoque de inversión</p>
             <h1 className="hero-banner-title">
-              <span>Convierte tu consumo</span>
-              <span>en una inversión</span>
+              <span>Convierte tu techo</span>
+              <span>en una inversión energética</span>
             </h1>
             <p className="hero-banner-slogan">
               Ejecutamos proyectos, desarrollamos inversiones.
             </p>
             <p className="hero-banner-text">
-              Evalúa instalación o mantenimiento en pocos pasos.
+              En Sakiara evaluamos si tu propiedad tiene sentido técnico y económico para energía solar, con una propuesta clara, profesional y fácil de entender.
             </p>
+
+            <div className="cta-row hero-cta-row">
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={() => goToView("instalacion")}
+              >
+                Evaluar mi proyecto solar
+              </button>
+              <button
+                className="btn-secondary hero-secondary-btn"
+                type="button"
+                onClick={handleWhatsApp}
+              >
+                Hablar por WhatsApp
+              </button>
+              <button
+                className="btn-secondary hero-secondary-btn"
+                type="button"
+                onClick={() =>
+                  document
+                    .getElementById("proyectos")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+              >
+                Ver proyectos realizados
+              </button>
+            </div>
+
+            <div className="hero-proof-row">
+              <span>Evaluación referencial clara</span>
+              <span>Valores IVA incluido</span>
+              <span>WhatsApp directo</span>
+            </div>
 
             <div className="hero-brand-block">
               <span className="hero-brand-label">
@@ -2931,54 +3049,118 @@ export default function SakiaraLandingPage() {
       </section>
 
       <section className="section-card home-services-wrap">
-        <div className="service-grid">
-          <div className="service-card">
+        <div className="service-grid home-service-grid">
+          <div className="service-card highlighted featured-service-card">
             <div>
-              <div className="offer-badge">Instalación</div>
+              <div className="offer-badge">Servicio principal</div>
               <h2 className="service-title">
-                Cotizador de instalación fotovoltaica
+                Instalación fotovoltaica residencial
               </h2>
               <p className="service-text">
-                Cotiza con tu boleta, tu consumo o ambos datos.
+                Diseñada para personas que quieren transformar su consumo eléctrico en una decisión de inversión mejor pensada.
               </p>
             </div>
-            <div className="service-points">
-              <div>Ahorro estimado</div>
-              <div>Retorno referencial</div>
-              <div>Valores IVA incluido</div>
+            <div className="service-points emphasis-points">
+              <div>Evaluación con boleta, consumo o ambos datos</div>
+              <div>Compensación proyectada y retorno referencial</div>
+              <div>Alternativas claras para comparar antes de decidir</div>
             </div>
             <button
               className="btn-primary"
               type="button"
               onClick={() => goToView("instalacion")}
             >
-              Cotizar instalación
+              Revisar mi potencial solar
             </button>
           </div>
 
-          <div className="service-card highlighted">
+          <div className="service-card secondary-service-card">
             <div>
-              <div className="offer-badge">Mantenimiento</div>
+              <div className="offer-badge">Postventa y continuidad</div>
               <h2 className="service-title">
-                Plan de mantenimiento fotovoltaico
+                Mantenimiento fotovoltaico
               </h2>
               <p className="service-text">
-                Evalúa el estado y cuidado de tu sistema.
+                Para sistemas que necesitan limpieza técnica, revisión general y una pauta clara de cuidado y seguimiento.
               </p>
             </div>
             <div className="service-points">
-              <div>Limpieza técnica</div>
-              <div>Revisión general</div>
-              <div>Frecuencia sugerida</div>
+              <div>Limpieza técnica y revisión visual</div>
+              <div>Frecuencia anual sugerida</div>
+              <div>Evaluación rápida según ubicación</div>
             </div>
             <button
-              className="btn-primary"
+              className="btn-secondary"
               type="button"
               onClick={() => goToView("mantenimiento")}
             >
               Evaluar mantenimiento
             </button>
           </div>
+        </div>
+      </section>
+
+      <section className="section-card">
+        <div className="section-head">
+          <p className="eyebrow">Por qué este paso puede tener sentido</p>
+          <h2 className="section-title">
+            No se trata solo de paneles: se trata de tomar una buena decisión energética
+          </h2>
+          <p className="section-text">
+            La idea no es vender por impulso, sino ayudarte a entender si la energía solar realmente conviene para tu propiedad, tu forma de consumo y tu objetivo de inversión.
+          </p>
+        </div>
+
+        <div className="insight-grid">
+          {homeDecisionDrivers.map((item) => (
+            <article key={item.title} className="insight-card">
+              <h3 className="insight-title">{item.title}</h3>
+              <p className="insight-text">{item.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section-card emphasis-card">
+        <div className="section-head">
+          <p className="eyebrow">Cómo trabaja Sakiara</p>
+          <h2 className="section-title">
+            Un recorrido simple para que evalúes tu proyecto con más claridad
+          </h2>
+          <p className="section-text">
+            Buscamos que el cliente entienda rápido el punto de partida, compare alternativas y tenga una base seria antes de avanzar a una propuesta comercial más detallada.
+          </p>
+        </div>
+
+        <div className="process-grid">
+          {homeProcessSteps.map((item) => (
+            <article key={item.step} className="process-card">
+              <div className="process-step-number">{item.step}</div>
+              <h3 className="process-title">{item.title}</h3>
+              <p className="process-text">{item.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section-card">
+        <div className="section-head">
+          <p className="eyebrow">Por qué confiar</p>
+          <h2 className="section-title">
+            Una propuesta comercial que intenta ser clara sin perder criterio técnico
+          </h2>
+          <p className="section-text">
+            Sakiara busca vender con seriedad: mostrando alternativas entendibles, una lectura económica inicial y una ejecución alineada con soluciones fotovoltaicas profesionales.
+          </p>
+        </div>
+
+        <div className="trust-grid">
+          {homeTrustPillars.map((item) => (
+            <article key={item.title} className="trust-card">
+              <h3 className="trust-title">{item.title}</h3>
+              <p className="trust-text">{item.text}</p>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -2989,9 +3171,7 @@ export default function SakiaraLandingPage() {
             Instalaciones reales desarrolladas por Sakiara Solar
           </h2>
           <p className="section-text">
-            Una muestra de proyectos fotovoltaicos ejecutados en distintos
-            formatos, con soluciones pensadas para aprovechar mejor la energía
-            solar y presentar una instalación limpia, ordenada y profesional.
+            Una muestra de proyectos fotovoltaicos ejecutados en distintos formatos, con soluciones pensadas para aprovechar mejor la energía solar y presentar una instalación limpia, ordenada y profesional.
           </p>
         </div>
 
@@ -3040,6 +3220,42 @@ export default function SakiaraLandingPage() {
           ))}
         </div>
       </section>
+
+      <section className="section-card final-cta-card">
+        <div className="final-cta-layout">
+          <div>
+            <p className="eyebrow">Siguiente paso</p>
+            <h2 className="section-title final-cta-title">
+              Revisemos si tu propiedad realmente tiene sentido para energía solar
+            </h2>
+            <p className="section-text final-cta-text">
+              Si quieres una primera lectura seria, puedes comenzar ahora la evaluación y revisar una alternativa referencial con inversión estimada, compensación proyectada y enfoque técnico-comercial claro.
+            </p>
+            <div className="final-cta-list">
+              <div>Propuesta referencial simple de comparar</div>
+              <div>Lectura comercial orientada a inversión</div>
+              <div>Contacto directo para continuar por WhatsApp</div>
+            </div>
+          </div>
+
+          <div className="final-cta-actions">
+            <button
+              className="btn-primary final-cta-button"
+              type="button"
+              onClick={() => goToView("instalacion")}
+            >
+              Comenzar evaluación solar
+            </button>
+            <button
+              className="btn-secondary final-cta-button"
+              type="button"
+              onClick={handleWhatsApp}
+            >
+              Hablar con Sakiara
+            </button>
+          </div>
+        </div>
+      </section>
     </>
   );
 
@@ -3050,13 +3266,13 @@ export default function SakiaraLandingPage() {
         <div className="subview-hero-image" aria-hidden="true" />
         <div className="hero-banner-inner subview-hero-inner">
           <div className="hero-banner-copy subview-hero-copy">
-            <p className="hero-kicker">Cotización fotovoltaica</p>
+            <p className="hero-kicker">Evaluación de inversión solar</p>
             <h1 className="hero-banner-title subview-hero-title">
-              <span>Instalación solar</span>
-              <span>clara y profesional</span>
+              <span>Revisa si tu propiedad</span>
+              <span>tiene sentido para energía solar</span>
             </h1>
             <p className="hero-banner-text subview-hero-text">
-              Evalúa tu proyecto con una experiencia más simple, limpia y fácil de entender.
+              Construye una propuesta referencial clara, compara alternativas y da el siguiente paso con mejor información técnica y comercial.
             </p>
           </div>
         </div>
@@ -3100,10 +3316,9 @@ export default function SakiaraLandingPage() {
           {installationStep === 1 && (
             <>
               <div className="wizard-copy">
-                <h3 className="wizard-title">Elige cómo quieres cotizar</h3>
+                <h3 className="wizard-title">Define tu punto de partida</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Puedes cotizar con tu boleta, con tu consumo o usar ambos
-                  datos para obtener una propuesta clara y fácil de comparar.
+                  Puedes comenzar con tu boleta, con tu consumo o con ambos datos para construir una evaluación referencial clara y útil desde el inicio.
                 </p>
               </div>
 
@@ -3334,11 +3549,10 @@ export default function SakiaraLandingPage() {
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">
-                  Revisa tus alternativas
+                  Compara tu propuesta referencial
                 </h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Abre el detalle de cada alternativa, compáralas con calma y
-                  selecciona la que mejor se ajuste a tu proyecto antes de continuar.
+                  Revisa cada alternativa con calma, compara inversión, compensación y retorno referencial, y luego selecciona la que mejor dialogue con tu objetivo.
                 </p>
               </div>
 
@@ -3464,11 +3678,9 @@ export default function SakiaraLandingPage() {
           {installationStep === 5 && (
             <>
               <div className="wizard-copy">
-                <h3 className="wizard-title">Completa tus datos</h3>
+                <h3 className="wizard-title">Solicita tu evaluación comercial</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Ya tienes una alternativa elegida. Completa el formulario o
-                  escríbenos por WhatsApp y seguiremos con la evaluación usando
-                  exactamente la propuesta que seleccionaste.
+                  Ya tienes una alternativa elegida. Déjanos tus datos o escríbenos por WhatsApp y continuaremos la revisión usando exactamente la propuesta seleccionada como base.
                 </p>
               </div>
 
@@ -3572,7 +3784,7 @@ export default function SakiaraLandingPage() {
 
                 <div className="contact-actions wizard-actions">
                   <button className="full-btn" type="submit" disabled={installationSubmitState.loading}>
-                    {installationSubmitState.loading ? "Enviando solicitud..." : "Solicitar propuesta"}
+                    {installationSubmitState.loading ? "Enviando solicitud..." : "Solicitar evaluación comercial"}
                   </button>
                   <button
                     className="wa-btn"
@@ -4456,6 +4668,44 @@ export default function SakiaraLandingPage() {
           margin-top: 28px;
         }
 
+        .hero-cta-row {
+          margin-top: 24px;
+        }
+
+        .hero-secondary-btn {
+          background: rgba(255, 255, 255, 0.14);
+          color: #ffffff;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          box-shadow: 0 16px 30px rgba(9, 14, 26, 0.18);
+        }
+
+        .hero-secondary-btn:hover {
+          background: rgba(255, 255, 255, 0.22);
+        }
+
+        .hero-proof-row {
+          margin-top: 18px;
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .hero-proof-row span {
+          display: inline-flex;
+          align-items: center;
+          min-height: 34px;
+          padding: 0 14px;
+          border-radius: 999px;
+          background: rgba(11, 18, 32, 0.18);
+          border: 1px solid rgba(255, 255, 255, 0.10);
+          color: rgba(255, 255, 255, 0.88);
+          font-size: 12px;
+          font-weight: 700;
+          box-shadow: 0 14px 24px rgba(0, 0, 0, 0.12);
+          backdrop-filter: blur(4px);
+        }
+
         .btn-primary,
         .btn-secondary,
         .profile-btn,
@@ -5136,6 +5386,136 @@ export default function SakiaraLandingPage() {
           background: #fffef5;
         }
 
+        .home-service-grid {
+          align-items: stretch;
+        }
+
+        .featured-service-card {
+          min-height: 320px;
+        }
+
+        .secondary-service-card {
+          background: #ffffff;
+        }
+
+        .emphasis-points div {
+          font-weight: 600;
+        }
+
+        .insight-grid,
+        .trust-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+          margin-top: 20px;
+        }
+
+        .trust-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .insight-card,
+        .trust-card,
+        .process-card {
+          background: #fbfbfa;
+          border: 1px solid rgba(102, 102, 107, 0.10);
+          border-radius: 22px;
+          padding: 22px;
+          box-shadow: 0 12px 24px rgba(17, 24, 39, 0.04);
+        }
+
+        .insight-title,
+        .trust-title,
+        .process-title {
+          margin: 0;
+          font-size: 24px;
+          line-height: 1.12;
+          color: #66666b;
+        }
+
+        .insight-text,
+        .trust-text,
+        .process-text {
+          margin: 12px 0 0;
+          font-size: 15px;
+          line-height: 1.72;
+          color: #66666b;
+        }
+
+        .emphasis-card {
+          background: linear-gradient(180deg, #fffef7 0%, #ffffff 100%);
+        }
+
+        .process-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 16px;
+          margin-top: 20px;
+        }
+
+        .process-step-number {
+          width: 46px;
+          height: 46px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #f1d433;
+          color: #1f2328;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          margin-bottom: 14px;
+          box-shadow: 0 12px 22px rgba(241, 212, 51, 0.24);
+        }
+
+        .final-cta-card {
+          background: linear-gradient(135deg, #fffef7 0%, #ffffff 62%);
+          border-color: rgba(241, 212, 51, 0.28);
+        }
+
+        .final-cta-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+          gap: 24px;
+          align-items: center;
+        }
+
+        .final-cta-title,
+        .final-cta-text {
+          text-align: left;
+          max-width: none;
+        }
+
+        .final-cta-list {
+          margin-top: 18px;
+          display: grid;
+          gap: 10px;
+        }
+
+        .final-cta-list div {
+          min-height: 48px;
+          display: flex;
+          align-items: center;
+          padding: 0 16px;
+          border-radius: 16px;
+          background: rgba(241, 212, 51, 0.14);
+          border: 1px solid rgba(241, 212, 51, 0.28);
+          color: #66666b;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .final-cta-actions {
+          display: grid;
+          gap: 12px;
+        }
+
+        .final-cta-button {
+          width: 100%;
+          justify-content: center;
+        }
+
         .project-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5688,7 +6068,11 @@ export default function SakiaraLandingPage() {
           .project-grid,
           .profile-options-grid,
           .project-meta-grid,
-          .wizard-progress {
+          .wizard-progress,
+          .insight-grid,
+          .trust-grid,
+          .process-grid,
+          .final-cta-layout {
             grid-template-columns: 1fr;
           }
         }
@@ -5820,6 +6204,16 @@ export default function SakiaraLandingPage() {
 
           .attachments-grid {
             grid-template-columns: 1fr;
+          }
+
+
+          .hero-proof-row {
+            justify-content: center;
+          }
+
+          .final-cta-title,
+          .final-cta-text {
+            text-align: center;
           }
 
           .goal-card .hint {
