@@ -89,11 +89,18 @@ export async function POST(request) {
       uploadedFiles = [],
     } = payload || {};
 
-    const safeLeadType = leadType === "mantenimiento" ? "mantenimiento" : "instalacion";
+    const safeLeadType =
+      leadType === "mantenimiento"
+        ? "mantenimiento"
+        : leadType === "empresa"
+          ? "empresa"
+          : "instalacion";
     const leadTitle =
       safeLeadType === "mantenimiento"
         ? "Nueva solicitud de mantenimiento fotovoltaico"
-        : "Nueva solicitud de evaluación solar";
+        : safeLeadType === "empresa"
+          ? "Nueva solicitud empresa para visita técnica"
+          : "Nueva solicitud de evaluación solar";
 
     const html = `
       <div style="font-family:Arial,Helvetica,sans-serif;background:#f5f5f4;padding:24px;color:#111827;">

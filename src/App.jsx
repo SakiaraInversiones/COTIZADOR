@@ -417,6 +417,80 @@ const homeTrustPillars = [
   },
 ];
 
+const enterpriseUseCases = [
+  {
+    title: "Bodegas y centros logísticos",
+    text:
+      "Cubiertas amplias, consumos diurnos y operaciones que se benefician de una evaluación más estructurada.",
+  },
+  {
+    title: "Comercio, oficinas y operaciones",
+    text:
+      "Proyectos pensados para reducir costos eléctricos y ordenar una implementación clara para la empresa.",
+  },
+  {
+    title: "Agrícola e industrial liviano",
+    text:
+      "Soluciones para demandas energéticas mayores, con foco en continuidad operativa, orden de montaje y criterio técnico.",
+  },
+];
+
+const enterpriseEvaluationPoints = [
+  "Distancias reales entre módulos, inversores, tableros y empalme.",
+  "Tipo de cubierta, estructura disponible, sombras y condiciones de montaje.",
+  "Potencia del empalme, red existente y estrategia de conexión net billing.",
+  "Espacios para canalizaciones, protecciones, monitoreo y crecimiento futuro del sistema.",
+];
+
+const enterpriseProcessSteps = [
+  {
+    step: "01",
+    title: "Levantamiento inicial",
+    text:
+      "Tomamos datos base del consumo, tipo de operación y ubicación para definir si conviene avanzar.",
+  },
+  {
+    step: "02",
+    title: "Visita técnica en terreno",
+    text:
+      "Revisamos cubiertas, recorridos, tableros, empalme y condiciones reales antes de cerrar una propuesta.",
+  },
+  {
+    step: "03",
+    title: "Propuesta técnica y comercial",
+    text:
+      "Ordenamos una solución a medida, con potencia sugerida, alcance, inversión referencial y etapas del proyecto.",
+  },
+  {
+    step: "04",
+    title: "Ejecución y puesta en marcha",
+    text:
+      "Si el proyecto avanza, seguimos con ingeniería, tramitación, coordinación de medidor y arranque del sistema.",
+  },
+];
+
+const enterpriseProjectTypeOptions = [
+  { value: "bodega", label: "Bodega / centro logístico" },
+  { value: "comercio", label: "Comercio / retail" },
+  { value: "oficina", label: "Oficinas / operación" },
+  { value: "agricola", label: "Agrícola" },
+  { value: "industrial", label: "Industrial liviano" },
+  { value: "otro", label: "Otro" },
+];
+
+const enterpriseSurfaceTypeOptions = [
+  { value: "cubierta", label: "Cubierta" },
+  { value: "suelo", label: "Suelo / estructura en terreno" },
+  { value: "estacionamiento", label: "Estacionamientos / sombreaderos" },
+  { value: "mixto", label: "Mixto" },
+];
+
+const enterpriseCommercialIntentOptions = [
+  { value: "compra", label: "Compra directa" },
+  { value: "evaluar", label: "Evaluar estructura comercial" },
+  { value: "a-definir", label: "A definir en visita" },
+];
+
 const VEHICLE_EFFICIENCY_KM_PER_L = 8;
 const REFERENCE_FUEL_PRICE_CLP_PER_L = 1300;
 const VEHICLE_WEAR_CLP_PER_KM = 120;
@@ -688,11 +762,13 @@ const SITE_FALLBACK_URL = "https://sakiarainversiones.com";
 const viewPathMap = {
   home: "/",
   instalacion: "/instalacion",
+  empresas: "/empresas",
   mantenimiento: "/mantenimiento",
 };
 
 const getViewFromPath = (pathname = "/") => {
   if (pathname === "/instalacion") return "instalacion";
+  if (pathname === "/empresas") return "empresas";
   if (pathname === "/mantenimiento") return "mantenimiento";
   return "home";
 };
@@ -750,6 +826,14 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
       path: "/instalacion",
       pageName: "Cotizador de instalación fotovoltaica",
       image: `${normalizedOrigin}${sakiaraLogo}`,
+    },
+    empresas: {
+      title: "Energía solar para empresas | Sakiara Solar",
+      description:
+        "Evaluamos proyectos solares para empresas con foco técnico-comercial, visita en terreno y una referencia desde $500.000 por kWp según condiciones del proyecto.",
+      path: "/empresas",
+      pageName: "Energía solar para empresas",
+      image: `${normalizedOrigin}/proyectos/calera-de-tango-30kw.jpg`,
     },
     mantenimiento: {
       title: "Mantenimiento de paneles solares | Sakiara Solar",
@@ -1883,6 +1967,21 @@ export default function SakiaraLandingPage() {
     tone: "idle",
     message: "",
   });
+  const [enterpriseCompany, setEnterpriseCompany] = useState("");
+  const [enterpriseProjectType, setEnterpriseProjectType] = useState("bodega");
+  const [enterpriseSurfaceType, setEnterpriseSurfaceType] = useState("cubierta");
+  const [enterpriseCommercialIntent, setEnterpriseCommercialIntent] = useState("evaluar");
+  const [enterpriseMonthlyBillInput, setEnterpriseMonthlyBillInput] =
+    useState("1200000");
+  const [enterpriseMonthlyConsumptionInput, setEnterpriseMonthlyConsumptionInput] =
+    useState("4200");
+  const [enterpriseRegion, setEnterpriseRegion] = useState("metropolitana");
+  const [enterpriseCommune, setEnterpriseCommune] = useState("colina");
+  const [enterpriseSubmitState, setEnterpriseSubmitState] = useState({
+    loading: false,
+    tone: "idle",
+    message: "",
+  });
 
   const selectedProfile = profileMap[profile];
   const selectedInstallationRegion =
@@ -1929,8 +2028,30 @@ export default function SakiaraLandingPage() {
     selectedMaintenanceRegion.communes[maintenanceCommune] ||
     selectedMaintenanceRegion.communes[fallbackMaintenanceCommuneKey];
 
+  const selectedEnterpriseRegion =
+    maintenanceRegionData[enterpriseRegion] ||
+    maintenanceRegionData.metropolitana;
+  const enterpriseCommuneOptions = useMemo(
+    () =>
+      Object.entries(selectedEnterpriseRegion.communes)
+        .map(([value, config]) => ({ value, label: config.label }))
+        .sort((a, b) => a.label.localeCompare(b.label, "es")),
+    [selectedEnterpriseRegion],
+  );
+  const fallbackEnterpriseCommuneKey =
+    enterpriseCommuneOptions[0]?.value || "colina";
+  const selectedEnterpriseCommune =
+    selectedEnterpriseRegion.communes[enterpriseCommune] ||
+    selectedEnterpriseRegion.communes[fallbackEnterpriseCommuneKey];
+  const enterpriseSolarProfile = useMemo(
+    () => getSolarProductionProfile(enterpriseRegion, enterpriseCommune),
+    [enterpriseRegion, enterpriseCommune],
+  );
+
   const maintenanceSystemSize = Number(maintenanceSystemSizeInput || 0);
   const maintenanceMonthlySavings = Number(maintenanceMonthlySavingsInput || 0);
+  const enterpriseMonthlyBill = Number(enterpriseMonthlyBillInput || 0);
+  const enterpriseMonthlyConsumption = Number(enterpriseMonthlyConsumptionInput || 0);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -2472,6 +2593,54 @@ export default function SakiaraLandingPage() {
     selectedMaintenanceCommune,
   ]);
 
+  const enterpriseMetrics = useMemo(() => {
+    const normalizedMonthlyConsumption =
+      enterpriseMonthlyConsumption > 0
+        ? enterpriseMonthlyConsumption
+        : enterpriseMonthlyBill > 0
+          ? enterpriseMonthlyBill / REFERENCE_TARIFF_CLP_PER_KWH
+          : 4200;
+
+    const suggestedPowerKw = clamp(
+      normalizedMonthlyConsumption /
+        Math.max(enterpriseSolarProfile.annual * 0.9, 1),
+      15,
+      500,
+    );
+    const roundedPowerKw = Math.ceil(suggestedPowerKw / 5) * 5;
+    const referenceInvestment = roundedPowerKw * 500000;
+    const annualOffset = normalizedMonthlyConsumption * 12 * 0.72;
+    const annualSavings = annualOffset * REFERENCE_TARIFF_CLP_PER_KWH;
+
+    return {
+      monthlyConsumption: normalizedMonthlyConsumption,
+      suggestedPowerKw,
+      roundedPowerKw,
+      referenceInvestment,
+      annualSavings,
+      locationLabel: `${selectedEnterpriseRegion.label} · ${selectedEnterpriseCommune.label}`,
+      projectTypeLabel:
+        enterpriseProjectTypeOptions.find((item) => item.value === enterpriseProjectType)?.label ||
+        "Proyecto empresarial",
+      surfaceTypeLabel:
+        enterpriseSurfaceTypeOptions.find((item) => item.value === enterpriseSurfaceType)?.label ||
+        "A definir",
+      commercialIntentLabel:
+        enterpriseCommercialIntentOptions.find((item) => item.value === enterpriseCommercialIntent)?.label ||
+        "A definir",
+      referenceText: "Desde $500.000 por kWp",
+    };
+  }, [
+    enterpriseCommercialIntent,
+    enterpriseMonthlyBill,
+    enterpriseMonthlyConsumption,
+    enterpriseProjectType,
+    enterpriseSolarProfile.annual,
+    enterpriseSurfaceType,
+    selectedEnterpriseCommune.label,
+    selectedEnterpriseRegion.label,
+  ]);
+
   const goToView = (view) => {
     setActiveView(view);
 
@@ -2563,23 +2732,52 @@ export default function SakiaraLandingPage() {
     { label: "Resultado", value: maintenanceMetrics.status },
   ];
 
-  const BUILDInstallationSummaryText = () =>
-    getInstallationSummaryItems()
-      .map((item) => `${item.label}: ${item.value}`)
-      .join("\n");
+  const getEnterpriseSummaryItems = () => [
+    { label: "Servicio", value: "Evaluación solar para empresas" },
+    { label: "Empresa", value: enterpriseCompany || "No informada" },
+    { label: "Tipo de proyecto", value: enterpriseMetrics.projectTypeLabel },
+    { label: "Superficie", value: enterpriseMetrics.surfaceTypeLabel },
+    { label: "Ubicación", value: enterpriseMetrics.locationLabel },
+    {
+      label: "Boleta referencial",
+      value: formatCLP(enterpriseMonthlyBill),
+    },
+    {
+      label: "Consumo mensual estimado",
+      value: `${formatNumber(enterpriseMetrics.monthlyConsumption)} kWh/mes`,
+    },
+    {
+      label: "Potencia preliminar sugerida",
+      value: `${formatNumber(enterpriseMetrics.roundedPowerKw)} kWp`,
+    },
+    {
+      label: "Referencia comercial",
+      value: enterpriseMetrics.referenceText,
+    },
+    {
+      label: "Interés comercial",
+      value: enterpriseMetrics.commercialIntentLabel,
+    },
+    { label: "Acción solicitada", value: "Agendar visita técnica" },
+  ];
 
-  const BUILDMaintenanceSummaryText = () =>
-    getMaintenanceSummaryItems()
-      .map((item) => `${item.label}: ${item.value}`)
-      .join("\n");
+  const getLeadSummaryItems = (leadType) => {
+    if (leadType === "mantenimiento") return getMaintenanceSummaryItems();
+    if (leadType === "empresa") return getEnterpriseSummaryItems();
+    return getInstallationSummaryItems();
+  };
+
+  const getLeadSelectedOption = (leadType) => {
+    if (leadType === "mantenimiento") return maintenanceMetrics.status;
+    if (leadType === "empresa") return "Visita técnica comercial";
+    return selectedInstallationOfferData?.title || "Pendiente";
+  };
 
   const getSummaryItems = () =>
-    activeView === "mantenimiento"
-      ? getMaintenanceSummaryItems()
-      : getInstallationSummaryItems();
+    getLeadSummaryItems(activeView === "empresas" ? "empresa" : activeView);
 
-  const buildSummaryText = () =>
-    getSummaryItems()
+  const buildSummaryText = (leadType = activeView) =>
+    getLeadSummaryItems(leadType === "empresas" ? "empresa" : leadType)
       .map((item) => `${item.label}: ${item.value}`)
       .join("\n");
 
@@ -2592,15 +2790,18 @@ export default function SakiaraLandingPage() {
       return;
     }
 
+    const normalizedLeadType = activeView === "empresas" ? "empresa" : activeView;
     const intro =
-      activeView === "mantenimiento"
+      normalizedLeadType === "mantenimiento"
         ? "Hola, quiero evaluar el mantenimiento de mi sistema fotovoltaico."
-        : "Hola, quiero cotizar un proyecto fotovoltaico para mi propiedad.";
+        : normalizedLeadType === "empresa"
+          ? "Hola, quiero agendar una visita técnica para evaluar un proyecto solar para mi empresa."
+          : "Hola, quiero cotizar un proyecto fotovoltaico para mi propiedad.";
 
     const text = encodeURIComponent(
       `${intro}
 
-${buildSummaryText()}
+${buildSummaryText(normalizedLeadType)}
 
 Nombre: ${name || "-"}
 Teléfono: ${phone || "-"}
@@ -2615,6 +2816,11 @@ Mensaje: ${message || "-"}`,
   const setLeadSubmitState = (leadType, nextState) => {
     if (leadType === "mantenimiento") {
       setMaintenanceSubmitState((current) => ({ ...current, ...nextState }));
+      return;
+    }
+
+    if (leadType === "empresa") {
+      setEnterpriseSubmitState((current) => ({ ...current, ...nextState }));
       return;
     }
 
@@ -2666,10 +2872,7 @@ Mensaje: ${message || "-"}`,
   const handleLeadSubmit = async (event, leadType) => {
     event.preventDefault();
 
-    const summaryItems =
-      leadType === "mantenimiento"
-        ? getMaintenanceSummaryItems()
-        : getInstallationSummaryItems();
+    const summaryItems = getLeadSummaryItems(leadType);
 
     const files = extractFilesFromFormData(new FormData(event.currentTarget));
 
@@ -2697,10 +2900,7 @@ Mensaje: ${message || "-"}`,
           email,
           message,
           summaryItems,
-          selectedOption:
-            leadType === "mantenimiento"
-              ? maintenanceMetrics.status
-              : selectedInstallationOfferData?.title || "Pendiente",
+          selectedOption: getLeadSelectedOption(leadType),
           uploadedFiles,
         }),
       });
@@ -2864,6 +3064,11 @@ Mensaje: ${message || "-"}`,
       return;
     }
 
+    if (activeView === "empresas") {
+      scrollToSection("visita-tecnica-empresas");
+      return;
+    }
+
     if (activeView === "mantenimiento") {
       setMaintenanceStep(5);
       scrollToSection("wizard-mantenimiento");
@@ -2871,7 +3076,8 @@ Mensaje: ${message || "-"}`,
     }
   };
 
-  const floatingQuoteLabel = "Cotiza ahora";
+  const floatingQuoteLabel =
+    activeView === "empresas" ? "Agendar visita" : "Cotiza ahora";
 
   const installationSteps = [
     { id: 1, title: "Modalidad", description: "Cómo quieres cotizar" },
@@ -3071,6 +3277,30 @@ Mensaje: ${message || "-"}`,
               onClick={() => goToView("instalacion")}
             >
               Revisar mi potencial solar
+            </button>
+          </div>
+
+          <div className="service-card enterprise-service-card">
+            <div>
+              <div className="offer-badge">Empresas</div>
+              <h2 className="service-title">
+                Proyectos solares para empresas
+              </h2>
+              <p className="service-text">
+                Una línea pensada para bodegas, comercios, oficinas, operaciones agrícolas e instalaciones con mayor exigencia técnica.
+              </p>
+            </div>
+            <div className="service-points">
+              <div>Referencia desde $500.000 por kWp</div>
+              <div>Visita técnica antes de cerrar propuesta</div>
+              <div>Net Billing y evaluación comercial a medida</div>
+            </div>
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => goToView("empresas")}
+            >
+              Revisar línea empresas
             </button>
           </div>
 
@@ -4321,6 +4551,423 @@ Mensaje: ${message || "-"}`,
   );
 
 
+  const renderEnterpriseView = () => (
+    <>
+      <section className="hero-banner subview-hero enterprise-hero">
+        <div className="enterprise-hero-image" aria-hidden="true" />
+        <div className="hero-banner-inner subview-hero-inner enterprise-hero-inner">
+          <div className="hero-banner-copy subview-hero-copy enterprise-hero-copy">
+            <p className="hero-kicker">Energía solar para empresas</p>
+            <h1 className="hero-banner-title subview-hero-title">
+              Proyectos fotovoltaicos evaluados con visita técnica
+            </h1>
+            <p className="hero-banner-text subview-hero-text">
+              En proyectos empresariales priorizamos una lectura seria del consumo, el montaje, el empalme y la ejecución antes de cerrar una propuesta comercial.
+            </p>
+            <div className="cta-row enterprise-hero-actions">
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={() => scrollToSection("visita-tecnica-empresas")}
+              >
+                Agendar visita técnica
+              </button>
+              <button
+                className="btn-secondary hero-secondary-btn"
+                type="button"
+                onClick={handleWhatsApp}
+              >
+                Hablar por WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section-card enterprise-intro-card">
+        <div className="section-head">
+          <p className="eyebrow">Línea empresas</p>
+          <h2 className="section-title">
+            Una propuesta pensada para operaciones que necesitan más que un valor rápido
+          </h2>
+          <p className="section-text">
+            Mantenemos la línea comercial de Sakiara, pero en empresas el cierre serio parte con una visita técnica. Eso nos permite revisar distancias, tableros, cubiertas, empalme, crecimiento futuro y el mejor alcance del proyecto.
+          </p>
+        </div>
+
+        <div className="enterprise-stat-grid">
+          <article className="summary-card enterprise-stat-card">
+            <span className="enterprise-stat-kicker">Referencia comercial</span>
+            <strong className="enterprise-stat-value">Desde $500.000 por kWp</strong>
+            <p className="enterprise-stat-text">Valor referencial para proyectos on-grid empresariales. Sujeto a visita técnica, equipos, metrajes, estructura y condiciones de montaje.</p>
+          </article>
+          <article className="summary-card enterprise-stat-card">
+            <span className="enterprise-stat-kicker">Potencia preliminar</span>
+            <strong className="enterprise-stat-value">{formatNumber(enterpriseMetrics.roundedPowerKw)} kWp</strong>
+            <p className="enterprise-stat-text">Lectura inicial en base al consumo ingresado y al perfil solar de la ubicación seleccionada.</p>
+          </article>
+          <article className="summary-card enterprise-stat-card">
+            <span className="enterprise-stat-kicker">Inversión base referencial</span>
+            <strong className="enterprise-stat-value">{formatCLP(enterpriseMetrics.referenceInvestment)}</strong>
+            <p className="enterprise-stat-text">Estimación inicial usando la referencia base de Sakiara para apoyar la conversación comercial.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="section-card enterprise-showcase-card">
+        <div className="enterprise-showcase-layout">
+          <div className="enterprise-showcase-copy">
+            <p className="eyebrow">Proyecto de referencia</p>
+            <h2 className="section-title">
+              Escala mayor, ejecución ordenada y criterio técnico desde el diseño
+            </h2>
+            <p className="section-text">
+              Para la línea empresas tomamos como referencia proyectos de mayor escala, donde el montaje, la distribución de equipos y la lectura del sitio importan tanto como el valor final del sistema.
+            </p>
+            <div className="final-cta-list enterprise-inline-list">
+              <div>Evaluación técnica antes de cerrar propuesta</div>
+              <div>Net Billing y puesta en marcha ordenada</div>
+              <div>Espacio para crecer sin perder control del proyecto</div>
+            </div>
+          </div>
+
+          <div className="enterprise-showcase-media">
+            <img
+              className="enterprise-showcase-image"
+              src="/proyectos/calera-de-tango-30kw.jpg"
+              alt="Proyecto fotovoltaico empresarial de referencia"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="section-card">
+        <div className="section-head">
+          <p className="eyebrow">Aplicaciones</p>
+          <h2 className="section-title">
+            Proyectos que pueden calzar con esta línea
+          </h2>
+          <p className="section-text">
+            Esta vista está pensada para clientes que requieren una solución más a medida y no una promesa cerrada antes de revisar el lugar.
+          </p>
+        </div>
+
+        <div className="insight-grid enterprise-use-grid">
+          {enterpriseUseCases.map((item) => (
+            <article key={item.title} className="insight-card enterprise-use-card">
+              <h3 className="insight-title">{item.title}</h3>
+              <p className="insight-text">{item.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section-card enterprise-evaluation-card">
+        <div className="section-head">
+          <p className="eyebrow">Qué revisamos en terreno</p>
+          <h2 className="section-title">
+            La visita técnica es parte de la propuesta, no un paso decorativo
+          </h2>
+          <p className="section-text">
+            Antes de formalizar una oferta revisamos los factores que realmente mueven el costo y la calidad del proyecto.
+          </p>
+        </div>
+
+        <div className="enterprise-check-grid">
+          {enterpriseEvaluationPoints.map((item) => (
+            <article key={item} className="info-card enterprise-check-card">
+              <p className="enterprise-check-text">{item}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section-card emphasis-card">
+        <div className="section-head">
+          <p className="eyebrow">Cómo trabajamos</p>
+          <h2 className="section-title">
+            Un proceso simple para avanzar con orden y criterio comercial
+          </h2>
+          <p className="section-text">
+            La idea es que la empresa entienda rápido si vale la pena avanzar y que el cierre técnico ocurra con información real del lugar.
+          </p>
+        </div>
+
+        <div className="process-grid enterprise-process-grid">
+          {enterpriseProcessSteps.map((item) => (
+            <article key={item.step} className="process-card">
+              <div className="process-step-number">{item.step}</div>
+              <h3 className="process-title">{item.title}</h3>
+              <p className="process-text">{item.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section-card enterprise-visit-card" id="visita-tecnica-empresas">
+        <div className="enterprise-visit-layout">
+          <div>
+            <div className="section-head wizard-section-head compact">
+              <div>
+                <p className="eyebrow">Agenda visita técnica</p>
+                <h2 className="section-title">
+                  Cuéntanos lo básico y coordinamos la evaluación del proyecto
+                </h2>
+                <p className="section-text">
+                  Este formulario está pensado como paso comercial inicial para proyectos empresa. Mientras mejor sea el punto de partida, más útil será la visita y la propuesta posterior.
+                </p>
+              </div>
+            </div>
+
+            <form
+              className="wizard-contact-form"
+              onSubmit={(event) => handleLeadSubmit(event, "empresa")}
+            >
+              <div className="fields-grid enterprise-form-grid">
+                <label className="field">
+                  <span className="label">Empresa</span>
+                  <input
+                    className="input"
+                    type="text"
+                    value={enterpriseCompany}
+                    onChange={(event) => setEnterpriseCompany(event.target.value)}
+                    placeholder="Nombre de la empresa"
+                    required
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="label">Nombre de contacto</span>
+                  <input
+                    className="input"
+                    type="text"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Nombre y cargo"
+                    required
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="label">Teléfono</span>
+                  <input
+                    className="input"
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    placeholder="+56 9 ..."
+                    required
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="label">Correo</span>
+                  <input
+                    className="input"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="correo@empresa.cl"
+                    required
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="label">Tipo de proyecto</span>
+                  <select
+                    className="select"
+                    value={enterpriseProjectType}
+                    onChange={(event) => setEnterpriseProjectType(event.target.value)}
+                  >
+                    {enterpriseProjectTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span className="label">Superficie disponible</span>
+                  <select
+                    className="select"
+                    value={enterpriseSurfaceType}
+                    onChange={(event) => setEnterpriseSurfaceType(event.target.value)}
+                  >
+                    {enterpriseSurfaceTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span className="label">Región</span>
+                  <select
+                    className="select"
+                    value={enterpriseRegion}
+                    onChange={(event) => {
+                      const nextRegion = event.target.value;
+                      setEnterpriseRegion(nextRegion);
+                      const nextCommune =
+                        Object.keys(
+                          maintenanceRegionData[nextRegion]?.communes || {},
+                        )[0] || "colina";
+                      setEnterpriseCommune(nextCommune);
+                    }}
+                  >
+                    {maintenanceRegionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span className="label">Comuna</span>
+                  <select
+                    className="select"
+                    value={enterpriseCommune}
+                    onChange={(event) => setEnterpriseCommune(event.target.value)}
+                  >
+                    {enterpriseCommuneOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span className="label">Boleta mensual referencial</span>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    value={enterpriseMonthlyBillInput}
+                    onChange={(event) => setEnterpriseMonthlyBillInput(sanitizeIntegerInput(event.target.value))}
+                    placeholder="1200000"
+                  />
+                  <span className="hint">Puedes usar una cifra aproximada para iniciar la evaluación.</span>
+                </label>
+
+                <label className="field">
+                  <span className="label">Consumo mensual estimado</span>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    value={enterpriseMonthlyConsumptionInput}
+                    onChange={(event) => setEnterpriseMonthlyConsumptionInput(sanitizeIntegerInput(event.target.value))}
+                    placeholder="4200"
+                  />
+                  <span className="hint">Si lo conoces, este dato nos ayuda a orientar mejor la potencia preliminar.</span>
+                </label>
+
+                <label className="field">
+                  <span className="label">Interés comercial</span>
+                  <select
+                    className="select"
+                    value={enterpriseCommercialIntent}
+                    onChange={(event) => setEnterpriseCommercialIntent(event.target.value)}
+                  >
+                    {enterpriseCommercialIntentOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field field-full">
+                  <span className="label">Comentario inicial</span>
+                  <textarea
+                    className="textarea"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    placeholder="Cuéntanos si ya tienen medidor trifásico, tipo de cubierta, restricciones de horario, necesidad de respaldo u otro dato útil."
+                  />
+                </label>
+
+                <label className="field attachment-box">
+                  <span className="label">Adjunto opcional 1</span>
+                  <input className="input file-input" type="file" name="adjunto_1" />
+                  <span className="hint">Cuenta eléctrica, layout o foto general del lugar.</span>
+                </label>
+
+                <label className="field attachment-box">
+                  <span className="label">Adjunto opcional 2</span>
+                  <input className="input file-input" type="file" name="adjunto_2" />
+                  <span className="hint">Imagen adicional, plano o documento complementario.</span>
+                </label>
+              </div>
+
+              <div className="contact-actions wizard-actions enterprise-actions">
+                <button
+                  className="btn-primary"
+                  type="submit"
+                  disabled={enterpriseSubmitState.loading}
+                >
+                  {enterpriseSubmitState.loading
+                    ? "Enviando solicitud..."
+                    : "Solicitar visita técnica"}
+                </button>
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  onClick={handleWhatsApp}
+                >
+                  Coordinar por WhatsApp
+                </button>
+              </div>
+
+              {enterpriseSubmitState.message && (
+                <div className={`submit-feedback ${enterpriseSubmitState.tone}`}>
+                  {enterpriseSubmitState.message}
+                </div>
+              )}
+            </form>
+          </div>
+
+          <aside className="mode-card wizard-highlight-card enterprise-summary-box">
+            <div className="wizard-contact-copy">
+              <div className="offer-badge">Lectura preliminar</div>
+              <h3>Base comercial para la visita</h3>
+              <p>
+                Esta referencia no reemplaza la visita técnica. Solo ordena la conversación comercial con una primera lectura del consumo y la potencia sugerida.
+              </p>
+            </div>
+
+            <div className="summary-grid enterprise-summary-grid">
+              <article className="summary-card">
+                <span className="summary-kicker">Ubicación</span>
+                <strong>{enterpriseMetrics.locationLabel}</strong>
+              </article>
+              <article className="summary-card">
+                <span className="summary-kicker">Potencia sugerida</span>
+                <strong>{formatNumber(enterpriseMetrics.roundedPowerKw)} kWp</strong>
+              </article>
+              <article className="summary-card">
+                <span className="summary-kicker">Inversión base</span>
+                <strong>{formatCLP(enterpriseMetrics.referenceInvestment)}</strong>
+              </article>
+              <article className="summary-card">
+                <span className="summary-kicker">Ahorro anual referencial</span>
+                <strong>{formatCLP(enterpriseMetrics.annualSavings)}</strong>
+              </article>
+            </div>
+
+            <div className="mode-note enterprise-note">
+              <strong>Referencia base:</strong> {enterpriseMetrics.referenceText}. El valor final depende de la visita técnica, potencia definitiva, equipamiento, metrajes, estructura, empalme y condiciones de montaje.
+            </div>
+          </aside>
+        </div>
+      </section>
+    </>
+  );
+
   return (
     <div className="sakiara-root">
       <style>{`
@@ -4883,7 +5530,7 @@ Mensaje: ${message || "-"}`,
         }
 
         .service-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
         .summary-grid {
@@ -5398,6 +6045,10 @@ Mensaje: ${message || "-"}`,
           background: #ffffff;
         }
 
+        .enterprise-service-card {
+          background: #f7f8fb;
+        }
+
         .emphasis-points div {
           font-weight: 600;
         }
@@ -5412,6 +6063,130 @@ Mensaje: ${message || "-"}`,
 
         .trust-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .enterprise-hero {
+          box-shadow: 0 28px 56px rgba(15, 23, 42, 0.18);
+        }
+
+        .enterprise-hero-image {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(180deg, rgba(9, 14, 26, 0.68) 0%, rgba(9, 14, 26, 0.36) 40%, rgba(9, 14, 26, 0.58) 100%),
+            radial-gradient(circle at 56% 18%, rgba(241, 212, 51, 0.20) 0%, rgba(241, 212, 51, 0.00) 28%),
+            url('/proyectos/calera-de-tango-30kw.jpg');
+          background-size: cover;
+          background-position: center center;
+          transform: scale(1.02);
+        }
+
+        .enterprise-hero-inner {
+          align-items: flex-end;
+        }
+
+        .enterprise-hero-copy {
+          max-width: 760px;
+        }
+
+        .enterprise-hero-actions {
+          justify-content: flex-start;
+        }
+
+        .enterprise-stat-grid,
+        .enterprise-check-grid,
+        .enterprise-summary-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+          margin-top: 20px;
+        }
+
+        .enterprise-check-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .enterprise-stat-card,
+        .enterprise-check-card {
+          text-align: left;
+        }
+
+        .enterprise-stat-kicker,
+        .summary-kicker {
+          display: block;
+          font-size: 11px;
+          line-height: 1.2;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          font-weight: 800;
+          color: #8b8b91;
+        }
+
+        .enterprise-stat-value,
+        .enterprise-summary-grid strong {
+          margin-top: 12px;
+          display: block;
+          font-size: clamp(24px, 3vw, 34px);
+          line-height: 1.05;
+          color: #30323a;
+        }
+
+        .enterprise-stat-text,
+        .enterprise-check-text {
+          margin: 12px 0 0;
+          font-size: 14px;
+          line-height: 1.7;
+          color: #707179;
+        }
+
+        .enterprise-showcase-layout,
+        .enterprise-visit-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+          gap: 24px;
+          align-items: start;
+        }
+
+        .enterprise-showcase-card {
+          overflow: hidden;
+        }
+
+        .enterprise-showcase-media {
+          min-height: 100%;
+        }
+
+        .enterprise-showcase-image {
+          display: block;
+          width: 100%;
+          height: 100%;
+          min-height: 320px;
+          object-fit: cover;
+          border-radius: 26px;
+          box-shadow: 0 18px 34px rgba(17, 24, 39, 0.10);
+        }
+
+        .enterprise-use-grid,
+        .enterprise-process-grid {
+          margin-top: 20px;
+        }
+
+        .enterprise-summary-box {
+          margin-top: 0;
+          position: sticky;
+          top: 24px;
+        }
+
+        .enterprise-note {
+          margin-top: 18px;
+          text-align: left;
+        }
+
+        .enterprise-form-grid .field-full {
+          grid-column: 1 / -1;
+        }
+
+        .enterprise-inline-list {
+          margin-top: 20px;
         }
 
         .insight-card,
@@ -6550,9 +7325,41 @@ Mensaje: ${message || "-"}`,
           )}
         </div>
 
+        <nav className="service-nav" aria-label="Secciones principales de Sakiara">
+          <button
+            className={`service-nav-btn ${activeView === "home" ? "active" : ""}`}
+            type="button"
+            onClick={() => goToView("home")}
+          >
+            Inicio
+          </button>
+          <button
+            className={`service-nav-btn ${activeView === "instalacion" ? "active" : ""}`}
+            type="button"
+            onClick={() => goToView("instalacion")}
+          >
+            Hogar
+          </button>
+          <button
+            className={`service-nav-btn ${activeView === "empresas" ? "active" : ""}`}
+            type="button"
+            onClick={() => goToView("empresas")}
+          >
+            Empresas
+          </button>
+          <button
+            className={`service-nav-btn ${activeView === "mantenimiento" ? "active" : ""}`}
+            type="button"
+            onClick={() => goToView("mantenimiento")}
+          >
+            Mantenimiento
+          </button>
+        </nav>
+
         <div className="stack">
           {activeView === "home" && renderHomeView()}
           {activeView === "instalacion" && renderInstallationView()}
+          {activeView === "empresas" && renderEnterpriseView()}
           {activeView === "mantenimiento" && renderMaintenanceView()}
         </div>
       </div>
@@ -6570,18 +7377,16 @@ Mensaje: ${message || "-"}`,
         className="floating-cta-stack"
         aria-label="Accesos rápidos de contacto"
       >
-        {activeView === "home" && (
-          <button
-            className="floating-cta-btn quote"
-            type="button"
-            onClick={handleFloatingQuote}
-          >
-            <span className="floating-cta-copy">
-              <span>{floatingQuoteLabel}</span>
-              <small>Ir al cotizador</small>
-            </span>
-          </button>
-        )}
+        <button
+          className="floating-cta-btn quote"
+          type="button"
+          onClick={handleFloatingQuote}
+        >
+          <span className="floating-cta-copy">
+            <span>{floatingQuoteLabel}</span>
+            <small>{activeView === "empresas" ? "Ir al formulario" : "Ir al cotizador"}</small>
+          </span>
+        </button>
         <button
           className="floating-cta-btn whatsapp"
           type="button"
