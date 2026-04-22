@@ -2619,6 +2619,8 @@ export default function SakiaraLandingPage() {
       referenceInvestment,
       annualSavings,
       locationLabel: `${selectedEnterpriseRegion.label} · ${selectedEnterpriseCommune.label}`,
+      locationPrimary: selectedEnterpriseRegion.label,
+      locationSecondary: selectedEnterpriseCommune.label,
       projectTypeLabel:
         enterpriseProjectTypeOptions.find((item) => item.value === enterpriseProjectType)?.label ||
         "Proyecto empresarial",
@@ -4675,7 +4677,8 @@ Mensaje: ${message || "-"}`,
 
         <div className="enterprise-check-grid">
           {enterpriseEvaluationPoints.map((item) => (
-            <article key={item} className="info-card enterprise-check-card">
+            <article key={item} className="enterprise-check-card">
+              <span className="enterprise-check-accent" aria-hidden="true" />
               <p className="enterprise-check-text">{item}</p>
             </article>
           ))}
@@ -4941,21 +4944,22 @@ Mensaje: ${message || "-"}`,
             </div>
 
             <div className="summary-grid enterprise-summary-grid">
-              <article className="summary-card">
+              <article className="summary-card enterprise-summary-card enterprise-summary-card-location">
                 <span className="summary-kicker">Ubicación</span>
-                <strong>{enterpriseMetrics.locationLabel}</strong>
+                <strong className="enterprise-summary-main">{enterpriseMetrics.locationPrimary}</strong>
+                <span className="enterprise-summary-subline">{enterpriseMetrics.locationSecondary}</span>
               </article>
-              <article className="summary-card">
+              <article className="summary-card enterprise-summary-card">
                 <span className="summary-kicker">Potencia sugerida</span>
-                <strong>{formatNumber(enterpriseMetrics.roundedPowerKw)} kWp</strong>
+                <strong className="enterprise-summary-main">{formatNumber(enterpriseMetrics.roundedPowerKw)} kWp</strong>
               </article>
-              <article className="summary-card">
+              <article className="summary-card enterprise-summary-card">
                 <span className="summary-kicker">Inversión base</span>
-                <strong>{formatCLP(enterpriseMetrics.referenceInvestment)}</strong>
+                <strong className="enterprise-summary-main">{formatCLP(enterpriseMetrics.referenceInvestment)}</strong>
               </article>
-              <article className="summary-card">
+              <article className="summary-card enterprise-summary-card">
                 <span className="summary-kicker">Ahorro anual referencial</span>
-                <strong>{formatCLP(enterpriseMetrics.annualSavings)}</strong>
+                <strong className="enterprise-summary-main">{formatCLP(enterpriseMetrics.annualSavings)}</strong>
               </article>
             </div>
 
@@ -6098,17 +6102,22 @@ Mensaje: ${message || "-"}`,
         .enterprise-check-grid,
         .enterprise-summary-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 16px;
           margin-top: 20px;
         }
 
-        .enterprise-check-grid {
+        .enterprise-stat-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .enterprise-check-grid,
+        .enterprise-summary-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .enterprise-stat-card,
-        .enterprise-check-card {
+        .enterprise-check-card,
+        .enterprise-summary-card {
           text-align: left;
         }
 
@@ -6134,9 +6143,9 @@ Mensaje: ${message || "-"}`,
 
         .enterprise-stat-text,
         .enterprise-check-text {
-          margin: 12px 0 0;
+          margin: 0;
           font-size: 14px;
-          line-height: 1.7;
+          line-height: 1.65;
           color: #707179;
           overflow-wrap: anywhere;
           word-break: break-word;
@@ -6211,6 +6220,61 @@ Mensaje: ${message || "-"}`,
         .enterprise-note {
           margin-top: 18px;
           text-align: left;
+        }
+
+        .enterprise-summary-card {
+          min-height: 0;
+          justify-content: flex-start;
+          text-align: left;
+          padding: 18px;
+        }
+
+        .enterprise-summary-card-location {
+          background: #fffef7;
+        }
+
+        .enterprise-summary-main {
+          margin-top: 10px;
+          display: block;
+          font-size: clamp(20px, 2.1vw, 28px);
+          line-height: 1.14;
+          color: #30323a;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          hyphens: auto;
+          text-wrap: pretty;
+        }
+
+        .enterprise-summary-subline {
+          margin-top: 4px;
+          display: block;
+          font-size: 15px;
+          line-height: 1.45;
+          color: #7b7c84;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .enterprise-check-card {
+          min-height: 0;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 18px 20px;
+          background: #fbfbfa;
+          border: 1px solid rgba(102, 102, 107, 0.10);
+          border-radius: 20px;
+          box-shadow: 0 12px 24px rgba(17, 24, 39, 0.04);
+        }
+
+        .enterprise-check-accent {
+          width: 10px;
+          height: 10px;
+          margin-top: 7px;
+          border-radius: 999px;
+          background: #f1d433;
+          flex: 0 0 auto;
+          box-shadow: 0 0 0 6px rgba(241, 212, 51, 0.16);
         }
 
         .enterprise-form-grid .field-full {
@@ -6573,7 +6637,7 @@ Mensaje: ${message || "-"}`,
 
 
         .summary-card {
-          min-height: 140px;
+          min-height: 120px;
           display: flex;
           flex-direction: column;
           justify-content: center;
@@ -7014,6 +7078,16 @@ Mensaje: ${message || "-"}`,
             gap: 14px;
           }
 
+          .enterprise-summary-grid,
+          .enterprise-check-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .enterprise-summary-card,
+          .enterprise-check-card {
+            padding: 16px;
+          }
+
           .field,
           .contact-box,
           .summary-card,
@@ -7145,6 +7219,15 @@ Mensaje: ${message || "-"}`,
           .enterprise-stat-value {
             font-size: 24px;
             line-height: 1.16;
+          }
+
+          .enterprise-summary-main {
+            font-size: 22px;
+            line-height: 1.18;
+          }
+
+          .enterprise-summary-subline {
+            font-size: 14px;
           }
 
           .insight-title,
