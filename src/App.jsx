@@ -833,7 +833,7 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
         "Evaluamos proyectos solares para empresas con foco técnico-comercial, visita en terreno y una referencia desde $500.000 por kWp según condiciones del proyecto.",
       path: "/empresas",
       pageName: "Energía solar para empresas",
-      image: `${normalizedOrigin}/proyectos/calera-de-tango-30kw.jpg`,
+      image: `${normalizedOrigin}/proyectos/empresa-referencia.jpg`,
     },
     mantenimiento: {
       title: "Mantenimiento de paneles solares | Sakiara Solar",
@@ -4634,8 +4634,8 @@ Mensaje: ${message || "-"}`,
           <div className="enterprise-showcase-media">
             <img
               className="enterprise-showcase-image"
-              src="/proyectos/calera-de-tango-30kw.jpg"
-              alt="Proyecto fotovoltaico empresarial de referencia"
+              src="/proyectos/empresa-referencia.jpg"
+              alt="Proyecto fotovoltaico empresarial de referencia Sakiara"
             />
           </div>
         </div>
@@ -6027,6 +6027,7 @@ Mensaje: ${message || "-"}`,
           justify-content: space-between;
           gap: 18px;
           min-height: 280px;
+          min-width: 0;
         }
 
         .service-card.highlighted {
@@ -6073,12 +6074,12 @@ Mensaje: ${message || "-"}`,
           position: absolute;
           inset: 0;
           background-image:
-            linear-gradient(180deg, rgba(9, 14, 26, 0.68) 0%, rgba(9, 14, 26, 0.36) 40%, rgba(9, 14, 26, 0.58) 100%),
-            radial-gradient(circle at 56% 18%, rgba(241, 212, 51, 0.20) 0%, rgba(241, 212, 51, 0.00) 28%),
-            url('/proyectos/calera-de-tango-30kw.jpg');
+            linear-gradient(180deg, rgba(9, 14, 26, 0.62) 0%, rgba(9, 14, 26, 0.30) 42%, rgba(9, 14, 26, 0.54) 100%),
+            radial-gradient(circle at 52% 22%, rgba(241, 212, 51, 0.18) 0%, rgba(241, 212, 51, 0.00) 28%),
+            url('/home/sakiara-hero-sunset-wide.jpg');
           background-size: cover;
-          background-position: center center;
-          transform: scale(1.02);
+          background-position: center 46%;
+          transform: scale(1.03);
         }
 
         .enterprise-hero-inner {
@@ -6126,8 +6127,8 @@ Mensaje: ${message || "-"}`,
         .enterprise-summary-grid strong {
           margin-top: 12px;
           display: block;
-          font-size: clamp(24px, 3vw, 34px);
-          line-height: 1.05;
+          font-size: clamp(22px, 2.4vw, 30px);
+          line-height: 1.12;
           color: #30323a;
         }
 
@@ -6137,6 +6138,37 @@ Mensaje: ${message || "-"}`,
           font-size: 14px;
           line-height: 1.7;
           color: #707179;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          hyphens: auto;
+        }
+
+        .enterprise-stat-value,
+        .insight-title,
+        .insight-text,
+        .process-title,
+        .process-text,
+        .section-title,
+        .section-text,
+        .service-title,
+        .service-text,
+        .project-title,
+        .project-description,
+        .final-cta-list div,
+        .enterprise-check-text {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          hyphens: auto;
+        }
+
+        .enterprise-stat-grid > *,
+        .enterprise-check-grid > *,
+        .enterprise-showcase-layout > *,
+        .enterprise-visit-layout > *,
+        .insight-grid > *,
+        .trust-grid > *,
+        .process-grid > * {
+          min-width: 0;
         }
 
         .enterprise-showcase-layout,
@@ -6203,8 +6235,8 @@ Mensaje: ${message || "-"}`,
         .trust-title,
         .process-title {
           margin: 0;
-          font-size: 24px;
-          line-height: 1.12;
+          font-size: clamp(20px, 2vw, 24px);
+          line-height: 1.18;
           color: #66666b;
         }
 
@@ -6847,7 +6879,12 @@ Mensaje: ${message || "-"}`,
           .insight-grid,
           .trust-grid,
           .process-grid,
-          .final-cta-layout {
+          .final-cta-layout,
+          .enterprise-stat-grid,
+          .enterprise-check-grid,
+          .enterprise-showcase-layout,
+          .enterprise-visit-layout,
+          .enterprise-summary-grid {
             grid-template-columns: 1fr;
           }
         }
@@ -6962,9 +6999,19 @@ Mensaje: ${message || "-"}`,
           .bottom-grid,
           .service-grid,
           .project-grid,
-          .project-meta-grid {
+          .project-meta-grid,
+          .enterprise-stat-grid,
+          .enterprise-check-grid,
+          .enterprise-summary-grid,
+          .enterprise-use-grid,
+          .enterprise-process-grid {
             gap: 10px;
             margin-top: 14px;
+          }
+
+          .enterprise-showcase-layout,
+          .enterprise-visit-layout {
+            gap: 14px;
           }
 
           .field,
@@ -7093,6 +7140,19 @@ Mensaje: ${message || "-"}`,
           .price-value,
           .summary-value {
             font-size: 28px;
+          }
+
+          .enterprise-stat-value {
+            font-size: 24px;
+            line-height: 1.16;
+          }
+
+          .insight-title,
+          .process-title,
+          .trust-title,
+          .service-title {
+            font-size: 19px;
+            line-height: 1.22;
           }
 
           .summary-sub {
