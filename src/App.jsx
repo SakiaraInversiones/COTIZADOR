@@ -3055,26 +3055,15 @@ Mensaje: ${message || "-"}`,
   };
 
   const handleFloatingQuote = () => {
-    if (activeView === "home") {
-      goToView("instalacion");
-      return;
-    }
+    if (activeView !== "home") return;
 
-    if (activeView === "instalacion") {
-      setInstallationStep(5);
-      scrollToSection("wizard-instalacion");
-      return;
-    }
+    setInstallationStep(1);
+    goToView("instalacion");
 
-    if (activeView === "empresas") {
-      scrollToSection("visita-tecnica-empresas");
-      return;
-    }
-
-    if (activeView === "mantenimiento") {
-      setMaintenanceStep(5);
-      scrollToSection("wizard-mantenimiento");
-      return;
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        scrollToSection("wizard-instalacion");
+      }, 150);
     }
   };
 
@@ -7520,16 +7509,18 @@ Mensaje: ${message || "-"}`,
         className="floating-cta-stack"
         aria-label="Accesos rápidos de contacto"
       >
-        <button
-          className="floating-cta-btn quote"
-          type="button"
-          onClick={handleFloatingQuote}
-        >
-          <span className="floating-cta-copy">
-            <span>{floatingQuoteLabel}</span>
-            <small>{activeView === "empresas" ? "Ir al formulario" : "Ir al cotizador"}</small>
-          </span>
-        </button>
+        {activeView === "home" && (
+          <button
+            className="floating-cta-btn quote"
+            type="button"
+            onClick={handleFloatingQuote}
+          >
+            <span className="floating-cta-copy">
+              <span>{floatingQuoteLabel}</span>
+              <small>Ir al cotizador</small>
+            </span>
+          </button>
+        )}
         <button
           className="floating-cta-btn whatsapp"
           type="button"
