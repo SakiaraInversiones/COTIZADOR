@@ -1132,113 +1132,6 @@ const loadPdfRuntime = () => {
   return pdfRuntimeLoaderPromise;
 };
 
-
-const getInAppBrowserContext = () => {
-  if (typeof navigator === "undefined") {
-    return {
-      isInstagram: false,
-      isFacebook: false,
-      isInAppBrowser: false,
-    };
-  }
-
-  const userAgent = navigator.userAgent || "";
-  const isInstagram = /Instagram/i.test(userAgent);
-  const isFacebook = /FBAN|FBAV|FB_IAB|FB4A|FBIOS/i.test(userAgent);
-
-  return {
-    isInstagram,
-    isFacebook,
-    isInAppBrowser: isInstagram || isFacebook,
-  };
-};
-
-const openPdfPreviewWindow = () => {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const previewWindow = window.open("", "_blank");
-
-    if (!previewWindow) return null;
-
-    previewWindow.document.open();
-    previewWindow.document.write(`
-      <!doctype html>
-      <html lang="es">
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Generando informe Sakiara</title>
-          <style>
-            body {
-              margin: 0;
-              min-height: 100vh;
-              display: grid;
-              place-items: center;
-              font-family: Arial, Helvetica, sans-serif;
-              color: #3f3f46;
-              background: #f7f7f4;
-            }
-            .box {
-              width: min(92vw, 420px);
-              padding: 24px;
-              border-radius: 22px;
-              background: #ffffff;
-              box-shadow: 0 18px 50px rgba(17, 24, 39, 0.14);
-              text-align: center;
-            }
-            strong { display: block; font-size: 18px; color: #27272a; }
-            p { margin: 10px 0 0; line-height: 1.55; }
-          </style>
-        </head>
-        <body>
-          <div class="box">
-            <strong>Generando informe PDF...</strong>
-            <p>Mantén esta ventana abierta. En unos segundos se mostrará el documento.</p>
-          </div>
-        </body>
-      </html>
-    `);
-    previewWindow.document.close();
-
-    return previewWindow;
-  } catch (error) {
-    return null;
-  }
-};
-
-const deliverPdfToClient = (pdf, fileName, previewWindow = null) => {
-  const browserContext = getInAppBrowserContext();
-
-  if (!browserContext.isInAppBrowser) {
-    pdf.save(fileName);
-    return;
-  }
-
-  const pdfBlob = pdf.output("blob");
-  const pdfUrl = URL.createObjectURL(pdfBlob);
-
-  const releaseObjectUrl = () => {
-    window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 45000);
-  };
-
-  if (previewWindow && !previewWindow.closed) {
-    previewWindow.location.href = pdfUrl;
-    releaseObjectUrl();
-    return;
-  }
-
-  const openedWindow = window.open(pdfUrl, "_blank");
-
-  if (openedWindow) {
-    releaseObjectUrl();
-    return;
-  }
-
-  window.location.href = pdfUrl;
-  releaseObjectUrl();
-};
-
 const waitForNodeImages = (root) => {
   if (!root) return Promise.resolve();
 
@@ -2089,8 +1982,6 @@ export default function SakiaraLandingPage() {
     tone: "idle",
     message: "",
   });
-
-  const browserContext = useMemo(() => getInAppBrowserContext(), []);
 
   const selectedProfile = profileMap[profile];
   const selectedInstallationRegion =
@@ -3046,9 +2937,6 @@ Mensaje: ${message || "-"}`,
     if (typeof window === "undefined") return;
 
     let reportContainer = null;
-    const pdfPreviewWindow = getInAppBrowserContext().isInAppBrowser
-      ? openPdfPreviewWindow()
-      : null;
 
     const reportMetrics = { ...installationMetrics };
     const reportOffers = createInstallationOfferOptions(reportMetrics);
@@ -3140,16 +3028,8 @@ Mensaje: ${message || "-"}`,
         pdf.addImage(imageData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
       }
 
-      deliverPdfToClient(
-        pdf,
-        `${fileNameBase || "informe-sakiara"}.pdf`,
-        pdfPreviewWindow,
-      );
+      pdf.save(`${fileNameBase || "informe-sakiara"}.pdf`);
     } catch (error) {
-      if (pdfPreviewWindow && !pdfPreviewWindow.closed) {
-        pdfPreviewWindow.close();
-      }
-
       console.error(error);
       const detail =
         error instanceof Error && error.message
@@ -3603,8 +3483,8 @@ Mensaje: ${message || "-"}`,
 
   const renderInstallationView = () => (
     <>
-      <section className="hero-banner subview-hero">
-        <div className="subview-hero-image" aria-hidden="true" />
+      <section className="hero-banner subview-hero installation-hero">
+        <div className="subview-hero-image installation-hero-image" aria-hidden="true" />
         <div className="hero-banner-inner subview-hero-inner">
           <div className="hero-banner-copy subview-hero-copy">
             <p className="hero-kicker">Evaluación de inversión solar</p>
@@ -4008,11 +3888,6 @@ Mensaje: ${message || "-"}`,
                 <div className="hint mobile-essential-hide">
                   Se descarga un informe autogenerado con gráficos, resumen técnico-comercial y datos meteorológicos referenciales.
                 </div>
-                {browserContext.isInstagram && (
-                  <div className="instagram-pdf-warning">
-                    📄 Estás navegando desde Instagram. Si el PDF no se descarga, toca los tres puntos ⋯ y elige “Abrir en navegador” para usar Chrome o Safari.
-                  </div>
-                )}
               </div>
 
               <div className="note mobile-essential-hide">
@@ -4150,12 +4025,6 @@ Mensaje: ${message || "-"}`,
                   </button>
                 </div>
 
-                {browserContext.isInstagram && (
-                  <div className="instagram-pdf-warning">
-                    📄 Si abriste esta cotización desde Instagram y el PDF no se descarga, abre la página en Chrome o Safari desde el menú de los tres puntos ⋯.
-                  </div>
-                )}
-
                 {installationSubmitState.message && (
                   <div className={`submit-feedback ${installationSubmitState.tone}`}>
                     {installationSubmitState.message}
@@ -4225,8 +4094,8 @@ Mensaje: ${message || "-"}`,
 
   const renderMaintenanceView = () => (
     <>
-      <section className="hero-banner subview-hero">
-        <div className="subview-hero-image" aria-hidden="true" />
+      <section className="hero-banner subview-hero maintenance-hero">
+        <div className="subview-hero-image maintenance-hero-image" aria-hidden="true" />
         <div className="hero-banner-inner subview-hero-inner">
           <div className="hero-banner-copy subview-hero-copy">
             <p className="hero-kicker">Mantenimiento fotovoltaico</p>
@@ -5232,13 +5101,25 @@ Mensaje: ${message || "-"}`,
         .subview-hero-image {
           position: absolute;
           inset: 0;
-          background-image:
-            linear-gradient(180deg, rgba(9, 14, 26, 0.58) 0%, rgba(9, 14, 26, 0.34) 40%, rgba(9, 14, 26, 0.48) 100%),
-            radial-gradient(circle at 50% 28%, rgba(255, 204, 82, 0.18) 0%, rgba(255, 204, 82, 0.00) 26%),
-            url('/home/sakiara-hero-interior.jpg');
           background-size: cover;
           background-position: center center;
           transform: scale(1.02);
+        }
+
+        .installation-hero-image {
+          background-image:
+            linear-gradient(180deg, rgba(9, 14, 26, 0.58) 0%, rgba(9, 14, 26, 0.34) 40%, rgba(9, 14, 26, 0.48) 100%),
+            radial-gradient(circle at 50% 28%, rgba(255, 204, 82, 0.18) 0%, rgba(255, 204, 82, 0.00) 26%),
+            url('/home/hero-hogar-claro.png');
+          background-position: center 52%;
+        }
+
+        .maintenance-hero-image {
+          background-image:
+            linear-gradient(180deg, rgba(9, 14, 26, 0.62) 0%, rgba(9, 14, 26, 0.32) 42%, rgba(9, 14, 26, 0.52) 100%),
+            radial-gradient(circle at 50% 26%, rgba(255, 204, 82, 0.16) 0%, rgba(255, 204, 82, 0.00) 24%),
+            url('/home/hero-mantenimiento-claro.png');
+          background-position: center center;
         }
 
         .subview-hero-inner {
@@ -6200,7 +6081,7 @@ Mensaje: ${message || "-"}`,
           background-image:
             linear-gradient(180deg, rgba(9, 14, 26, 0.62) 0%, rgba(9, 14, 26, 0.30) 42%, rgba(9, 14, 26, 0.54) 100%),
             radial-gradient(circle at 52% 22%, rgba(241, 212, 51, 0.18) 0%, rgba(241, 212, 51, 0.00) 28%),
-            url('/home/sakiara-hero-sunset-wide.jpg');
+            url('/home/hero-empresa-claro.png');
           background-size: cover;
           background-position: center 46%;
           transform: scale(1.03);
@@ -7031,19 +6912,6 @@ Mensaje: ${message || "-"}`,
 
         .report-actions .hint {
           max-width: 760px;
-        }
-
-        .instagram-pdf-warning {
-          width: min(100%, 760px);
-          margin-top: 10px;
-          border: 1px solid rgba(241, 212, 51, 0.55);
-          border-radius: 16px;
-          background: rgba(241, 212, 51, 0.16);
-          padding: 12px 14px;
-          color: #5f5a3a;
-          font-size: 13px;
-          line-height: 1.55;
-          text-align: left;
         }
 
         .info-card {
