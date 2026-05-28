@@ -73,63 +73,53 @@ const formatNumber = (value, digits = 0) =>
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-const solarProductionProfilesByRegion = {
-  aricaParinacota: { annual: 158, winter: 138 },
-  tarapaca: { annual: 164, winter: 142 },
-  antofagasta: { annual: 168, winter: 145 },
-  atacama: { annual: 160, winter: 132 },
-  coquimbo: { annual: 147, winter: 108 },
-  valparaiso: { annual: 132, winter: 86 },
-  metropolitana: { annual: 128, winter: 82 },
-  ohiggins: { annual: 123, winter: 77 },
-  maule: { annual: 118, winter: 71 },
-  nuble: { annual: 112, winter: 64 },
-  biobio: { annual: 108, winter: 60 },
-  araucania: { annual: 103, winter: 54 },
-  losRios: { annual: 98, winter: 47 },
-  losLagos: { annual: 93, winter: 43 },
-  aysen: { annual: 96, winter: 42 },
-  magallanes: { annual: 83, winter: 26 },
-};
+const SOLAR_PERFORMANCE_RATIO = 0.82;
+const SOLAR_PLANE_GAIN_FACTOR = 1.05;
 
-const solarProductionCommuneOverrides = {
-  metropolitana: {
-    colina: { annual: 130, winter: 84 },
-    lampa: { annual: 130, winter: 84 },
-    tiltil: { annual: 131, winter: 84 },
-    loBarnechea: { annual: 127, winter: 81 },
-    lasCondes: { annual: 126, winter: 80 },
-    vitacura: { annual: 126, winter: 80 },
-    sanJoseDeMaipo: { annual: 123, winter: 75 },
-  },
-  valparaiso: {
-    concon: { annual: 134, winter: 88 },
-    vinaDelMar: { annual: 133, winter: 87 },
-    valparaiso: { annual: 132, winter: 86 },
-    losAndes: { annual: 136, winter: 90 },
-    sanFelipe: { annual: 137, winter: 91 },
-  },
-  coquimbo: {
-    laSerena: { annual: 149, winter: 111 },
-    coquimbo: { annual: 148, winter: 110 },
-    ovalle: { annual: 150, winter: 113 },
-  },
+const solarGhiReferenceByRegion = {
+  aricaParinacota: { annual: 6.15, winter: 5.45, summer: 7.15, referenceLng: -69.8 },
+  tarapaca: { annual: 6.35, winter: 5.65, summer: 7.35, referenceLng: -69.6 },
+  antofagasta: { annual: 6.5, winter: 5.75, summer: 7.45, referenceLng: -69.4 },
+  atacama: { annual: 6.15, winter: 4.95, summer: 7.45, referenceLng: -70.2 },
+  coquimbo: { annual: 5.55, winter: 4.25, summer: 7.0, referenceLng: -70.9 },
+  valparaiso: { annual: 5.05, winter: 3.4, summer: 7.0, referenceLng: -71.0 },
+  metropolitana: { annual: 5.0, winter: 3.2, summer: 7.35, referenceLng: -70.7 },
+  ohiggins: { annual: 4.75, winter: 3.0, summer: 7.05, referenceLng: -70.9 },
+  maule: { annual: 4.55, winter: 2.75, summer: 6.8, referenceLng: -71.3 },
+  nuble: { annual: 4.3, winter: 2.45, summer: 6.45, referenceLng: -71.4 },
+  biobio: { annual: 4.15, winter: 2.25, summer: 6.2, referenceLng: -72.0 },
+  araucania: { annual: 3.95, winter: 2.05, summer: 5.95, referenceLng: -72.3 },
+  losRios: { annual: 3.75, winter: 1.8, summer: 5.65, referenceLng: -72.6 },
+  losLagos: { annual: 3.55, winter: 1.65, summer: 5.35, referenceLng: -73.0 },
+  aysen: { annual: 3.65, winter: 1.6, summer: 5.5, referenceLng: -72.5 },
+  magallanes: { annual: 3.15, winter: 1.05, summer: 5.1, referenceLng: -71.6 },
 };
 
 const getSolarProductionProfile = (regionKey, communeKey) => {
-  const baseProfile =
-    solarProductionCommuneOverrides[regionKey]?.[communeKey] ||
-    solarProductionProfilesByRegion[regionKey] ||
-    { annual: 125, winter: 78 };
+  const communeProfile =
+    maintenanceRegionData[regionKey]?.communes?.[communeKey]?.solarProfile;
+
+  if (communeProfile) return communeProfile;
+
+  const baseReference =
+    solarGhiReferenceByRegion[regionKey] || solarGhiReferenceByRegion.metropolitana;
+  const annual = Math.round(
+    (baseReference.annual * 365 * SOLAR_PERFORMANCE_RATIO * SOLAR_PLANE_GAIN_FACTOR) / 12,
+  );
+  const winter = Math.round(
+    baseReference.winter * 30 * SOLAR_PERFORMANCE_RATIO * SOLAR_PLANE_GAIN_FACTOR,
+  );
+  const summer = Math.round(
+    baseReference.summer * 30 * SOLAR_PERFORMANCE_RATIO * SOLAR_PLANE_GAIN_FACTOR,
+  );
 
   return {
-    ...baseProfile,
-    summer:
-      baseProfile.summer ||
-      Math.max(
-        Math.round(baseProfile.annual * 1.48),
-        baseProfile.annual + 18,
-      ),
+    annual,
+    winter,
+    summer,
+    ghiAnnual: baseReference.annual,
+    ghiWinter: baseReference.winter,
+    ghiSummer: baseReference.summer,
   };
 };
 
@@ -565,190 +555,912 @@ const getInstallationProjectLogistics = (communeConfig) => {
   };
 };
 
-const maintenanceMetropolitanaCommunes = {
-  alhue: { label: "Alhué", roundTripKm: 250, tolls: 12000 },
-  buin: { label: "Buin", roundTripKm: 118, tolls: 3000 },
-  caleraDeTango: { label: "Calera de Tango", roundTripKm: 92, tolls: 0 },
-  cerrillos: { label: "Cerrillos", roundTripKm: 62, tolls: 0 },
-  cerroNavia: { label: "Cerro Navia", roundTripKm: 50, tolls: 0 },
-  colina: { label: "Colina", roundTripKm: 0, tolls: 0 },
-  conchali: { label: "Conchalí", roundTripKm: 44, tolls: 0 },
-  curacavi: { label: "Curacaví", roundTripKm: 132, tolls: 9000 },
-  elBosque: { label: "El Bosque", roundTripKm: 72, tolls: 0 },
-  elMonte: { label: "El Monte", roundTripKm: 118, tolls: 4000 },
-  estacionCentral: { label: "Estación Central", roundTripKm: 58, tolls: 0 },
-  huechuraba: { label: "Huechuraba", roundTripKm: 36, tolls: 0 },
-  independencia: { label: "Independencia", roundTripKm: 46, tolls: 0 },
-  islaDeMaipo: { label: "Isla de Maipo", roundTripKm: 122, tolls: 5000 },
-  laCisterna: { label: "La Cisterna", roundTripKm: 70, tolls: 0 },
-  laFlorida: { label: "La Florida", roundTripKm: 74, tolls: 0 },
-  laGranja: { label: "La Granja", roundTripKm: 76, tolls: 0 },
-  laPintana: { label: "La Pintana", roundTripKm: 86, tolls: 0 },
-  laReina: { label: "La Reina", roundTripKm: 72, tolls: 0 },
-  lampa: { label: "Lampa", roundTripKm: 28, tolls: 0 },
-  lasCondes: { label: "Las Condes", roundTripKm: 72, tolls: 0 },
-  loBarnechea: { label: "Lo Barnechea", roundTripKm: 84, tolls: 0 },
-  loEspejo: { label: "Lo Espejo", roundTripKm: 72, tolls: 0 },
-  loPrado: { label: "Lo Prado", roundTripKm: 54, tolls: 0 },
-  macul: { label: "Macul", roundTripKm: 70, tolls: 0 },
-  maipu: { label: "Maipú", roundTripKm: 78, tolls: 0 },
-  mariaPinto: { label: "María Pinto", roundTripKm: 150, tolls: 6000 },
-  melipilla: { label: "Melipilla", roundTripKm: 154, tolls: 7000 },
-  nunoa: { label: "Ñuñoa", roundTripKm: 66, tolls: 0 },
-  padreHurtado: { label: "Padre Hurtado", roundTripKm: 92, tolls: 4000 },
-  paine: { label: "Paine", roundTripKm: 150, tolls: 5000 },
-  pedroAguirreCerda: {
-    label: "Pedro Aguirre Cerda",
-    roundTripKm: 64,
-    tolls: 0,
+const BASE_OPERATION_LOCATION = { label: "Colina", lat: -33.2045, lng: -70.6746 };
+
+const CHILE_REGIONS_COMMUNES = [
+  {
+    "key": "aricaParinacota",
+    "label": "Arica y Parinacota",
+    "communes": [
+      "Arica",
+      "Camarones",
+      "Putre",
+      "General Lagos"
+    ]
   },
-  penaflor: { label: "Peñaflor", roundTripKm: 98, tolls: 4000 },
-  penalolen: { label: "Peñalolén", roundTripKm: 76, tolls: 0 },
-  pirque: { label: "Pirque", roundTripKm: 106, tolls: 0 },
-  providencia: { label: "Providencia", roundTripKm: 60, tolls: 0 },
-  pudahuel: { label: "Pudahuel", roundTripKm: 58, tolls: 0 },
-  puenteAlto: { label: "Puente Alto", roundTripKm: 90, tolls: 0 },
-  quilicura: { label: "Quilicura", roundTripKm: 26, tolls: 0 },
-  quintaNormal: { label: "Quinta Normal", roundTripKm: 52, tolls: 0 },
-  recoleta: { label: "Recoleta", roundTripKm: 48, tolls: 0 },
-  renca: { label: "Renca", roundTripKm: 42, tolls: 0 },
-  sanBernardo: { label: "San Bernardo", roundTripKm: 88, tolls: 0 },
-  sanJoaquin: { label: "San Joaquín", roundTripKm: 70, tolls: 0 },
-  sanJoseDeMaipo: { label: "San José de Maipo", roundTripKm: 156, tolls: 0 },
-  sanMiguel: { label: "San Miguel", roundTripKm: 66, tolls: 0 },
-  sanPedro: { label: "San Pedro", roundTripKm: 216, tolls: 9000 },
-  sanRamon: { label: "San Ramón", roundTripKm: 78, tolls: 0 },
-  santiago: { label: "Santiago", roundTripKm: 54, tolls: 0 },
-  talagante: { label: "Talagante", roundTripKm: 108, tolls: 4000 },
-  tiltil: { label: "Tiltil", roundTripKm: 76, tolls: 0 },
-  vitacura: { label: "Vitacura", roundTripKm: 64, tolls: 0 },
+  {
+    "key": "tarapaca",
+    "label": "Tarapacá",
+    "communes": [
+      "Iquique",
+      "Alto Hospicio",
+      "Pozo Almonte",
+      "Camiña",
+      "Colchane",
+      "Huara",
+      "Pica"
+    ]
+  },
+  {
+    "key": "antofagasta",
+    "label": "Antofagasta",
+    "communes": [
+      "Antofagasta",
+      "Mejillones",
+      "Sierra Gorda",
+      "Taltal",
+      "Calama",
+      "Ollagüe",
+      "San Pedro de Atacama",
+      "Tocopilla",
+      "María Elena"
+    ]
+  },
+  {
+    "key": "atacama",
+    "label": "Atacama",
+    "communes": [
+      "Copiapó",
+      "Caldera",
+      "Tierra Amarilla",
+      "Chañaral",
+      "Diego de Almagro",
+      "Vallenar",
+      "Alto del Carmen",
+      "Freirina",
+      "Huasco"
+    ]
+  },
+  {
+    "key": "coquimbo",
+    "label": "Coquimbo",
+    "communes": [
+      "La Serena",
+      "Coquimbo",
+      "Andacollo",
+      "La Higuera",
+      "Paihuano",
+      "Vicuña",
+      "Illapel",
+      "Canela",
+      "Los Vilos",
+      "Salamanca",
+      "Ovalle",
+      "Combarbalá",
+      "Monte Patria",
+      "Punitaqui",
+      "Río Hurtado"
+    ]
+  },
+  {
+    "key": "valparaiso",
+    "label": "Valparaíso",
+    "communes": [
+      "Valparaíso",
+      "Casablanca",
+      "Concón",
+      "Juan Fernández",
+      "Puchuncaví",
+      "Quintero",
+      "Viña del Mar",
+      "Isla de Pascua",
+      "Los Andes",
+      "Calle Larga",
+      "Rinconada",
+      "San Esteban",
+      "La Ligua",
+      "Cabildo",
+      "Papudo",
+      "Petorca",
+      "Zapallar",
+      "Quillota",
+      "Calera",
+      "Hijuelas",
+      "La Cruz",
+      "Nogales",
+      "San Antonio",
+      "Algarrobo",
+      "Cartagena",
+      "El Quisco",
+      "El Tabo",
+      "Santo Domingo",
+      "San Felipe",
+      "Catemu",
+      "Llaillay",
+      "Panquehue",
+      "Putaendo",
+      "Santa María",
+      "Quilpué",
+      "Limache",
+      "Olmué",
+      "Villa Alemana"
+    ]
+  },
+  {
+    "key": "metropolitana",
+    "label": "Región Metropolitana",
+    "communes": [
+      "Cerrillos",
+      "Cerro Navia",
+      "Conchalí",
+      "El Bosque",
+      "Estación Central",
+      "Huechuraba",
+      "Independencia",
+      "La Cisterna",
+      "La Florida",
+      "La Granja",
+      "La Pintana",
+      "La Reina",
+      "Las Condes",
+      "Lo Barnechea",
+      "Lo Espejo",
+      "Lo Prado",
+      "Macul",
+      "Maipú",
+      "Ñuñoa",
+      "Pedro Aguirre Cerda",
+      "Peñalolén",
+      "Providencia",
+      "Pudahuel",
+      "Quilicura",
+      "Quinta Normal",
+      "Recoleta",
+      "Renca",
+      "Santiago",
+      "San Joaquín",
+      "San Miguel",
+      "San Ramón",
+      "Vitacura",
+      "Puente Alto",
+      "Pirque",
+      "San José de Maipo",
+      "Colina",
+      "Lampa",
+      "Tiltil",
+      "San Bernardo",
+      "Buin",
+      "Calera de Tango",
+      "Paine",
+      "Melipilla",
+      "Alhué",
+      "Curacaví",
+      "María Pinto",
+      "San Pedro",
+      "Talagante",
+      "El Monte",
+      "Isla de Maipo",
+      "Padre Hurtado",
+      "Peñaflor"
+    ]
+  },
+  {
+    "key": "ohiggins",
+    "label": "O'Higgins",
+    "communes": [
+      "Rancagua",
+      "Codegua",
+      "Coinco",
+      "Coltauco",
+      "Doñihue",
+      "Graneros",
+      "Las Cabras",
+      "Machalí",
+      "Malloa",
+      "Mostazal",
+      "Olivar",
+      "Peumo",
+      "Pichidegua",
+      "Quinta de Tilcoco",
+      "Rengo",
+      "Requínoa",
+      "San Vicente",
+      "Pichilemu",
+      "La Estrella",
+      "Litueche",
+      "Marchihue",
+      "Navidad",
+      "Paredones",
+      "San Fernando",
+      "Chépica",
+      "Chimbarongo",
+      "Lolol",
+      "Nancagua",
+      "Palmilla",
+      "Peralillo",
+      "Placilla",
+      "Pumanque",
+      "Santa Cruz"
+    ]
+  },
+  {
+    "key": "maule",
+    "label": "Maule",
+    "communes": [
+      "Talca",
+      "Constitución",
+      "Curepto",
+      "Empedrado",
+      "Maule",
+      "Pelarco",
+      "Pencahue",
+      "Río Claro",
+      "San Clemente",
+      "San Rafael",
+      "Cauquenes",
+      "Chanco",
+      "Pelluhue",
+      "Curicó",
+      "Hualañé",
+      "Licantén",
+      "Molina",
+      "Rauco",
+      "Romeral",
+      "Sagrada Familia",
+      "Teno",
+      "Vichuquén",
+      "Linares",
+      "Colbún",
+      "Longaví",
+      "Parral",
+      "Retiro",
+      "San Javier",
+      "Villa Alegre",
+      "Yerbas Buenas"
+    ]
+  },
+  {
+    "key": "nuble",
+    "label": "Ñuble",
+    "communes": [
+      "Cobquecura",
+      "Coelemu",
+      "Ninhue",
+      "Portezuelo",
+      "Quirihue",
+      "Ránquil",
+      "Treguaco",
+      "Bulnes",
+      "Chillán Viejo",
+      "Chillán",
+      "El Carmen",
+      "Pemuco",
+      "Pinto",
+      "Quillón",
+      "San Ignacio",
+      "Yungay",
+      "Coihueco",
+      "Ñiquén",
+      "San Carlos",
+      "San Fabián",
+      "San Nicolás"
+    ]
+  },
+  {
+    "key": "biobio",
+    "label": "Biobío",
+    "communes": [
+      "Concepción",
+      "Coronel",
+      "Chiguayante",
+      "Florida",
+      "Hualqui",
+      "Lota",
+      "Penco",
+      "San Pedro de la Paz",
+      "Santa Juana",
+      "Talcahuano",
+      "Tomé",
+      "Hualpén",
+      "Lebu",
+      "Arauco",
+      "Cañete",
+      "Contulmo",
+      "Curanilahue",
+      "Los Álamos",
+      "Tirúa",
+      "Los Ángeles",
+      "Antuco",
+      "Cabrero",
+      "Laja",
+      "Mulchén",
+      "Nacimiento",
+      "Negrete",
+      "Quilaco",
+      "Quilleco",
+      "San Rosendo",
+      "Santa Bárbara",
+      "Tucapel",
+      "Yumbel",
+      "Alto Biobío"
+    ]
+  },
+  {
+    "key": "araucania",
+    "label": "La Araucanía",
+    "communes": [
+      "Temuco",
+      "Carahue",
+      "Cunco",
+      "Curarrehue",
+      "Freire",
+      "Galvarino",
+      "Gorbea",
+      "Lautaro",
+      "Loncoche",
+      "Melipeuco",
+      "Nueva Imperial",
+      "Padre Las Casas",
+      "Perquenco",
+      "Pitrufquén",
+      "Pucón",
+      "Saavedra",
+      "Teodoro Schmidt",
+      "Toltén",
+      "Vilcún",
+      "Villarrica",
+      "Cholchol",
+      "Angol",
+      "Collipulli",
+      "Curacautín",
+      "Ercilla",
+      "Lonquimay",
+      "Los Sauces",
+      "Lumaco",
+      "Purén",
+      "Renaico",
+      "Traiguén",
+      "Victoria"
+    ]
+  },
+  {
+    "key": "losRios",
+    "label": "Los Ríos",
+    "communes": [
+      "Valdivia",
+      "Corral",
+      "Lanco",
+      "Los Lagos",
+      "Máfil",
+      "Mariquina",
+      "Paillaco",
+      "Panguipulli",
+      "La Unión",
+      "Futrono",
+      "Lago Ranco",
+      "Río Bueno"
+    ]
+  },
+  {
+    "key": "losLagos",
+    "label": "Los Lagos",
+    "communes": [
+      "Puerto Montt",
+      "Calbuco",
+      "Cochamó",
+      "Fresia",
+      "Frutillar",
+      "Los Muermos",
+      "Llanquihue",
+      "Maullín",
+      "Puerto Varas",
+      "Castro",
+      "Ancud",
+      "Chonchi",
+      "Curaco de Vélez",
+      "Dalcahue",
+      "Puqueldón",
+      "Queilén",
+      "Quellón",
+      "Quemchi",
+      "Quinchao",
+      "Osorno",
+      "Puerto Octay",
+      "Purranque",
+      "Puyehue",
+      "Río Negro",
+      "San Juan de la Costa",
+      "San Pablo",
+      "Chaitén",
+      "Futaleufú",
+      "Hualaihué",
+      "Palena"
+    ]
+  },
+  {
+    "key": "aysen",
+    "label": "Aysén",
+    "communes": [
+      "Coyhaique",
+      "Lago Verde",
+      "Aysén",
+      "Cisnes",
+      "Guaitecas",
+      "Cochrane",
+      "O'Higgins",
+      "Tortel",
+      "Chile Chico",
+      "Río Ibáñez"
+    ]
+  },
+  {
+    "key": "magallanes",
+    "label": "Magallanes",
+    "communes": [
+      "Punta Arenas",
+      "Laguna Blanca",
+      "Río Verde",
+      "San Gregorio",
+      "Cabo de Hornos",
+      "Antártica",
+      "Porvenir",
+      "Primavera",
+      "Timaukel",
+      "Natales",
+      "Torres del Paine"
+    ]
+  }
+];
+
+const REGION_COORDINATE_REFERENCE = {
+  aricaParinacota: { lat: -18.65, lng: -69.65, latSpread: 1.2, lngSpread: 0.75, latJitter: 0.12, lngJitter: 0.18 },
+  tarapaca: { lat: -20.1, lng: -69.45, latSpread: 1.3, lngSpread: 0.85, latJitter: 0.18, lngJitter: 0.22 },
+  antofagasta: { lat: -23.25, lng: -69.55, latSpread: 2.4, lngSpread: 1.1, latJitter: 0.2, lngJitter: 0.28 },
+  atacama: { lat: -27.35, lng: -70.35, latSpread: 2.1, lngSpread: 0.8, latJitter: 0.18, lngJitter: 0.24 },
+  coquimbo: { lat: -30.3, lng: -70.8, latSpread: 2.1, lngSpread: 0.75, latJitter: 0.18, lngJitter: 0.24 },
+  valparaiso: { lat: -32.85, lng: -71.15, latSpread: 1.9, lngSpread: 0.7, latJitter: 0.16, lngJitter: 0.2 },
+  metropolitana: { lat: -33.55, lng: -70.75, latSpread: 1.45, lngSpread: 0.55, latJitter: 0.12, lngJitter: 0.16 },
+  ohiggins: { lat: -34.35, lng: -71.0, latSpread: 1.8, lngSpread: 0.75, latJitter: 0.16, lngJitter: 0.2 },
+  maule: { lat: -35.55, lng: -71.55, latSpread: 2.1, lngSpread: 0.9, latJitter: 0.18, lngJitter: 0.22 },
+  nuble: { lat: -36.6, lng: -72.0, latSpread: 1.2, lngSpread: 0.75, latJitter: 0.14, lngJitter: 0.18 },
+  biobio: { lat: -37.25, lng: -72.4, latSpread: 2.0, lngSpread: 0.9, latJitter: 0.18, lngJitter: 0.24 },
+  araucania: { lat: -38.75, lng: -72.55, latSpread: 1.9, lngSpread: 0.9, latJitter: 0.16, lngJitter: 0.22 },
+  losRios: { lat: -39.85, lng: -72.85, latSpread: 1.1, lngSpread: 0.8, latJitter: 0.14, lngJitter: 0.18 },
+  losLagos: { lat: -41.55, lng: -73.2, latSpread: 3.2, lngSpread: 1.25, latJitter: 0.22, lngJitter: 0.32 },
+  aysen: { lat: -46.25, lng: -72.75, latSpread: 4.8, lngSpread: 1.4, latJitter: 0.32, lngJitter: 0.34 },
+  magallanes: { lat: -52.5, lng: -71.15, latSpread: 5.1, lngSpread: 1.6, latJitter: 0.34, lngJitter: 0.36 },
 };
 
-const maintenanceRegionData = {
+const REGION_ROAD_FACTOR = {
+  aricaParinacota: 1.18,
+  tarapaca: 1.18,
+  antofagasta: 1.18,
+  atacama: 1.16,
+  coquimbo: 1.16,
+  valparaiso: 1.22,
+  metropolitana: 1.35,
+  ohiggins: 1.22,
+  maule: 1.24,
+  nuble: 1.25,
+  biobio: 1.28,
+  araucania: 1.3,
+  losRios: 1.32,
+  losLagos: 1.35,
+  aysen: 1.55,
+  magallanes: 1.62,
+};
+
+const COMMUNE_COORDINATE_OVERRIDES = {
   aricaParinacota: {
-    label: "Arica y Parinacota",
-    communes: {
-      arica: { label: "Arica", roundTripKm: 4120, tolls: 65000 },
-      putre: { label: "Putre", roundTripKm: 4300, tolls: 65000 },
-    },
+    arica: { lat: -18.4783, lng: -70.3126 },
+    camarones: { lat: -19.0167, lng: -69.8667 },
+    putre: { lat: -18.1982, lng: -69.5593 },
+    "general-lagos": { lat: -17.6500, lng: -69.6333 },
   },
   tarapaca: {
-    label: "Tarapacá",
-    communes: {
-      iquique: { label: "Iquique", roundTripKm: 3600, tolls: 56000 },
-      altoHospicio: { label: "Alto Hospicio", roundTripKm: 3600, tolls: 56000 },
-    },
+    iquique: { lat: -20.2133, lng: -70.1524 },
+    "alto-hospicio": { lat: -20.2682, lng: -70.1048 },
+    "pozo-almonte": { lat: -20.2596, lng: -69.7862 },
+    camina: { lat: -19.3128, lng: -69.4264 },
+    colchane: { lat: -19.2733, lng: -68.6378 },
+    huara: { lat: -19.9966, lng: -69.7717 },
+    pica: { lat: -20.4892, lng: -69.3286 },
   },
   antofagasta: {
-    label: "Antofagasta",
-    communes: {
-      antofagasta: { label: "Antofagasta", roundTripKm: 2740, tolls: 46000 },
-      calama: { label: "Calama", roundTripKm: 3000, tolls: 49000 },
-    },
+    antofagasta: { lat: -23.6509, lng: -70.3975 },
+    mejillones: { lat: -23.1000, lng: -70.4500 },
+    "sierra-gorda": { lat: -22.8895, lng: -69.3204 },
+    taltal: { lat: -25.4000, lng: -70.4833 },
+    calama: { lat: -22.4667, lng: -68.9333 },
+    ollague: { lat: -21.2247, lng: -68.2539 },
+    "san-pedro-de-atacama": { lat: -22.9087, lng: -68.1997 },
+    tocopilla: { lat: -22.0861, lng: -70.1979 },
+    "maria-elena": { lat: -22.3450, lng: -69.6600 },
   },
   atacama: {
-    label: "Atacama",
-    communes: {
-      copiapo: { label: "Copiapó", roundTripKm: 1660, tolls: 30000 },
-      vallenar: { label: "Vallenar", roundTripKm: 1320, tolls: 26000 },
-    },
+    copiapo: { lat: -27.3668, lng: -70.3323 },
+    caldera: { lat: -27.0667, lng: -70.8333 },
+    "tierra-amarilla": { lat: -27.4667, lng: -70.2667 },
+    chanaral: { lat: -26.3450, lng: -70.6200 },
+    "diego-de-almagro": { lat: -26.3900, lng: -70.0500 },
+    vallenar: { lat: -28.5700, lng: -70.7600 },
+    "alto-del-carmen": { lat: -28.7600, lng: -70.4900 },
+    freirina: { lat: -28.5100, lng: -71.0800 },
+    huasco: { lat: -28.4700, lng: -71.2200 },
   },
   coquimbo: {
-    label: "Coquimbo",
-    communes: {
-      laSerena: { label: "La Serena", roundTripKm: 940, tolls: 18000 },
-      coquimbo: { label: "Coquimbo", roundTripKm: 950, tolls: 18000 },
-      ovalle: { label: "Ovalle", roundTripKm: 780, tolls: 16000 },
-    },
+    "la-serena": { lat: -29.9045, lng: -71.2489 },
+    coquimbo: { lat: -29.9533, lng: -71.3436 },
+    andacollo: { lat: -30.2300, lng: -71.0850 },
+    "la-higuera": { lat: -29.5000, lng: -71.2667 },
+    paihuano: { lat: -30.0300, lng: -70.5170 },
+    vicuna: { lat: -30.0319, lng: -70.7081 },
+    illapel: { lat: -31.6300, lng: -71.1700 },
+    canela: { lat: -31.4000, lng: -71.4500 },
+    "los-vilos": { lat: -31.9100, lng: -71.5100 },
+    salamanca: { lat: -31.7800, lng: -70.9700 },
+    ovalle: { lat: -30.6011, lng: -71.1990 },
+    combarbala: { lat: -31.1800, lng: -71.0000 },
+    "monte-patria": { lat: -30.6900, lng: -70.9500 },
+    punitqui: { lat: -30.8300, lng: -71.2600 },
+    "rio-hurtado": { lat: -30.2700, lng: -70.6900 },
   },
   valparaiso: {
-    label: "Valparaíso",
-    communes: {
-      valparaiso: { label: "Valparaíso", roundTripKm: 300, tolls: 12000 },
-      vinaDelMar: { label: "Viña del Mar", roundTripKm: 310, tolls: 12000 },
-      quilpue: { label: "Quilpué", roundTripKm: 290, tolls: 10000 },
-      concon: { label: "Concón", roundTripKm: 320, tolls: 12000 },
-      losAndes: { label: "Los Andes", roundTripKm: 220, tolls: 9000 },
-      sanFelipe: { label: "San Felipe", roundTripKm: 200, tolls: 9000 },
-    },
+    valparaiso: { lat: -33.0472, lng: -71.6127 },
+    casablanca: { lat: -33.3167, lng: -71.4167 },
+    concon: { lat: -32.9333, lng: -71.5167 },
+    "juan-fernandez": { lat: -33.6400, lng: -78.8300, island: true },
+    puchuncavi: { lat: -32.7333, lng: -71.4167 },
+    quintero: { lat: -32.7833, lng: -71.5333 },
+    "vina-del-mar": { lat: -33.0245, lng: -71.5518 },
+    "isla-de-pascua": { lat: -27.1127, lng: -109.3497, island: true, solarBoost: 0.15 },
+    "los-andes": { lat: -32.8333, lng: -70.6000 },
+    "calle-larga": { lat: -32.8500, lng: -70.6333 },
+    rinconada: { lat: -32.8333, lng: -70.7000 },
+    "san-esteban": { lat: -32.8000, lng: -70.5833 },
+    "la-ligua": { lat: -32.4500, lng: -71.2333 },
+    cabildo: { lat: -32.4250, lng: -71.0667 },
+    papudo: { lat: -32.5167, lng: -71.4500 },
+    petorca: { lat: -32.2500, lng: -70.9333 },
+    zapallar: { lat: -32.5500, lng: -71.4500 },
+    quillota: { lat: -32.8833, lng: -71.2500 },
+    calera: { lat: -32.7833, lng: -71.2167 },
+    hijuelas: { lat: -32.8000, lng: -71.1667 },
+    "la-cruz": { lat: -32.8250, lng: -71.2333 },
+    nogales: { lat: -32.7333, lng: -71.2333 },
+    "san-antonio": { lat: -33.5933, lng: -71.6217 },
+    algarrobo: { lat: -33.3911, lng: -71.6928 },
+    cartagena: { lat: -33.5486, lng: -71.5997 },
+    "el-quisco": { lat: -33.4000, lng: -71.7000 },
+    "el-tabo": { lat: -33.4500, lng: -71.6667 },
+    "santo-domingo": { lat: -33.6333, lng: -71.6333 },
+    "san-felipe": { lat: -32.7500, lng: -70.7333 },
+    catemu: { lat: -32.6333, lng: -71.0333 },
+    llaillay: { lat: -32.8333, lng: -70.9667 },
+    panquehue: { lat: -32.8000, lng: -70.8333 },
+    putaendo: { lat: -32.6333, lng: -70.7167 },
+    "santa-maria": { lat: -32.7500, lng: -70.6500 },
+    quilpue: { lat: -33.0500, lng: -71.4500 },
+    limache: { lat: -33.0167, lng: -71.2667 },
+    olmue: { lat: -32.9950, lng: -71.1860 },
+    "villa-alemana": { lat: -33.0500, lng: -71.3667 },
   },
   metropolitana: {
-    label: "Región Metropolitana",
-    communes: maintenanceMetropolitanaCommunes,
+    cerrillos: { lat: -33.5000, lng: -70.7167 },
+    "cerro-navia": { lat: -33.4250, lng: -70.7333 },
+    conchali: { lat: -33.3833, lng: -70.6750 },
+    "el-bosque": { lat: -33.5667, lng: -70.6750 },
+    "estacion-central": { lat: -33.4590, lng: -70.6980 },
+    huechuraba: { lat: -33.3667, lng: -70.6333 },
+    independencia: { lat: -33.4167, lng: -70.6667 },
+    "la-cisterna": { lat: -33.5370, lng: -70.6640 },
+    "la-florida": { lat: -33.5333, lng: -70.5833 },
+    "la-granja": { lat: -33.5333, lng: -70.6250 },
+    "la-pintana": { lat: -33.5833, lng: -70.6333 },
+    "la-reina": { lat: -33.4500, lng: -70.5500 },
+    "las-condes": { lat: -33.4167, lng: -70.5833 },
+    "lo-barnechea": { lat: -33.3500, lng: -70.5167 },
+    "lo-espejo": { lat: -33.5167, lng: -70.6833 },
+    "lo-prado": { lat: -33.4500, lng: -70.7250 },
+    macul: { lat: -33.5000, lng: -70.6000 },
+    maipu: { lat: -33.5167, lng: -70.7667 },
+    nunoa: { lat: -33.4569, lng: -70.5978 },
+    "pedro-aguirre-cerda": { lat: -33.4910, lng: -70.6760 },
+    penalolen: { lat: -33.4833, lng: -70.5333 },
+    providencia: { lat: -33.4310, lng: -70.6090 },
+    pudahuel: { lat: -33.4333, lng: -70.7667 },
+    quilicura: { lat: -33.3667, lng: -70.7333 },
+    "quinta-normal": { lat: -33.4280, lng: -70.7000 },
+    recoleta: { lat: -33.4167, lng: -70.6333 },
+    renca: { lat: -33.4000, lng: -70.7167 },
+    santiago: { lat: -33.4489, lng: -70.6693 },
+    "san-joaquin": { lat: -33.5000, lng: -70.6167 },
+    "san-miguel": { lat: -33.5000, lng: -70.6500 },
+    "san-ramon": { lat: -33.5333, lng: -70.6500 },
+    vitacura: { lat: -33.4000, lng: -70.6000 },
+    "puente-alto": { lat: -33.6167, lng: -70.5667 },
+    pirque: { lat: -33.6333, lng: -70.5667 },
+    "san-jose-de-maipo": { lat: -33.6333, lng: -70.3500, solarBoost: -0.08 },
+    colina: { lat: -33.2045, lng: -70.6746, solarBoost: 0.06 },
+    lampa: { lat: -33.2833, lng: -70.9000, solarBoost: 0.06 },
+    tiltil: { lat: -33.0833, lng: -70.9333, solarBoost: 0.07 },
+    "san-bernardo": { lat: -33.5833, lng: -70.7000 },
+    buin: { lat: -33.7333, lng: -70.7333 },
+    "calera-de-tango": { lat: -33.6333, lng: -70.7833 },
+    paine: { lat: -33.8167, lng: -70.7500 },
+    melipilla: { lat: -33.6833, lng: -71.2167 },
+    alhue: { lat: -34.0333, lng: -71.1000 },
+    curacavi: { lat: -33.4000, lng: -71.1333 },
+    "maria-pinto": { lat: -33.5167, lng: -71.1167 },
+    "san-pedro": { lat: -33.9000, lng: -71.4667 },
+    talagante: { lat: -33.6667, lng: -70.9333 },
+    "el-monte": { lat: -33.6833, lng: -71.0167 },
+    "isla-de-maipo": { lat: -33.7500, lng: -70.9000 },
+    "padre-hurtado": { lat: -33.5667, lng: -70.8167 },
+    penaflor: { lat: -33.6000, lng: -70.8833 },
   },
   ohiggins: {
-    label: "O'Higgins",
-    communes: {
-      rancagua: { label: "Rancagua", roundTripKm: 170, tolls: 6000 },
-      machali: { label: "Machalí", roundTripKm: 180, tolls: 6000 },
-      sanFernando: { label: "San Fernando", roundTripKm: 280, tolls: 9000 },
-      pichilemu: { label: "Pichilemu", roundTripKm: 430, tolls: 13000 },
-    },
+    rancagua: { lat: -34.1700, lng: -70.7400 },
+    machali: { lat: -34.1833, lng: -70.6667 },
+    "san-fernando": { lat: -34.5833, lng: -70.9833 },
+    pichilemu: { lat: -34.3833, lng: -72.0000 },
   },
   maule: {
-    label: "Maule",
-    communes: {
-      talca: { label: "Talca", roundTripKm: 510, tolls: 14000 },
-      curico: { label: "Curicó", roundTripKm: 380, tolls: 11000 },
-      linares: { label: "Linares", roundTripKm: 620, tolls: 16000 },
-    },
+    talca: { lat: -35.4264, lng: -71.6554 },
+    curico: { lat: -34.9833, lng: -71.2333 },
+    linares: { lat: -35.8500, lng: -71.6000 },
+    parral: { lat: -36.1500, lng: -71.8333 },
+    constitucion: { lat: -35.3333, lng: -72.4167 },
   },
   nuble: {
-    label: "Ñuble",
-    communes: {
-      chillan: { label: "Chillán", roundTripKm: 800, tolls: 19000 },
-      sanCarlos: { label: "San Carlos", roundTripKm: 740, tolls: 18000 },
-    },
+    chillan: { lat: -36.6067, lng: -72.1034 },
+    "chillan-viejo": { lat: -36.6167, lng: -72.1333 },
+    "san-carlos": { lat: -36.4250, lng: -71.9583 },
   },
   biobio: {
-    label: "Biobío",
-    communes: {
-      concepcion: { label: "Concepción", roundTripKm: 1040, tolls: 24000 },
-      talcahuano: { label: "Talcahuano", roundTripKm: 1060, tolls: 24000 },
-      losAngeles: { label: "Los Ángeles", roundTripKm: 900, tolls: 21000 },
-    },
+    concepcion: { lat: -36.8269, lng: -73.0503 },
+    talcahuano: { lat: -36.7167, lng: -73.1167 },
+    "los-angeles": { lat: -37.4667, lng: -72.3500 },
+    coronel: { lat: -37.0167, lng: -73.1500 },
   },
   araucania: {
-    label: "La Araucanía",
-    communes: {
-      temuco: { label: "Temuco", roundTripKm: 1380, tolls: 30000 },
-      villarrica: { label: "Villarrica", roundTripKm: 1520, tolls: 32000 },
-    },
+    temuco: { lat: -38.7359, lng: -72.5904 },
+    villarrica: { lat: -39.2857, lng: -72.2279 },
+    pucon: { lat: -39.2823, lng: -71.9540 },
+    angol: { lat: -37.8000, lng: -72.7167 },
   },
   losRios: {
-    label: "Los Ríos",
-    communes: {
-      valdivia: { label: "Valdivia", roundTripKm: 1680, tolls: 35000 },
-      laUnion: { label: "La Unión", roundTripKm: 1750, tolls: 36000 },
-    },
+    valdivia: { lat: -39.8142, lng: -73.2459 },
+    "la-union": { lat: -40.2933, lng: -73.0817 },
+    "rio-bueno": { lat: -40.3300, lng: -72.9500 },
   },
   losLagos: {
-    label: "Los Lagos",
-    communes: {
-      puertoMontt: { label: "Puerto Montt", roundTripKm: 2090, tolls: 40000 },
-      osorno: { label: "Osorno", roundTripKm: 1820, tolls: 38000 },
-      castro: { label: "Castro", roundTripKm: 2390, tolls: 45000 },
-    },
+    "puerto-montt": { lat: -41.4693, lng: -72.9424 },
+    osorno: { lat: -40.5739, lng: -73.1335 },
+    castro: { lat: -42.4801, lng: -73.7624 },
+    ancud: { lat: -41.8675, lng: -73.8277 },
+    quellon: { lat: -43.1167, lng: -73.6167 },
+    "puerto-varas": { lat: -41.3167, lng: -72.9833 },
+    chaiten: { lat: -42.9156, lng: -72.7063 },
   },
   aysen: {
-    label: "Aysén",
-    communes: {
-      coyhaique: { label: "Coyhaique", roundTripKm: 3380, tolls: 20000 },
-      puertoAysen: { label: "Puerto Aysén", roundTripKm: 3460, tolls: 20000 },
-    },
+    coyhaique: { lat: -45.5712, lng: -72.0685 },
+    aysen: { lat: -45.4000, lng: -72.7000 },
+    cochrane: { lat: -47.2533, lng: -72.5722 },
+    "chile-chico": { lat: -46.5400, lng: -71.7200 },
+    tortel: { lat: -47.8000, lng: -73.5333 },
   },
   magallanes: {
-    label: "Magallanes",
-    communes: {
-      puntaArenas: { label: "Punta Arenas", roundTripKm: 5660, tolls: 10000 },
-      puertoNatales: {
-        label: "Puerto Natales",
-        roundTripKm: 5400,
-        tolls: 10000,
-      },
-    },
+    "punta-arenas": { lat: -53.1638, lng: -70.9171 },
+    "puerto-natales": { lat: -51.7300, lng: -72.5067 },
+    natales: { lat: -51.7300, lng: -72.5067 },
+    porvenir: { lat: -53.3000, lng: -70.3667 },
+    "cabo-de-hornos": { lat: -55.9833, lng: -67.2667, island: true },
+    antartica: { lat: -62.0000, lng: -58.0000, island: true, solarBoost: -0.35 },
   },
 };
+
+const COMMUNE_LOGISTICS_OVERRIDES = {
+  metropolitana: {
+    alhue: { roundTripKm: 250, tolls: 12000 },
+    buin: { roundTripKm: 118, tolls: 3000 },
+    "calera-de-tango": { roundTripKm: 92, tolls: 0 },
+    cerrillos: { roundTripKm: 62, tolls: 0 },
+    "cerro-navia": { roundTripKm: 50, tolls: 0 },
+    colina: { roundTripKm: 0, tolls: 0 },
+    conchali: { roundTripKm: 44, tolls: 0 },
+    curacavi: { roundTripKm: 132, tolls: 9000 },
+    "el-bosque": { roundTripKm: 72, tolls: 0 },
+    "el-monte": { roundTripKm: 118, tolls: 4000 },
+    "estacion-central": { roundTripKm: 58, tolls: 0 },
+    huechuraba: { roundTripKm: 36, tolls: 0 },
+    independencia: { roundTripKm: 46, tolls: 0 },
+    "isla-de-maipo": { roundTripKm: 122, tolls: 5000 },
+    "la-cisterna": { roundTripKm: 70, tolls: 0 },
+    "la-florida": { roundTripKm: 74, tolls: 0 },
+    "la-granja": { roundTripKm: 76, tolls: 0 },
+    "la-pintana": { roundTripKm: 86, tolls: 0 },
+    "la-reina": { roundTripKm: 72, tolls: 0 },
+    lampa: { roundTripKm: 28, tolls: 0 },
+    "las-condes": { roundTripKm: 72, tolls: 0 },
+    "lo-barnechea": { roundTripKm: 84, tolls: 0 },
+    "lo-espejo": { roundTripKm: 72, tolls: 0 },
+    "lo-prado": { roundTripKm: 54, tolls: 0 },
+    macul: { roundTripKm: 70, tolls: 0 },
+    maipu: { roundTripKm: 78, tolls: 0 },
+    "maria-pinto": { roundTripKm: 150, tolls: 6000 },
+    melipilla: { roundTripKm: 154, tolls: 7000 },
+    nunoa: { roundTripKm: 66, tolls: 0 },
+    "padre-hurtado": { roundTripKm: 92, tolls: 4000 },
+    paine: { roundTripKm: 150, tolls: 5000 },
+    "pedro-aguirre-cerda": { roundTripKm: 64, tolls: 0 },
+    penaflor: { roundTripKm: 98, tolls: 4000 },
+    penalolen: { roundTripKm: 76, tolls: 0 },
+    pirque: { roundTripKm: 106, tolls: 0 },
+    providencia: { roundTripKm: 60, tolls: 0 },
+    pudahuel: { roundTripKm: 58, tolls: 0 },
+    "puente-alto": { roundTripKm: 90, tolls: 0 },
+    quilicura: { roundTripKm: 26, tolls: 0 },
+    "quinta-normal": { roundTripKm: 52, tolls: 0 },
+    recoleta: { roundTripKm: 48, tolls: 0 },
+    renca: { roundTripKm: 42, tolls: 0 },
+    "san-bernardo": { roundTripKm: 88, tolls: 0 },
+    "san-joaquin": { roundTripKm: 70, tolls: 0 },
+    "san-jose-de-maipo": { roundTripKm: 156, tolls: 0 },
+    "san-miguel": { roundTripKm: 66, tolls: 0 },
+    "san-pedro": { roundTripKm: 216, tolls: 9000 },
+    "san-ramon": { roundTripKm: 78, tolls: 0 },
+    santiago: { roundTripKm: 54, tolls: 0 },
+    talagante: { roundTripKm: 108, tolls: 4000 },
+    tiltil: { roundTripKm: 76, tolls: 0 },
+    vitacura: { roundTripKm: 64, tolls: 0 },
+  },
+  aricaParinacota: { arica: { roundTripKm: 4120, tolls: 65000 }, putre: { roundTripKm: 4300, tolls: 65000 } },
+  tarapaca: { iquique: { roundTripKm: 3600, tolls: 56000 }, "alto-hospicio": { roundTripKm: 3600, tolls: 56000 } },
+  antofagasta: { antofagasta: { roundTripKm: 2740, tolls: 46000 }, calama: { roundTripKm: 3000, tolls: 49000 } },
+  atacama: { copiapo: { roundTripKm: 1660, tolls: 30000 }, vallenar: { roundTripKm: 1320, tolls: 26000 } },
+  coquimbo: { "la-serena": { roundTripKm: 940, tolls: 18000 }, coquimbo: { roundTripKm: 950, tolls: 18000 }, ovalle: { roundTripKm: 780, tolls: 16000 } },
+  valparaiso: {
+    valparaiso: { roundTripKm: 300, tolls: 12000 },
+    "vina-del-mar": { roundTripKm: 310, tolls: 12000 },
+    quilpue: { roundTripKm: 290, tolls: 10000 },
+    concon: { roundTripKm: 320, tolls: 12000 },
+    "los-andes": { roundTripKm: 220, tolls: 9000 },
+    "san-felipe": { roundTripKm: 200, tolls: 9000 },
+    "juan-fernandez": { roundTripKm: 1320, tolls: 0, specialLogistics: true },
+    "isla-de-pascua": { roundTripKm: 7500, tolls: 0, specialLogistics: true },
+  },
+  ohiggins: { rancagua: { roundTripKm: 170, tolls: 6000 }, machali: { roundTripKm: 180, tolls: 6000 }, "san-fernando": { roundTripKm: 280, tolls: 9000 }, pichilemu: { roundTripKm: 430, tolls: 13000 } },
+  maule: { talca: { roundTripKm: 510, tolls: 14000 }, curico: { roundTripKm: 380, tolls: 11000 }, linares: { roundTripKm: 620, tolls: 16000 } },
+  nuble: { chillan: { roundTripKm: 800, tolls: 19000 }, "san-carlos": { roundTripKm: 740, tolls: 18000 } },
+  biobio: { concepcion: { roundTripKm: 1040, tolls: 24000 }, talcahuano: { roundTripKm: 1060, tolls: 24000 }, "los-angeles": { roundTripKm: 900, tolls: 21000 } },
+  araucania: { temuco: { roundTripKm: 1380, tolls: 30000 }, villarrica: { roundTripKm: 1520, tolls: 32000 } },
+  losRios: { valdivia: { roundTripKm: 1680, tolls: 35000 }, "la-union": { roundTripKm: 1750, tolls: 36000 } },
+  losLagos: { "puerto-montt": { roundTripKm: 2090, tolls: 40000 }, osorno: { roundTripKm: 1820, tolls: 38000 }, castro: { roundTripKm: 2390, tolls: 45000 } },
+  aysen: { coyhaique: { roundTripKm: 3380, tolls: 20000 }, aysen: { roundTripKm: 3460, tolls: 20000 } },
+  magallanes: { "punta-arenas": { roundTripKm: 5660, tolls: 10000 }, natales: { roundTripKm: 5400, tolls: 10000 } },
+};
+
+const roundToNearest = (value, step = 1) => Math.round(value / step) * step;
+
+const getCommuneCoordinateProfile = (regionKey, communeKey, index, total) => {
+  const override = COMMUNE_COORDINATE_OVERRIDES[regionKey]?.[communeKey];
+  if (override) return override;
+
+  const regionReference =
+    REGION_COORDINATE_REFERENCE[regionKey] || REGION_COORDINATE_REFERENCE.metropolitana;
+  const normalizedIndex = total > 1 ? index / (total - 1) - 0.5 : 0;
+  const wave = Math.sin((index + 1) * 1.735);
+  const counterWave = Math.cos((index + 1) * 2.113);
+
+  return {
+    lat: Number(
+      (regionReference.lat + normalizedIndex * regionReference.latSpread + wave * regionReference.latJitter).toFixed(4),
+    ),
+    lng: Number(
+      (regionReference.lng + counterWave * regionReference.lngSpread + normalizedIndex * regionReference.lngJitter).toFixed(4),
+    ),
+    approximate: true,
+  };
+};
+
+const getHaversineDistanceKm = (from, to) => {
+  const earthRadiusKm = 6371;
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const dLat = toRadians(to.lat - from.lat);
+  const dLng = toRadians(to.lng - from.lng);
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const estimateRoundTripKmFromCoordinates = (regionKey, coordinates) => {
+  if (coordinates?.island) {
+    return roundToNearest(getHaversineDistanceKm(BASE_OPERATION_LOCATION, coordinates) * 2, 10);
+  }
+
+  const oneWayKm = getHaversineDistanceKm(BASE_OPERATION_LOCATION, coordinates);
+  const roadFactor = REGION_ROAD_FACTOR[regionKey] || 1.3;
+  const localMinimum = regionKey === "metropolitana" ? 0 : 90;
+
+  return roundToNearest(Math.max(oneWayKm * 2 * roadFactor, localMinimum), 10);
+};
+
+const estimateTollsFromDistance = (regionKey, roundTripKm, coordinates) => {
+  if (coordinates?.island || roundTripKm < 90) return 0;
+
+  const oneWayKm = roundTripKm / 2;
+  const tollRateByRegion =
+    ["valparaiso", "metropolitana", "ohiggins", "maule", "nuble", "biobio"].includes(regionKey)
+      ? 39
+      : 32;
+  const estimatedTolls = oneWayKm * tollRateByRegion;
+
+  return roundToNearest(clamp(estimatedTolls, 0, 65000), 1000);
+};
+
+const estimateSolarProfileFromCoordinates = (regionKey, coordinates) => {
+  const reference =
+    solarGhiReferenceByRegion[regionKey] || solarGhiReferenceByRegion.metropolitana;
+  const longitudeDelta = (coordinates.lng || reference.referenceLng) - reference.referenceLng;
+  const inlandBoost = clamp(longitudeDelta * 0.08, -0.18, 0.22);
+  const islandAdjustment = coordinates.island ? -0.08 : 0;
+  const annualGhi = clamp(
+    reference.annual + inlandBoost + islandAdjustment + (coordinates.solarBoost || 0),
+    2.4,
+    7.1,
+  );
+  const winterGhi = clamp(
+    reference.winter + inlandBoost * 0.55 + islandAdjustment + (coordinates.solarBoost || 0) * 0.8,
+    0.85,
+    6.2,
+  );
+  const summerGhi = clamp(
+    reference.summer + inlandBoost * 0.45 + islandAdjustment + (coordinates.solarBoost || 0) * 0.55,
+    3.6,
+    8.1,
+  );
+
+  return {
+    annual: Math.round((annualGhi * 365 * SOLAR_PERFORMANCE_RATIO * SOLAR_PLANE_GAIN_FACTOR) / 12),
+    winter: Math.round(winterGhi * 30 * SOLAR_PERFORMANCE_RATIO * SOLAR_PLANE_GAIN_FACTOR),
+    summer: Math.round(summerGhi * 30 * SOLAR_PERFORMANCE_RATIO * SOLAR_PLANE_GAIN_FACTOR),
+    ghiAnnual: Number(annualGhi.toFixed(2)),
+    ghiWinter: Number(winterGhi.toFixed(2)),
+    ghiSummer: Number(summerGhi.toFixed(2)),
+  };
+};
+
+const buildCommuneConfig = (regionKey, communeLabel, index, total) => {
+  const communeKey = slugifyPathSegment(communeLabel);
+  const coordinates = getCommuneCoordinateProfile(regionKey, communeKey, index, total);
+  const logisticsOverride = COMMUNE_LOGISTICS_OVERRIDES[regionKey]?.[communeKey];
+  const roundTripKm =
+    logisticsOverride?.roundTripKm ??
+    estimateRoundTripKmFromCoordinates(regionKey, coordinates);
+  const tolls =
+    logisticsOverride?.tolls ?? estimateTollsFromDistance(regionKey, roundTripKm, coordinates);
+
+  return [
+    communeKey,
+    {
+      label: communeLabel,
+      roundTripKm,
+      tolls,
+      specialLogistics: Boolean(logisticsOverride?.specialLogistics || coordinates.island),
+      coordinates,
+      solarProfile: estimateSolarProfileFromCoordinates(regionKey, coordinates),
+    },
+  ];
+};
+
+const maintenanceRegionData = Object.fromEntries(
+  CHILE_REGIONS_COMMUNES.map((region) => [
+    region.key,
+    {
+      label: region.label,
+      communes: Object.fromEntries(
+        region.communes.map((communeLabel, index) =>
+          buildCommuneConfig(region.key, communeLabel, index, region.communes.length),
+        ),
+      ),
+    },
+  ]),
+);
 
 const maintenanceRegionOptions = Object.entries(maintenanceRegionData).map(
   ([value, config]) => ({
@@ -1433,6 +2145,21 @@ const buildInstallationReportMarkup = ({
             <p>Lectura climática inicial para reforzar credibilidad y contexto técnico del informe.</p>
           </div>
           <div class="pdf-grid pdf-grid--climate">
+            <article class="pdf-card">
+              <span>RGH promedio</span>
+              <strong>${escapeHtml(formatNumber(metrics.annualGhi, 2))} kWh/m²/día</strong>
+              <small>Radiación global horizontal estimada</small>
+            </article>
+            <article class="pdf-card">
+              <span>RGH invierno</span>
+              <strong>${escapeHtml(formatNumber(metrics.winterGhi, 2))} kWh/m²/día</strong>
+              <small>Meses de menor recurso solar</small>
+            </article>
+            <article class="pdf-card">
+              <span>RGH verano</span>
+              <strong>${escapeHtml(formatNumber(metrics.summerGhi, 2))} kWh/m²/día</strong>
+              <small>Meses de mayor recurso solar</small>
+            </article>
             <article class="pdf-card">
               <span>Factor solar promedio</span>
               <strong>${escapeHtml(formatNumber(metrics.annualProductionFactor, 0))} kWh/kWp/mes</strong>
@@ -2180,6 +2907,9 @@ export default function SakiaraLandingPage() {
     const annualProductionFactor = installationSolarProfile.annual;
     const winterProductionFactor = installationSolarProfile.winter;
     const summerProductionFactor = installationSolarProfile.summer;
+    const annualGhi = installationSolarProfile.ghiAnnual;
+    const winterGhi = installationSolarProfile.ghiWinter;
+    const summerGhi = installationSolarProfile.ghiSummer;
     const isWinterGoal = coverageGoalMode === "winter";
     const isSeasonalGoal = coverageGoalMode === "seasonal";
 
@@ -2478,6 +3208,9 @@ export default function SakiaraLandingPage() {
       annualProductionFactor,
       winterProductionFactor,
       summerProductionFactor,
+      annualGhi,
+      winterGhi,
+      summerGhi,
       monthlyGenerationKWh,
       winterGenerationKWh,
       summerGenerationKWh,
@@ -3891,7 +4624,7 @@ Mensaje: ${message || "-"}`,
               </div>
 
               <div className="note mobile-essential-hide">
-                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró un factor solar referencial de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio, {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno y {formatNumber(installationMetrics.summerProductionFactor, 0)} kWh/kWp/mes en verano para {selectedInstallationCommune.label}.
+                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró una RGH referencial de {formatNumber(installationMetrics.annualGhi, 2)} kWh/m²/día y un factor solar de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio, {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno y {formatNumber(installationMetrics.summerProductionFactor, 0)} kWh/kWp/mes en verano para {selectedInstallationCommune.label}.
               </div>
             </>
           )}
