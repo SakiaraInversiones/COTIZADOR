@@ -1964,8 +1964,10 @@ const buildReportBarChartMarkup = ({
 const getInstallationQuotationItems = (metrics, selectedOffer) => {
   const costs = metrics.quotationCosts || {};
   const selectedKey = selectedOffer?.key || "huaweiNoBattery";
-  const isHuawei = selectedKey.startsWith("huawei");
-  const isSolis = selectedKey.startsWith("solis");
+  const normalizedSelectedKey = selectedKey.toLowerCase();
+  const isHuawei = normalizedSelectedKey.startsWith("huawei");
+  const isSolis = normalizedSelectedKey.startsWith("solis");
+  const includesBattery = normalizedSelectedKey.includes("withbattery");
   const inverterDescription = isHuawei
     ? "INVERSOR HUAWEI HÍBRIDO 8 KW"
     : isSolis
