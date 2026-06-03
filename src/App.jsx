@@ -488,9 +488,16 @@ const VEHICLE_WEAR_CLP_PER_KM = 120;
 const BASE_TRAVEL_FEE = 10000;
 const TRAVEL_BLOCK_KM = 50;
 const TRAVEL_BLOCK_FEE = 20000;
-const INSTALLATION_PROJECT_WORK_DAYS = 5;
-const INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM = 100;
-const INSTALLATION_OVERNIGHT_CLP_PER_NIGHT = 100000;
+const INSTALLATION_MIN_WORK_DAYS = 5;
+const INSTALLATION_PANEL_CREW_CAPACITY_PER_DAY = 8;
+const INSTALLATION_REMOTE_TRAVEL_DAYS = 2;
+const INSTALLATION_REMOTE_BASE_BUFFER_DAYS = 1;
+const INSTALLATION_REMOTE_PANEL_BUFFER_BLOCK = 16;
+const INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM = 400;
+const INSTALLATION_REMOTE_DISTANCE_BUFFER_THRESHOLD_KM = 1200;
+const INSTALLATION_REMOTE_DISTANCE_BUFFER_BLOCK_KM = 800;
+const INSTALLATION_TECH_CREW_LABOR_CLP_PER_DAY = 140000;
+const INSTALLATION_REMOTE_LODGING_CLP_PER_DAY = 70000;
 const INSTALLATION_LOCAL_LOGISTICS_CLP_PER_DAY = 20000;
 
 
@@ -512,47 +519,97 @@ const getTravelLogisticsBase = (roundTripKm, tolls = 0) => {
   };
 };
 
-const getInstallationProjectLogistics = (communeConfig) => {
+const getInstallationWorkDaysFromPanels = (panelCount = 0) => {
+  const safePanelCount = Math.max(Math.ceil(Number(panelCount) || 0), 1);
+  const panelBasedWorkDays = Math.ceil(
+    safePanelCount / INSTALLATION_PANEL_CREW_CAPACITY_PER_DAY,
+  );
+
+  return Math.max(INSTALLATION_MIN_WORK_DAYS, panelBasedWorkDays);
+};
+
+const getInstallationRemoteBufferDays = (panelCount = 0, roundTripKm = 0) => {
+  const safePanelCount = Math.max(Math.ceil(Number(panelCount) || 0), 1);
+  const panelBufferDays =
+    INSTALLATION_REMOTE_BASE_BUFFER_DAYS +
+    Math.ceil(Math.max(safePanelCount - 20, 0) / INSTALLATION_REMOTE_PANEL_BUFFER_BLOCK);
+  const distanceBufferDays =
+    roundTripKm >= INSTALLATION_REMOTE_DISTANCE_BUFFER_THRESHOLD_KM
+      ? Math.ceil(
+          (roundTripKm - INSTALLATION_REMOTE_DISTANCE_BUFFER_THRESHOLD_KM + 1) /
+            INSTALLATION_REMOTE_DISTANCE_BUFFER_BLOCK_KM,
+        )
+      : 0;
+
+  return panelBufferDays + distanceBufferDays;
+};
+
+const getInstallationProjectLogistics = (communeConfig, panelCount = 0) => {
   const safeCommune = communeConfig || { roundTripKm: 0, tolls: 0 };
   const travelMetrics = getTravelLogisticsBase(
     safeCommune.roundTripKm,
     safeCommune.tolls,
   );
   const isRemoteProject =
-    safeCommune.roundTripKm > INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM;
+    Boolean(safeCommune.specialLogistics) ||
+    safeCommune.roundTripKm >= INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM;
+  const projectWorkDays = getInstallationWorkDaysFromPanels(panelCount);
 
   if (isRemoteProject) {
-    const lodgingNights = INSTALLATION_PROJECT_WORK_DAYS + 1;
+    const travelDays = INSTALLATION_REMOTE_TRAVEL_DAYS;
+    const bufferDays = getInstallationRemoteBufferDays(
+      panelCount,
+      safeCommune.roundTripKm,
+    );
+    const projectCalendarDays = projectWorkDays + travelDays + bufferDays;
+    const lodgingDays = projectCalendarDays;
     const localLogistics =
-      INSTALLATION_PROJECT_WORK_DAYS * INSTALLATION_LOCAL_LOGISTICS_CLP_PER_DAY;
+      projectCalendarDays * INSTALLATION_LOCAL_LOGISTICS_CLP_PER_DAY;
+    const laborDays = projectCalendarDays;
+    const laborTotal = laborDays * INSTALLATION_TECH_CREW_LABOR_CLP_PER_DAY;
 
     return {
       ...travelMetrics,
       roundTripKm: safeCommune.roundTripKm,
       tolls: safeCommune.tolls,
       isRemoteProject,
-      projectWorkDays: INSTALLATION_PROJECT_WORK_DAYS,
-      travelDays: 2,
-      lodgingNights,
+      panelCount: Math.max(Math.ceil(Number(panelCount) || 0), 1),
+      projectWorkDays,
+      travelDays,
+      bufferDays,
+      projectCalendarDays,
+      lodgingDays,
+      lodgingNights: lodgingDays,
       localLogistics,
+      laborDays,
+      laborTotal,
       logisticsTotal:
         travelMetrics.logisticsBase +
-        lodgingNights * INSTALLATION_OVERNIGHT_CLP_PER_NIGHT +
+        lodgingDays * INSTALLATION_REMOTE_LODGING_CLP_PER_DAY +
         localLogistics,
     };
   }
+
+  const projectCalendarDays = projectWorkDays;
+  const laborDays = projectCalendarDays;
+  const laborTotal = laborDays * INSTALLATION_TECH_CREW_LABOR_CLP_PER_DAY;
 
   return {
     ...travelMetrics,
     roundTripKm: safeCommune.roundTripKm,
     tolls: safeCommune.tolls,
     isRemoteProject,
-    projectWorkDays: INSTALLATION_PROJECT_WORK_DAYS,
+    panelCount: Math.max(Math.ceil(Number(panelCount) || 0), 1),
+    projectWorkDays,
     travelDays: 0,
+    bufferDays: 0,
+    projectCalendarDays,
+    lodgingDays: 0,
     lodgingNights: 0,
     localLogistics: 0,
-    logisticsTotal:
-      travelMetrics.logisticsBase * INSTALLATION_PROJECT_WORK_DAYS,
+    laborDays,
+    laborTotal,
+    logisticsTotal: travelMetrics.logisticsBase * projectWorkDays,
   };
 };
 
@@ -1310,7 +1367,7 @@ const COMMUNE_LOGISTICS_OVERRIDES = {
   tarapaca: { iquique: { roundTripKm: 3600, tolls: 56000 }, "alto-hospicio": { roundTripKm: 3600, tolls: 56000 } },
   antofagasta: { antofagasta: { roundTripKm: 2740, tolls: 46000 }, calama: { roundTripKm: 3000, tolls: 49000 } },
   atacama: { copiapo: { roundTripKm: 1660, tolls: 30000 }, vallenar: { roundTripKm: 1320, tolls: 26000 } },
-  coquimbo: { "la-serena": { roundTripKm: 940, tolls: 18000 }, coquimbo: { roundTripKm: 950, tolls: 18000 }, ovalle: { roundTripKm: 780, tolls: 16000 } },
+  coquimbo: { "la-serena": { roundTripKm: 940, tolls: 18000 }, coquimbo: { roundTripKm: 950, tolls: 18000 }, ovalle: { roundTripKm: 780, tolls: 16000 }, vicuna: { roundTripKm: 1040, tolls: 22000 }, paihuano: { roundTripKm: 1120, tolls: 22000 } },
   valparaiso: {
     valparaiso: { roundTripKm: 300, tolls: 12000 },
     "vina-del-mar": { roundTripKm: 310, tolls: 12000 },
@@ -3314,10 +3371,6 @@ export default function SakiaraLandingPage() {
     () => getSolarProductionProfile(installationRegion, installationCommune),
     [installationRegion, installationCommune],
   );
-  const installationLogisticsMetrics = useMemo(
-    () => getInstallationProjectLogistics(selectedInstallationCommune),
-    [selectedInstallationCommune],
-  );
   const climateReferenceProfile = useMemo(
     () => getClimateReferenceProfile(installationRegion),
     [installationRegion],
@@ -3413,7 +3466,6 @@ export default function SakiaraLandingPage() {
     const moduleSellPerPanel = 79610.79168509509;
     const huaweiInverterNet = 823740.8226448474;
     const solisInverterNet = 1318842.105263158;
-    const laborNet = 700000;
     const certSecNet = 500000;
     const workbookBaseLogisticsNet = 250000;
     const ccCablingNet = 418534.8606811147;
@@ -3594,6 +3646,11 @@ export default function SakiaraLandingPage() {
       0,
     );
     const structureBlocks = Math.max(1, Math.ceil(estimatedPanels / 4));
+    const installationLogisticsMetrics = getInstallationProjectLogistics(
+      selectedInstallationCommune,
+      estimatedPanels,
+    );
+    const laborNet = installationLogisticsMetrics.laborTotal;
 
     const monthlyGenerationKWh = estimatedSystemSizeKwp * annualProductionFactor;
     const winterGenerationKWh = estimatedSystemSizeKwp * winterProductionFactor;
@@ -3767,6 +3824,12 @@ export default function SakiaraLandingPage() {
         huaweiInverterNet,
         solisInverterNet,
         laborNet,
+        laborDays: installationLogisticsMetrics.laborDays,
+        projectWorkDays: installationLogisticsMetrics.projectWorkDays,
+        travelDays: installationLogisticsMetrics.travelDays,
+        bufferDays: installationLogisticsMetrics.bufferDays,
+        projectCalendarDays: installationLogisticsMetrics.projectCalendarDays,
+        lodgingDays: installationLogisticsMetrics.lodgingDays,
         logisticsNet: fixedLogisticsNet,
         ccCablingNet,
         acBoardNet,
@@ -3802,6 +3865,13 @@ export default function SakiaraLandingPage() {
         Math.max(annualSavingsWithBattery, 1),
       locationLabel: `${selectedInstallationRegion.label} · ${selectedInstallationCommune.label}`,
       logisticsTotal: fixedLogisticsNet,
+      laborDays: installationLogisticsMetrics.laborDays,
+      projectWorkDays: installationLogisticsMetrics.projectWorkDays,
+      travelDays: installationLogisticsMetrics.travelDays,
+      bufferDays: installationLogisticsMetrics.bufferDays,
+      projectCalendarDays: installationLogisticsMetrics.projectCalendarDays,
+      lodgingDays: installationLogisticsMetrics.lodgingDays,
+      isRemoteProject: installationLogisticsMetrics.isRemoteProject,
       projectExecutionNote,
       annualProductionFactor,
       winterProductionFactor,
@@ -3846,8 +3916,8 @@ export default function SakiaraLandingPage() {
     billConsumptionInput,
     installationSolarProfile,
     selectedProfile,
-    installationLogisticsMetrics,
     selectedInstallationRegion.label,
+    selectedInstallationCommune,
     selectedInstallationCommune.label,
     coverageGoalMode,
     winterCoverageTargetPercent,
