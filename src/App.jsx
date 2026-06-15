@@ -2132,7 +2132,6 @@ const buildInstallationQuotationMarkup = ({
           <td class="quote-col-item">${escapeHtml(row.item)}</td>
           <td>${escapeHtml(row.description)}</td>
           <td class="quote-col-qty">${escapeHtml(formatNumber(row.quantity))}</td>
-          <td class="quote-col-money">${escapeHtml(formatCLP(row.totalNet))}</td>
         </tr>
       `,
     )
@@ -2176,7 +2175,6 @@ const buildInstallationQuotationMarkup = ({
               <th>ITEM</th>
               <th>DESCRIPCIÓN</th>
               <th>CANT.</th>
-              <th>TOTAL NETO</th>
             </tr>
           </thead>
           <tbody>${rowsMarkup}</tbody>
@@ -2402,13 +2400,15 @@ const buildInstallationQuotationMarkup = ({
         .quote-table td:nth-child(3) {
           width: 78px;
         }
+        .quote-table th:nth-child(2),
+        .quote-table td:nth-child(2) {
+          width: auto;
+        }
+        /* Seguridad adicional: en la cotización residencial no se muestra
+           desglose económico por ítem. Solo se muestran ITEM, DESCRIPCIÓN y CANT. */
         .quote-table th:nth-child(4),
         .quote-table td:nth-child(4) {
-          width: 130px;
-        }
-        .quote-col-money {
-          text-align: right;
-          white-space: nowrap;
+          display: none !important;
         }
         .quote-summary-strip {
           display: grid;
