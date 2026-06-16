@@ -488,35 +488,44 @@ const ENTERPRISE_MODULE_DIMENSIONS_M = {
   width: 1.134,
   area: 2.278 * 1.134,
 };
-const ENTERPRISE_SYSTEM_MIN_KWP = 15;
+const ENTERPRISE_SYSTEM_MIN_KWP = 3;
 const ENTERPRISE_SYSTEM_MAX_KWP = 500;
 const ENTERPRISE_DC_AC_RATIO_TARGET = 1.22;
 const ENTERPRISE_STRING_PANEL_COUNT = 18;
 const ENTERPRISE_MODULE_SPACING_FACTOR = 1.15;
-const ENTERPRISE_CERTIFICATION_NET = 2000000;
-const ENTERPRISE_ENGINEERING_MIN_NET = 500000;
-const ENTERPRISE_ENGINEERING_FACTOR = 0.1;
+const ENTERPRISE_SMALL_PROJECT_CERTIFICATION_NET = 1000000;
+const ENTERPRISE_LARGE_PROJECT_CERTIFICATION_NET = 2000000;
+const getEnterpriseCertificationNet = (systemSizeKwp = 0) =>
+  systemSizeKwp >= ENTERPRISE_LARGE_PROJECT_MIN_KWP
+    ? ENTERPRISE_LARGE_PROJECT_CERTIFICATION_NET
+    : ENTERPRISE_SMALL_PROJECT_CERTIFICATION_NET;
+const ENTERPRISE_ENGINEERING_MIN_NET = 250000;
+const ENTERPRISE_ENGINEERING_FACTOR = 0.05;
 const ENTERPRISE_REFERENCE_SELF_CONSUMPTION_RATE = 0.78;
 const ENTERPRISE_REFERENCE_EXPORT_RATE_FACTOR = 0.55;
 const ENTERPRISE_CANALIZATION_MIN_NET = 1500000;
+const ENTERPRISE_SMALL_PROJECT_CANALIZATION_MIN_NET = 500000;
+const ENTERPRISE_LARGE_PROJECT_MIN_KWP = 30;
+const ENTERPRISE_SMALL_PROJECT_MIN_DC_CABLE_METERS_PER_POLARITY = 120;
 const ENTERPRISE_CANALIZATION_NET_PER_KWP = 35000;
 const ENTERPRISE_MIN_DC_CABLE_METERS_PER_POLARITY = 500;
 const ENTERPRISE_TECH_CREW_PANEL_CAPACITY_PER_DAY = 8;
 const ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY = 140000;
-const ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY = 35000;
+const ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY = 80000;
+const ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY = 20000;
 const ENTERPRISE_LODGING_CLP_PER_DAY_PER_CREW = 70000;
 const ENTERPRISE_REMOTE_DISTANCE_THRESHOLD_KM = 400;
 const ENTERPRISE_REMOTE_TRAVEL_DAYS = 2;
-const ENTERPRISE_LOCAL_MOBILIZATION_MIN_NET = 150000;
-const ENTERPRISE_REMOTE_MOBILIZATION_MIN_NET = 350000;
+const ENTERPRISE_LOCAL_MOBILIZATION_MIN_NET = 0;
+const ENTERPRISE_REMOTE_MOBILIZATION_MIN_NET = 0;
 
 const getEnterpriseCommercialFloorNetPerKwp = (systemSizeKwp = 0) => {
   const size = Number(systemSizeKwp) || 0;
-  if (size <= 30) return 820000;
-  if (size <= 50) return 760000;
-  if (size <= 100) return 700000;
-  if (size <= 300) return 650000;
-  return 600000;
+  if (size <= 30) return 650000;
+  if (size <= 50) return 620000;
+  if (size <= 100) return 590000;
+  if (size <= 300) return 560000;
+  return 540000;
 };
 
 const getEnterpriseProjectTypeFactor = (projectType = "bodega") => {
@@ -524,9 +533,9 @@ const getEnterpriseProjectTypeFactor = (projectType = "bodega") => {
     bodega: 1,
     comercio: 1.03,
     oficina: 1.03,
-    agricola: 1.08,
-    industrial: 1.1,
-    otro: 1.06,
+    agricola: 1.03,
+    industrial: 1.05,
+    otro: 1.03,
   };
   return factors[projectType] || 1.06;
 };
@@ -534,9 +543,9 @@ const getEnterpriseProjectTypeFactor = (projectType = "bodega") => {
 const getEnterpriseSurfaceCommercialFactor = (surfaceType = "cubierta") => {
   const factors = {
     cubierta: 1,
-    suelo: 1.08,
-    estacionamiento: 1.18,
-    mixto: 1.12,
+    suelo: 1.04,
+    estacionamiento: 1.12,
+    mixto: 1.06,
   };
   return factors[surfaceType] || 1.08;
 };
@@ -761,14 +770,19 @@ const getEnterpriseCablingPlan = ({
   stringCount = 1,
   inverterCount = 1,
 } = {}) => {
+  const isLargeEnterpriseProject = systemSizeKwp >= ENTERPRISE_LARGE_PROJECT_MIN_KWP;
   const dcCableMetersPerPolarity = Math.ceil(
     Math.max(
-      ENTERPRISE_MIN_DC_CABLE_METERS_PER_POLARITY,
+      isLargeEnterpriseProject
+        ? ENTERPRISE_MIN_DC_CABLE_METERS_PER_POLARITY
+        : ENTERPRISE_SMALL_PROJECT_MIN_DC_CABLE_METERS_PER_POLARITY,
       stringCount * 35 + inverterCount * 60,
     ),
   );
   const canalizationNet = Math.max(
-    ENTERPRISE_CANALIZATION_MIN_NET,
+    isLargeEnterpriseProject
+      ? ENTERPRISE_CANALIZATION_MIN_NET
+      : ENTERPRISE_SMALL_PROJECT_CANALIZATION_MIN_NET,
     Math.ceil((systemSizeKwp * ENTERPRISE_CANALIZATION_NET_PER_KWP) / 1000) *
       1000,
   );
@@ -785,6 +799,7 @@ const getEnterpriseCablingPlan = ({
     stringCount * 6 * enterpriseProductPricesNet.cableClipTwo;
 
   return {
+    isLargeEnterpriseProject,
     dcCableMetersPerPolarity,
     redCableNet,
     blackCableNet,
@@ -848,59 +863,35 @@ const getEnterpriseProjectExecutionPlan = ({
   panelCount = 0,
   systemSizeKwp = 0,
 } = {}) => {
-  const safeCommune = communeConfig || { roundTripKm: 0, tolls: 0 };
-  const safePanelCount = Math.max(Math.ceil(Number(panelCount) || 0), 1);
-  const crewCount = systemSizeKwp >= 120 ? 3 : systemSizeKwp >= 55 ? 2 : 1;
-  const workDays = Math.max(
-    5,
-    Math.ceil(
-      safePanelCount /
-        Math.max(ENTERPRISE_TECH_CREW_PANEL_CAPACITY_PER_DAY * crewCount, 1),
-    ),
-  );
-  const travelMetrics = getTravelLogisticsBase(
-    safeCommune.roundTripKm,
-    safeCommune.tolls,
-  );
-  const isRemoteProject =
-    Boolean(safeCommune.specialLogistics) ||
-    safeCommune.roundTripKm >= ENTERPRISE_REMOTE_DISTANCE_THRESHOLD_KM;
-  const travelDays = isRemoteProject ? ENTERPRISE_REMOTE_TRAVEL_DAYS : 0;
-  const bufferDays = isRemoteProject
-    ? Math.max(1, Math.ceil(safePanelCount / 36))
-    : Math.ceil(safePanelCount / 80);
-  const projectCalendarDays = workDays + travelDays + bufferDays;
-  const laborNet =
-    projectCalendarDays * crewCount * ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY;
-  const lodgingNet = isRemoteProject
-    ? projectCalendarDays * crewCount * ENTERPRISE_LODGING_CLP_PER_DAY_PER_CREW
-    : 0;
-  const localLogisticsNet =
-    projectCalendarDays * crewCount * ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY;
-  const mobilizationBaseNet = Math.max(
-    travelMetrics.logisticsBase,
-    isRemoteProject
-      ? ENTERPRISE_REMOTE_MOBILIZATION_MIN_NET
-      : ENTERPRISE_LOCAL_MOBILIZATION_MIN_NET,
-  );
-  const logisticsNet =
-    mobilizationBaseNet + lodgingNet + localLogisticsNet;
+  const homeLikePlan = getInstallationProjectLogistics(communeConfig, panelCount);
+  const laborDays = homeLikePlan.laborDays || homeLikePlan.projectCalendarDays || 0;
+  const technicalCrewLaborNet = laborDays * ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY;
+  const helperCrewLaborNet = laborDays * ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY;
 
   return {
-    crewCount,
-    workDays,
-    travelDays,
-    bufferDays,
-    projectCalendarDays,
-    isRemoteProject,
-    roundTripKm: safeCommune.roundTripKm,
-    tolls: safeCommune.tolls,
-    laborNet,
-    lodgingNet,
-    localLogisticsNet,
-    mobilizationBaseNet,
-    travelLogisticsNet: travelMetrics.logisticsBase,
-    logisticsNet,
+    crewCount: 2,
+    technicalCrewCount: 1,
+    helperCrewCount: 1,
+    workDays: homeLikePlan.projectWorkDays,
+    travelDays: homeLikePlan.travelDays,
+    bufferDays: homeLikePlan.bufferDays,
+    laborDays,
+    projectCalendarDays: homeLikePlan.projectCalendarDays,
+    isRemoteProject: homeLikePlan.isRemoteProject,
+    roundTripKm: homeLikePlan.roundTripKm,
+    tolls: homeLikePlan.tolls,
+    technicalCrewLaborNet,
+    helperCrewLaborNet,
+    dailyLaborNet:
+      ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY +
+      ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY,
+    laborNet: technicalCrewLaborNet + helperCrewLaborNet,
+    lodgingNet:
+      homeLikePlan.lodgingDays * INSTALLATION_REMOTE_LODGING_CLP_PER_DAY,
+    localLogisticsNet: homeLikePlan.localLogistics,
+    mobilizationBaseNet: homeLikePlan.logisticsBase,
+    travelLogisticsNet: homeLikePlan.logisticsBase,
+    logisticsNet: homeLikePlan.logisticsTotal,
   };
 };
 
@@ -2022,7 +2013,7 @@ const getSeoConfig = (view, origin = SITE_FALLBACK_URL) => {
     empresas: {
       title: "Energía solar para empresas | Sakiara Solar",
       description:
-        "Evaluamos proyectos solares para empresas con foco técnico-comercial, visita en terreno y una referencia desde $500.000 por kWp según condiciones del proyecto.",
+        "Evaluamos proyectos solares para empresas con foco técnico-comercial, visita en terreno y una referencia según evaluación técnica según condiciones del proyecto.",
       path: "/empresas",
       pageName: "Energía solar para empresas",
       image: `${normalizedOrigin}/proyectos/empresa-referencia.jpg`,
@@ -3090,7 +3081,7 @@ const buildEnterpriseQuotationMarkup = ({
             <ul>
               <li>Validez de la cotización: ${escapeHtml(validDays)} días desde la fecha de emisión.</li>
               <li>Propuesta preliminar sujeta a visita técnica, ingeniería, metrajes reales, empalme y factibilidad de conexión.</li>
-              <li>Certificación SEC considerada en $2.000.000 neto.</li>
+              <li>Certificación SEC considerada en ${escapeHtml(formatCLP(metrics.certificationNet))} neto.</li>
               <li>Valores IVA incluido, salvo que se indique expresamente lo contrario.</li>
               <li>La distribución interna de costos no forma parte de esta presentación comercial.</li>
             </ul>
@@ -3101,7 +3092,7 @@ const buildEnterpriseQuotationMarkup = ({
               <span>Superficie</span><strong>${escapeHtml(metrics.surfaceTypeLabel)}</strong>
               <span>Ubicación</span><strong>${escapeHtml(`${communeLabel}, ${regionLabel}`)}</strong>
               <span>Días proyecto</span><strong>${escapeHtml(formatNumber(metrics.executionPlan.projectCalendarDays))}</strong>
-              <span>Duplas</span><strong>${escapeHtml(formatNumber(metrics.executionPlan.crewCount))}</strong>
+              <span>Equipos de trabajo</span><strong>${escapeHtml(formatNumber(metrics.executionPlan.technicalCrewCount))} técnica + ${escapeHtml(formatNumber(metrics.executionPlan.helperCrewCount))} jornalera</strong>
               <span>Logística</span><strong>${escapeHtml(metrics.executionPlan.isRemoteProject ? "Remota" : "Local")}</strong>
             </div>
           </div>
@@ -4104,6 +4095,13 @@ const buildEnterpriseReportMarkup = ({
   const safeCompany = enterpriseCompany?.trim() || "Empresa por completar";
   const safeName = name?.trim() || "Contacto por completar";
   const addressLabel = projectAddress?.trim() || `${communeLabel}, ${regionLabel}`;
+  const isLargeEnterpriseProject = Boolean(metrics.cablingPlan?.isLargeEnterpriseProject);
+  const canalizationLabel = isLargeEnterpriseProject
+    ? "mín. $1.500.000"
+    : "escala tipo Hogar";
+  const cableLabel = isLargeEnterpriseProject
+    ? "500 m + 500 m mín."
+    : `${formatNumber(metrics.cablingPlan.dcCableMetersPerPolarity)} m + ${formatNumber(metrics.cablingPlan.dcCableMetersPerPolarity)} m`;
 
   const generationChart = buildReportBarChartMarkup({
     title: "Generación mensual estimada",
@@ -4170,7 +4168,7 @@ const buildEnterpriseReportMarkup = ({
       values: [
         ["Paneles", `${formatNumber(metrics.estimatedPanels)}`],
         ["Inversores", `${formatNumber(metrics.inverterPlan.inverterCount)}`],
-        ["Duplas", `${formatNumber(metrics.executionPlan.crewCount)}`],
+        ["Equipos", `${formatNumber(metrics.executionPlan.technicalCrewCount)} dupla técnica + ${formatNumber(metrics.executionPlan.helperCrewCount)} dupla jornalera`],
       ],
     },
     {
@@ -4179,14 +4177,14 @@ const buildEnterpriseReportMarkup = ({
       text: "La estructura se estima con módulos en vertical. Para cubierta se usa la regla práctica de 4 paneles por bloque y 2 rieles de 5 metros.",
       values: [
         ["Rieles", `${formatNumber(metrics.structurePlan.railCount)}`],
-        ["Canalización", "mín. $1.500.000"],
-        ["Cable CC", "500 m + 500 m mín."],
+        ["Canalización", canalizationLabel],
+        ["Cable CC", cableLabel],
       ],
     },
     {
       badge: "Comercial",
       title: "Precio preliminar",
-      text: "El valor aplica piso empresarial por kWp y queda sujeto a visita técnica, ingeniería de detalle, empalme, tablero existente y trazado real.",
+      text: "El valor mantiene lógica tipo Hogar para proyectos pequeños y escala empresarial solo en plantas grandes, quedando sujeto a visita técnica, empalme, tablero existente y trazado real.",
       values: [
         ["Neto", formatCLP(metrics.totalNet)],
         ["IVA", formatCLP(metrics.vat)],
@@ -4402,10 +4400,10 @@ const buildEnterpriseReportMarkup = ({
               <strong>Montaje:</strong> la estructura se estima según superficie seleccionada. En cubierta se usa panel vertical y la regla de 4 paneles por bloque con 2 rieles de 5 m.
             </div>
             <div class="pdf-note">
-              <strong>Canalización:</strong> se considera mínimo empresarial de $1.500.000 neto y mínimo 500 m de cable solar rojo + 500 m negro.
+              <strong>Canalización:</strong> para plantas grandes se considera mínimo empresarial de $1.500.000 neto y mínimo 500 m de cable solar rojo + 500 m negro; en proyectos pequeños se escala similar a Hogar.
             </div>
             <div class="pdf-note">
-              <strong>Certificación:</strong> se considera SEC empresa en $2.000.000 neto + IVA.
+              <strong>Certificación:</strong> para proyectos pequeños se considera SEC en $1.000.000 neto + IVA; para plantas grandes se mantiene evaluación superior según alcance.
             </div>
             <div class="pdf-note pdf-note--full">
               <strong>Descargo:</strong> valor sujeto a visita técnica, ingeniería de detalle, factibilidad de conexión, tablero existente, empalme, protecciones, sombras, seguridad, accesos, metrajes reales y condiciones del sitio.
@@ -5562,6 +5560,7 @@ export default function SakiaraLandingPage() {
       panelCount: estimatedPanels,
       systemSizeKwp: roundedPowerKw,
     });
+    const certificationNet = getEnterpriseCertificationNet(roundedPowerKw);
 
     const modulesNet = estimatedPanels * enterpriseProductPricesNet.jinko585Panel;
     const directNet =
@@ -5572,7 +5571,7 @@ export default function SakiaraLandingPage() {
       acProtectionPlan.totalNet +
       executionPlan.laborNet +
       executionPlan.logisticsNet +
-      ENTERPRISE_CERTIFICATION_NET;
+      certificationNet;
     const engineeringNet = Math.max(
       ENTERPRISE_ENGINEERING_MIN_NET,
       directNet * ENTERPRISE_ENGINEERING_FACTOR,
@@ -5584,8 +5583,8 @@ export default function SakiaraLandingPage() {
     const adjustedTotalNet = rawTotalNet * commercialFactor;
     const commercialFloorNet =
       roundedPowerKw * getEnterpriseCommercialFloorNetPerKwp(roundedPowerKw);
-    const totalNet = Math.max(adjustedTotalNet, commercialFloorNet);
-    const marketAdjustmentNet = Math.max(totalNet - rawTotalNet, 0);
+    const totalNet = Math.max(rawTotalNet, adjustedTotalNet);
+    const marketAdjustmentNet = 0;
     const vat = totalNet * 0.19;
     const referenceInvestment = totalNet + vat;
 
@@ -5640,7 +5639,7 @@ export default function SakiaraLandingPage() {
         totalNet: acProtectionPlan.totalNet,
       },
       {
-        description: "Mano de obra técnica",
+        description: "Mano de obra técnica y jornalera",
         quantity: executionPlan.crewCount,
         totalNet: executionPlan.laborNet,
       },
@@ -5652,7 +5651,7 @@ export default function SakiaraLandingPage() {
       {
         description: "Certificación SEC y tramitación",
         quantity: 1,
-        totalNet: ENTERPRISE_CERTIFICATION_NET,
+        totalNet: certificationNet,
       },
       {
         description: "Ingeniería, coordinación y contingencia comercial",
@@ -5698,6 +5697,7 @@ export default function SakiaraLandingPage() {
       structurePlan,
       cablingPlan,
       acProtectionPlan,
+      certificationNet,
       executionPlan,
       quotationItems,
       locationLabel: `${selectedEnterpriseRegion.label} · ${selectedEnterpriseCommune.label}`,
@@ -5712,8 +5712,9 @@ export default function SakiaraLandingPage() {
       commercialIntentLabel:
         enterpriseCommercialIntentOptions.find((item) => item.value === enterpriseCommercialIntent)?.label ||
         "A definir",
-      referenceText:
-        "Estimación preliminar con equipos Huawei, módulo Jinko 585 W, canalización mínima empresarial, cable CC mínimo 500 m rojo + 500 m negro y certificación SEC de $2.000.000 neto.",
+      referenceText: cablingPlan.isLargeEnterpriseProject
+        ? "Estimación preliminar con equipos Huawei, módulo Jinko 585 W, canalización mínima empresarial, cable CC mínimo 500 m rojo + 500 m negro y certificación SEC de $2.000.000 neto."
+        : "Estimación preliminar para proyecto pequeño tipo 2× domiciliario, con equipos Huawei, módulo Jinko 585 W, logística igual a Hogar, dupla técnica + dupla jornalera y certificación SEC de $1.000.000 neto.",
     };
   }, [
     enterpriseCommercialIntent,
@@ -6693,7 +6694,7 @@ Mensaje: ${message || "-"}`,
               </p>
             </div>
             <div className="service-points">
-              <div>Referencia desde $500.000 por kWp</div>
+              <div>Referencia según evaluación técnica</div>
               <div>Visita técnica antes de cerrar propuesta</div>
               <div>Net Billing y evaluación comercial a medida</div>
             </div>
@@ -8300,7 +8301,7 @@ Mensaje: ${message || "-"}`,
                   <div className="offer-badge">Alcance técnico resumido</div>
                   <h3>{enterpriseMetrics.projectTypeLabel}</h3>
                   <p>
-                    {enterpriseMetrics.inverterSummary}. {enterpriseMetrics.structurePlan.typeLabel}. Cableado mínimo empresarial de {formatNumber(enterpriseMetrics.cablingPlan.dcCableMetersPerPolarity)} m por polaridad y certificación SEC empresa considerada.
+                    {enterpriseMetrics.inverterSummary}. {enterpriseMetrics.structurePlan.typeLabel}. {enterpriseMetrics.cablingPlan.isLargeEnterpriseProject ? "Cableado mínimo empresarial" : "Cableado escala tipo Hogar"} de {formatNumber(enterpriseMetrics.cablingPlan.dcCableMetersPerPolarity)} m por polaridad y certificación SEC considerada por {formatCLP(enterpriseMetrics.certificationNet)} neto.
                   </p>
                 </div>
                 <div className="summary-grid enterprise-summary-grid">
