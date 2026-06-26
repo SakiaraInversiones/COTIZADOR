@@ -2128,6 +2128,8 @@ function OfferCard({
   winterCompensation,
   summerCompensation,
   payback,
+  panelCount,
+  systemSizeKwp,
   variant,
   collapsible = false,
   isOpen = true,
@@ -2168,6 +2170,18 @@ function OfferCard({
           </div>
 
           <div className="stats-grid">
+            <div className="stat">
+              <div className="stat-label">Paneles</div>
+              <div className="stat-value">
+                {Number.isFinite(panelCount) ? formatNumber(panelCount) : "-"}
+              </div>
+            </div>
+            <div className="stat">
+              <div className="stat-label">Potencia</div>
+              <div className="stat-value">
+                {Number.isFinite(systemSizeKwp) ? `${formatNumber(systemSizeKwp, 1)} kWp` : "-"}
+              </div>
+            </div>
             <div className="stat">
               <div className="stat-label">Ahorro</div>
               <div className="stat-value">{savings}</div>
@@ -2431,6 +2445,26 @@ const buildReportBarChartMarkup = ({
   `;
 };
 
+const getInstallationQuotationPanelCount = (metrics, selectedOffer) => {
+  const selectedOfferPanelCount = Number(selectedOffer?.panelCount);
+  const metricsPanelCount = Number(metrics?.estimatedPanels);
+  const panelCount = Number.isFinite(selectedOfferPanelCount) && selectedOfferPanelCount > 0
+    ? selectedOfferPanelCount
+    : metricsPanelCount;
+
+  return Math.max(4, Math.ceil(Number.isFinite(panelCount) ? panelCount : 0));
+};
+
+const getInstallationQuotationSystemSizeKwp = (metrics, selectedOffer) => {
+  const selectedOfferSystemSize = Number(selectedOffer?.systemSizeKwp);
+
+  if (Number.isFinite(selectedOfferSystemSize) && selectedOfferSystemSize > 0) {
+    return selectedOfferSystemSize;
+  }
+
+  return getInstallationQuotationPanelCount(metrics, selectedOffer) * PANEL_POWER_KW;
+};
+
 const getInstallationQuotationItems = (metrics, selectedOffer) => {
   const costs = metrics.quotationCosts || {};
   const selectedKey = selectedOffer?.key || "huaweiNoBattery";
@@ -2438,6 +2472,12 @@ const getInstallationQuotationItems = (metrics, selectedOffer) => {
   const isHuawei = normalizedSelectedKey.startsWith("huawei");
   const isSolis = normalizedSelectedKey.startsWith("solis");
   const includesBattery = normalizedSelectedKey.includes("withbattery");
+  const panelCount = getInstallationQuotationPanelCount(metrics, selectedOffer);
+  const structureBlocks = Math.max(1, Math.ceil(panelCount / 4));
+  const metricsPanelCount = Math.max(1, Math.ceil(Number(metrics?.estimatedPanels) || panelCount));
+  const metricsStructureBlocks = Math.max(1, Math.ceil(Number(metrics?.structureBlocks) || structureBlocks));
+  const moduleNetPerPanel = (Number(costs.modulesNet) || 0) / metricsPanelCount;
+  const structureNetPerBlock = (Number(costs.structureNet) || 0) / metricsStructureBlocks;
   const inverterDescription = isHuawei
     ? "INVERSOR HUAWEI HÍBRIDO 8 KW"
     : isSolis
@@ -2447,8 +2487,8 @@ const getInstallationQuotationItems = (metrics, selectedOffer) => {
   const rows = [
     {
       description: "MÓDULOS FOTOVOLTAICOS 585W",
-      quantity: metrics.estimatedPanels,
-      totalNet: costs.modulesNet,
+      quantity: panelCount,
+      totalNet: panelCount * moduleNetPerPanel,
     },
     {
       description: inverterDescription,
@@ -2500,8 +2540,8 @@ const getInstallationQuotationItems = (metrics, selectedOffer) => {
 
   rows.push({
     description: "ESTRUCTURA PARA MÓDULOS",
-    quantity: metrics.structureBlocks,
-    totalNet: costs.structureNet,
+    quantity: structureBlocks,
+    totalNet: structureBlocks * structureNetPerBlock,
   });
 
   return rows
@@ -2524,6 +2564,8 @@ const buildInstallationQuotationMarkup = ({
   quoteDate,
 }) => {
   const validDays = 15;
+  const quotedPanelCount = getInstallationQuotationPanelCount(metrics, selectedOffer);
+  const quotedSystemSizeKwp = getInstallationQuotationSystemSizeKwp(metrics, selectedOffer);
   const quotationItems = getInstallationQuotationItems(metrics, selectedOffer);
   const totalNet = quotationItems.reduce((sum, row) => sum + row.totalNet, 0);
   const vat = totalNet * 0.19;
@@ -2596,8 +2638,8 @@ const buildInstallationQuotationMarkup = ({
         <section class="quote-summary-strip">
           <div>
             <span>Paneles</span>
-            <strong>${escapeHtml(formatNumber(metrics.estimatedPanels))}</strong>
-            <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp estimados</small>
+            <strong>${escapeHtml(formatNumber(quotedPanelCount))}</strong>
+            <small>${escapeHtml(formatNumber(quotedSystemSizeKwp, 1))} kWp estimados</small>
           </div>
           <div>
             <span>Boleta base</span>
@@ -2619,7 +2661,7 @@ const buildInstallationQuotationMarkup = ({
         <section class="quote-totals-wrap">
           <div class="quote-technical-note">
             <strong>Resumen técnico:</strong>
-            Sistema de ${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp con ${escapeHtml(formatNumber(metrics.estimatedPanels))} módulos de 585 W e ${escapeHtml(selectedInverterLabel)}.
+            Sistema de ${escapeHtml(formatNumber(quotedSystemSizeKwp, 1))} kWp con ${escapeHtml(formatNumber(quotedPanelCount))} módulos de 585 W e ${escapeHtml(selectedInverterLabel)}.
             Generación mensual estimada: ${escapeHtml(formatNumber(metrics.monthlyGenerationKWh))} kWh promedio,
             ${escapeHtml(formatNumber(metrics.winterGenerationKWh))} kWh en invierno y ${escapeHtml(formatNumber(metrics.summerGenerationKWh))} kWh en verano.
           </div>
@@ -6528,6 +6570,8 @@ Mensaje: ${message || "-"}`,
       winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
       summerCompensation: `${formatNumber(metrics.summerCompensationNoBattery)}%`,
       payback: `${formatNumber(metrics.paybackHuaweiNoBattery, 1)} años`,
+      panelCount: metrics.estimatedPanels,
+      systemSizeKwp: metrics.estimatedSystemSizeKwp,
       variant: "huawei",
     },
     {
@@ -6541,6 +6585,8 @@ Mensaje: ${message || "-"}`,
       winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
       summerCompensation: `${formatNumber(metrics.summerCompensationNoBattery)}%`,
       payback: `${formatNumber(metrics.paybackSolisNoBattery, 1)} años`,
+      panelCount: metrics.estimatedPanels,
+      systemSizeKwp: metrics.estimatedSystemSizeKwp,
       variant: "solis",
     },
     {
@@ -6554,6 +6600,8 @@ Mensaje: ${message || "-"}`,
       winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
       summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
       payback: `${formatNumber(metrics.paybackHuaweiWithBattery, 1)} años`,
+      panelCount: metrics.estimatedPanels,
+      systemSizeKwp: metrics.estimatedSystemSizeKwp,
       variant: "hybrid",
     },
     {
@@ -6567,6 +6615,8 @@ Mensaje: ${message || "-"}`,
       winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
       summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
       payback: `${formatNumber(metrics.paybackSolisWithBattery, 1)} años`,
+      panelCount: metrics.estimatedPanels,
+      systemSizeKwp: metrics.estimatedSystemSizeKwp,
       variant: "solis hybrid",
     },
   ];
@@ -7247,7 +7297,7 @@ Mensaje: ${message || "-"}`,
                   </p>
                   <p className="info-text">
                     Ese ajuste usa un factor de producción invernal más exigente y lleva la compensación estimada en invierno a
-                    <strong> 100%</strong>.
+                    <strong> 100%</strong>. La cotización y el PDF solo usarán esa cantidad de paneles cuando presiones el botón de abajo.
                   </p>
                   <button
                     className="btn-secondary"
@@ -7274,6 +7324,8 @@ Mensaje: ${message || "-"}`,
                     winterCompensation={offer.winterCompensation}
                     summerCompensation={offer.summerCompensation}
                     payback={offer.payback}
+                    panelCount={offer.panelCount}
+                    systemSizeKwp={offer.systemSizeKwp}
                     variant={offer.variant}
                     collapsible
                     selectable
@@ -7332,6 +7384,11 @@ Mensaje: ${message || "-"}`,
                   label="Inversión estimada"
                   value={selectedInstallationOfferData?.price || "-"}
                   sub="IVA incluido"
+                />
+                <SummaryCard
+                  label="Proyecto cotizado"
+                  value={`${formatNumber(selectedInstallationOfferData?.panelCount || installationMetrics.estimatedPanels)} paneles`}
+                  sub={`${formatNumber(selectedInstallationOfferData?.systemSizeKwp || installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
                 />
               </div>
 
