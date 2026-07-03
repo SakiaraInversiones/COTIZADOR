@@ -9,6 +9,119 @@ const PANEL_POWER_KW = 0.585;
 const REFERENCE_TARIFF_CLP_PER_KWH = 278;
 const WINTER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
 const SUMMER_COVERAGE_OPTIONS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+
+const GRID_CONNECTION_PHASE_OPTIONS = [
+  { value: "mono", label: "Monofásico 220 V", voltage: 220 },
+  { value: "three", label: "Trifásico 380 V", voltage: 380 },
+];
+
+const RESIDENTIAL_GRID_AMP_OPTIONS = [10, 15, 20, 25, 32, 40, 50, 63];
+const ENTERPRISE_GRID_AMP_OPTIONS = [25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400];
+
+const installationHuaweiInverterOptions = [
+  { capacityKw: 2, description: "Huawei, Inversor Híbrido, 2kW, IP65, versión L1", shortDescription: "INVERSOR HUAWEI HÍBRIDO 2 KW", totalNet: 459011.83 },
+  { capacityKw: 3, description: "Huawei, Inversor Híbrido, 3kW, IP65, versión L1", shortDescription: "INVERSOR HUAWEI HÍBRIDO 3 KW", totalNet: 497592.13 },
+  { capacityKw: 4, description: "Huawei, Inversor Híbrido, 4kW, IP65, versión L1", shortDescription: "INVERSOR HUAWEI HÍBRIDO 4 KW", totalNet: 592570.81 },
+  { capacityKw: 5, description: "Huawei, Inversor Híbrido, 5kW, IP65, versión L1", shortDescription: "INVERSOR HUAWEI HÍBRIDO 5 KW", totalNet: 670610.99 },
+  { capacityKw: 6, description: "Huawei, Inversor Híbrido, 6kW, IP65, versión L1", shortDescription: "INVERSOR HUAWEI HÍBRIDO 6 KW", totalNet: 691712.9 },
+  { capacityKw: 8, description: "Huawei, Inversor Híbrido, 8KTL, IP65, versión LC0", shortDescription: "INVERSOR HUAWEI HÍBRIDO 8 KW", totalNet: 830775 },
+  { capacityKw: 10, description: "Huawei, Inversor Híbrido, 10KTL, IP65, versión LCO", shortDescription: "INVERSOR HUAWEI HÍBRIDO 10 KW", totalNet: 761792.07 },
+  { capacityKw: 12, description: "Huawei SUN2000-12K-MAP0", shortDescription: "INVERSOR HUAWEI SUN2000 12 KW", totalNet: 1316813.43 },
+];
+
+const getGridConnectionPhaseConfig = (phase = "mono") =>
+  GRID_CONNECTION_PHASE_OPTIONS.find((option) => option.value === phase) || GRID_CONNECTION_PHASE_OPTIONS[0];
+
+const getGridConnectionCapacityKw = (phase = "mono", amps = "") => {
+  const numericAmps = Number(amps || 0);
+  if (!Number.isFinite(numericAmps) || numericAmps <= 0) return 0;
+  const phaseConfig = getGridConnectionPhaseConfig(phase);
+  if (phaseConfig.value === "three") {
+    return (Math.sqrt(3) * phaseConfig.voltage * numericAmps) / 1000;
+  }
+  return (phaseConfig.voltage * numericAmps) / 1000;
+};
+
+const getGridConnectionLabel = (phase = "mono", amps = "") => {
+  const numericAmps = Number(amps || 0);
+  if (!Number.isFinite(numericAmps) || numericAmps <= 0) return "No informado";
+  const phaseConfig = getGridConnectionPhaseConfig(phase);
+  return `${phaseConfig.label} · ${numericAmps} A`;
+};
+
+const getClosestInstallationHuaweiInverter = (availableKw = 0) => {
+  const numericAvailableKw = Number(availableKw) || 0;
+  return [...installationHuaweiInverterOptions]
+    .map((option) => ({ ...option, distance: Math.abs(option.capacityKw - numericAvailableKw) }))
+    .sort((a, b) => a.distance - b.distance || b.capacityKw - a.capacityKw)[0];
+};
+
+const getInstallationEmpalmeSizing = (phase = "mono", amps = "") => {
+  const capacityKw = getGridConnectionCapacityKw(phase, amps);
+  if (capacityKw <= 0) return null;
+  const inverter = getClosestInstallationHuaweiInverter(capacityKw);
+  const targetDcKwp = Math.max(PANEL_POWER_KW * 4, inverter.capacityKw * 1.15);
+  const panelCount = Math.max(4, Math.ceil(targetDcKwp / PANEL_POWER_KW));
+  const systemSizeKwp = panelCount * PANEL_POWER_KW;
+  return {
+    active: true,
+    phase,
+    amps: Number(amps),
+    capacityKw,
+    label: getGridConnectionLabel(phase, amps),
+    inverter,
+    panelCount,
+    systemSizeKwp,
+  };
+};
+
+const getEnterpriseEmpalmeSizing = (phase = "three", amps = "") => {
+  const capacityKw = getGridConnectionCapacityKw(phase, amps);
+  if (capacityKw <= 0) return null;
+  const targetAcKw = Math.max(2, capacityKw);
+
+  let inverterPlan;
+  if (phase === "mono") {
+    const inverter = getClosestInstallationHuaweiInverter(targetAcKw);
+    inverterPlan = {
+      targetAcKw,
+      totalAcKw: inverter.capacityKw,
+      totalNet: inverter.totalNet,
+      inverterCount: 1,
+      items: [
+        {
+          description: inverter.description,
+          capacityKw: inverter.capacityKw,
+          quantity: 1,
+          totalNet: inverter.totalNet,
+        },
+      ],
+    };
+  } else {
+    inverterPlan = getClosestEnterpriseHuaweiInverterPlan(targetAcKw);
+  }
+
+  const targetDcKwp = Math.max(
+    ENTERPRISE_PANEL_POWER_KW * 4,
+    inverterPlan.totalAcKw * ENTERPRISE_DC_AC_RATIO_TARGET,
+  );
+  const panelCount = Math.max(4, Math.ceil(targetDcKwp / ENTERPRISE_PANEL_POWER_KW));
+  const systemSizeKwp = panelCount * ENTERPRISE_PANEL_POWER_KW;
+  return {
+    active: true,
+    phase,
+    amps: Number(amps),
+    capacityKw,
+    label: getGridConnectionLabel(phase, amps),
+    inverterPlan: {
+      ...inverterPlan,
+      dcAcRatio: systemSizeKwp / Math.max(inverterPlan.totalAcKw, 1),
+    },
+    panelCount,
+    systemSizeKwp,
+  };
+};
+
 const HTML2CANVAS_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
 const JSPDF_LIBRARY_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 
@@ -705,6 +818,68 @@ const getEnterpriseHuaweiInverterPlan = (systemSizeKwp = 0) => {
     totalAcKw,
     totalNet,
     dcAcRatio: systemSizeKwp / Math.max(totalAcKw, 1),
+    inverterCount: items.reduce((sum, item) => sum + item.quantity, 0),
+    items,
+  };
+};
+
+const getClosestEnterpriseHuaweiInverterPlan = (availableKw = 0) => {
+  const targetAcKw = Math.max(15, Number(availableKw) || 0);
+  const maxCapacity = Math.max(Math.ceil(targetAcKw) + 150, 600);
+  const dp = Array.from({ length: maxCapacity + 1 }, () => null);
+  dp[0] = { cost: 0, items: [] };
+
+  for (let capacity = 0; capacity <= maxCapacity; capacity += 1) {
+    const current = dp[capacity];
+    if (!current) continue;
+
+    enterpriseHuaweiInverterOptions.forEach((option) => {
+      const nextCapacity = Math.min(maxCapacity, capacity + option.capacityKw);
+      const nextCost = current.cost + option.totalNet;
+      if (!dp[nextCapacity] || nextCost < dp[nextCapacity].cost) {
+        dp[nextCapacity] = {
+          cost: nextCost,
+          items: [...current.items, option],
+        };
+      }
+    });
+  }
+
+  const selected = dp
+    .map((item, capacity) => ({ ...(item || {}), capacity }))
+    .filter((item) => item.items && item.capacity > 0)
+    .sort(
+      (a, b) =>
+        Math.abs(a.capacity - targetAcKw) - Math.abs(b.capacity - targetAcKw) ||
+        (a.capacity > targetAcKw ? 1 : 0) - (b.capacity > targetAcKw ? 1 : 0) ||
+        a.cost - b.cost ||
+        a.capacity - b.capacity,
+    )[0];
+
+  const groupedItems = (selected?.items || []).reduce((acc, item) => {
+    const key = item.description;
+    if (!acc[key]) {
+      acc[key] = {
+        description: item.description,
+        capacityKw: item.capacityKw,
+        quantity: 0,
+        totalNet: 0,
+      };
+    }
+    acc[key].quantity += 1;
+    acc[key].totalNet += item.totalNet;
+    return acc;
+  }, {});
+
+  const items = Object.values(groupedItems);
+  const totalAcKw = items.reduce((sum, item) => sum + item.capacityKw * item.quantity, 0);
+  const totalNet = items.reduce((sum, item) => sum + item.totalNet, 0);
+
+  return {
+    targetAcKw,
+    totalAcKw,
+    totalNet,
+    dcAcRatio: targetAcKw / Math.max(totalAcKw, 1),
     inverterCount: items.reduce((sum, item) => sum + item.quantity, 0),
     items,
   };
@@ -2479,7 +2654,7 @@ const getInstallationQuotationItems = (metrics, selectedOffer) => {
   const moduleNetPerPanel = (Number(costs.modulesNet) || 0) / metricsPanelCount;
   const structureNetPerBlock = (Number(costs.structureNet) || 0) / metricsStructureBlocks;
   const inverterDescription = isHuawei
-    ? "INVERSOR HUAWEI HÍBRIDO 8 KW"
+    ? metrics.selectedHuaweiInverterLabel || "INVERSOR HUAWEI HÍBRIDO 8 KW"
     : isSolis
       ? "INVERSOR SOLIS HÍBRIDO 8 KW"
       : "INVERSOR HÍBRIDO 8 KW";
@@ -4864,6 +5039,8 @@ export default function SakiaraLandingPage() {
   const [summerCoverageTargetPercent, setSummerCoverageTargetPercent] = useState(80);
   const [monthlyBillInput, setMonthlyBillInput] = useState("250000");
   const [billConsumptionInput, setBillConsumptionInput] = useState("900");
+  const [installationGridPhase, setInstallationGridPhase] = useState("mono");
+  const [installationGridAmps, setInstallationGridAmps] = useState("");
   const [installationRegion, setInstallationRegion] = useState("metropolitana");
   const [installationCommune, setInstallationCommune] = useState("colina");
   const [installationStep, setInstallationStep] = useState(1);
@@ -4908,6 +5085,8 @@ export default function SakiaraLandingPage() {
   const [enterpriseMonthlyConsumptionInput, setEnterpriseMonthlyConsumptionInput] =
     useState("4200");
   const [enterpriseTargetPowerInput, setEnterpriseTargetPowerInput] = useState("50");
+  const [enterpriseGridPhase, setEnterpriseGridPhase] = useState("three");
+  const [enterpriseGridAmps, setEnterpriseGridAmps] = useState("");
   const [enterpriseRegion, setEnterpriseRegion] = useState("metropolitana");
   const [enterpriseCommune, setEnterpriseCommune] = useState("colina");
   const [enterpriseSubmitState, setEnterpriseSubmitState] = useState({
@@ -4941,6 +5120,11 @@ export default function SakiaraLandingPage() {
     () => getClimateReferenceProfile(installationRegion),
     [installationRegion],
   );
+  const installationEmpalmeSizing = useMemo(
+    () => getInstallationEmpalmeSizing(installationGridPhase, installationGridAmps),
+    [installationGridPhase, installationGridAmps],
+  );
+  const installationUsesEmpalme = Boolean(installationEmpalmeSizing);
 
   const selectedMaintenanceRegion =
     maintenanceRegionData[maintenanceRegion] ||
@@ -4977,6 +5161,11 @@ export default function SakiaraLandingPage() {
     () => getSolarProductionProfile(enterpriseRegion, enterpriseCommune),
     [enterpriseRegion, enterpriseCommune],
   );
+  const enterpriseEmpalmeSizing = useMemo(
+    () => getEnterpriseEmpalmeSizing(enterpriseGridPhase, enterpriseGridAmps),
+    [enterpriseGridPhase, enterpriseGridAmps],
+  );
+  const enterpriseUsesEmpalme = Boolean(enterpriseEmpalmeSizing);
 
   const maintenanceSystemSize = Number(maintenanceSystemSizeInput || 0);
   const maintenanceMonthlySavings = Number(maintenanceMonthlySavingsInput || 0);
@@ -5186,17 +5375,30 @@ export default function SakiaraLandingPage() {
       summerGoalSystemSizeKwp,
     );
 
-    const chosenSystemSizeKwp = isWinterGoal
-      ? winterGoalSystemSizeKwp
-      : isSeasonalGoal
-        ? seasonalGoalSystemSizeKwp
-        : optimizedSystemSizeKwp;
+    const chosenSystemSizeKwp = installationEmpalmeSizing
+      ? installationEmpalmeSizing.systemSizeKwp
+      : isWinterGoal
+        ? winterGoalSystemSizeKwp
+        : isSeasonalGoal
+          ? seasonalGoalSystemSizeKwp
+          : optimizedSystemSizeKwp;
 
-    const estimatedPanels = Math.max(
-      4,
-      Math.ceil(chosenSystemSizeKwp / PANEL_POWER_KW),
-    );
-    const estimatedSystemSizeKwp = estimatedPanels * PANEL_POWER_KW;
+    const estimatedPanels = installationEmpalmeSizing
+      ? installationEmpalmeSizing.panelCount
+      : Math.max(
+          4,
+          Math.ceil(chosenSystemSizeKwp / PANEL_POWER_KW),
+        );
+    const estimatedSystemSizeKwp = installationEmpalmeSizing
+      ? installationEmpalmeSizing.systemSizeKwp
+      : estimatedPanels * PANEL_POWER_KW;
+    const selectedHuaweiInverter = installationEmpalmeSizing?.inverter || {
+      capacityKw: 8,
+      description: "Huawei, Inversor Híbrido, 8KTL, IP65, versión LC0",
+      shortDescription: "INVERSOR HUAWEI HÍBRIDO 8 KW",
+      totalNet: huaweiInverterNet,
+    };
+    const selectedHuaweiInverterNet = selectedHuaweiInverter.totalNet || huaweiInverterNet;
     const winterGoalPanels = Math.max(
       4,
       Math.ceil(winterGoalSystemSizeKwp / PANEL_POWER_KW),
@@ -5315,14 +5517,14 @@ export default function SakiaraLandingPage() {
       structureBlocks * structureBlockNet;
 
     const projectCostHuaweiNoBatteryGross =
-      (commonBaseNet + huaweiInverterNet + huaweiSmartPowerSensorNet) *
+      (commonBaseNet + selectedHuaweiInverterNet + huaweiSmartPowerSensorNet) *
       vatMultiplier;
     const projectCostSolisNoBatteryGross =
       (commonBaseNet + solisInverterNet) * vatMultiplier;
 
     const projectCostHuaweiWithBatteryGross =
       (commonBaseNet +
-        huaweiInverterNet +
+        selectedHuaweiInverterNet +
         huaweiSmartPowerSensorNet +
         huaweiBatteryPackNet) *
       vatMultiplier;
@@ -5365,17 +5567,21 @@ export default function SakiaraLandingPage() {
       ? "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica, alcance real del proyecto y validación final del sitio."
       : "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica y validación final del sitio.";
 
-    const coverageObjectiveLabel = isWinterGoal
-      ? `Cobertura invernal objetivo ${formatNumber(winterCoverageTargetPercent)}%`
-      : isSeasonalGoal
-        ? `Cobertura estacional · Invierno ${formatNumber(winterCoverageTargetPercent)}% / Verano ${formatNumber(summerCoverageTargetPercent)}%`
-        : "Compensación optimizada";
+    const coverageObjectiveLabel = installationEmpalmeSizing
+      ? "Sistema ideal por empalme"
+      : isWinterGoal
+        ? `Cobertura invernal objetivo ${formatNumber(winterCoverageTargetPercent)}%`
+        : isSeasonalGoal
+          ? `Cobertura estacional · Invierno ${formatNumber(winterCoverageTargetPercent)}% / Verano ${formatNumber(summerCoverageTargetPercent)}%`
+          : "Compensación optimizada";
 
-    const coverageObjectiveHint = isWinterGoal
-      ? `Se dimensiona con un factor de producción invernal para apuntar a una compensación de la cuenta cercana al ${formatNumber(winterCoverageTargetPercent)}% en los meses más exigentes.`
-      : isSeasonalGoal
-        ? `Se compara el objetivo de invierno y verano, y se usa el escenario más exigente para definir la cantidad final de paneles.`
-        : "Se dimensiona buscando una compensación alta con una inversión más contenida en meses promedio.";
+    const coverageObjectiveHint = installationEmpalmeSizing
+      ? `Se seleccionó ${selectedHuaweiInverter.shortDescription} según el empalme ${installationEmpalmeSizing.label}, con capacidad referencial de ${formatNumber(installationEmpalmeSizing.capacityKw, 1)} kW.`
+      : isWinterGoal
+        ? `Se dimensiona con un factor de producción invernal para apuntar a una compensación de la cuenta cercana al ${formatNumber(winterCoverageTargetPercent)}% en los meses más exigentes.`
+        : isSeasonalGoal
+          ? `Se compara el objetivo de invierno y verano, y se usa el escenario más exigente para definir la cantidad final de paneles.`
+          : "Se dimensiona buscando una compensación alta con una inversión más contenida en meses promedio.";
 
     return {
       monthlyBill: normalizedMonthlyBill,
@@ -5385,10 +5591,15 @@ export default function SakiaraLandingPage() {
       modeSummaryHint,
       estimatedPanels,
       estimatedSystemSizeKwp,
+      usesEmpalme: Boolean(installationEmpalmeSizing),
+      empalmeLabel: installationEmpalmeSizing?.label || "No informado",
+      empalmeCapacityKw: installationEmpalmeSizing?.capacityKw || 0,
+      selectedHuaweiInverter,
+      selectedHuaweiInverterLabel: selectedHuaweiInverter.shortDescription,
       structureBlocks,
       quotationCosts: {
         modulesNet: estimatedPanels * moduleSellPerPanel,
-        huaweiInverterNet,
+        huaweiInverterNet: selectedHuaweiInverterNet,
         solisInverterNet,
         laborNet,
         laborDays: installationLogisticsMetrics.laborDays,
@@ -5478,6 +5689,7 @@ export default function SakiaraLandingPage() {
         winterGoalPanels > estimatedPanels,
     };
   }, [
+    installationEmpalmeSizing,
     installationInputMode,
     monthlyBillInput,
     billConsumptionInput,
@@ -5575,18 +5787,24 @@ export default function SakiaraLandingPage() {
     const requestedPowerKw = enterpriseTargetPower > 0
       ? enterpriseTargetPower
       : consumptionBasedPowerKw;
-    const targetSystemSizeKwp = clamp(
-      requestedPowerKw,
-      ENTERPRISE_SYSTEM_MIN_KWP,
-      ENTERPRISE_SYSTEM_MAX_KWP,
-    );
-    const estimatedPanels = Math.max(
-      1,
-      Math.ceil(targetSystemSizeKwp / ENTERPRISE_PANEL_POWER_KW),
-    );
-    const roundedPowerKw = estimatedPanels * ENTERPRISE_PANEL_POWER_KW;
+    const targetSystemSizeKwp = enterpriseEmpalmeSizing
+      ? enterpriseEmpalmeSizing.systemSizeKwp
+      : clamp(
+          requestedPowerKw,
+          ENTERPRISE_SYSTEM_MIN_KWP,
+          ENTERPRISE_SYSTEM_MAX_KWP,
+        );
+    const estimatedPanels = enterpriseEmpalmeSizing
+      ? enterpriseEmpalmeSizing.panelCount
+      : Math.max(
+          1,
+          Math.ceil(targetSystemSizeKwp / ENTERPRISE_PANEL_POWER_KW),
+        );
+    const roundedPowerKw = enterpriseEmpalmeSizing
+      ? enterpriseEmpalmeSizing.systemSizeKwp
+      : estimatedPanels * ENTERPRISE_PANEL_POWER_KW;
     const stringPlan = getEnterpriseStringPlan(estimatedPanels);
-    const inverterPlan = getEnterpriseHuaweiInverterPlan(roundedPowerKw);
+    const inverterPlan = enterpriseEmpalmeSizing?.inverterPlan || getEnterpriseHuaweiInverterPlan(roundedPowerKw);
     const structurePlan = getEnterpriseStructurePlan(
       estimatedPanels,
       enterpriseSurfaceType,
@@ -5707,6 +5925,9 @@ export default function SakiaraLandingPage() {
       suggestedPowerKw: consumptionBasedPowerKw,
       requestedPowerKw,
       roundedPowerKw,
+      usesEmpalme: Boolean(enterpriseEmpalmeSizing),
+      empalmeLabel: enterpriseEmpalmeSizing?.label || "No informado",
+      empalmeCapacityKw: enterpriseEmpalmeSizing?.capacityKw || 0,
       estimatedPanels,
       estimatedSystemSizeKwp: roundedPowerKw,
       monthlyGenerationKWh,
@@ -5754,12 +5975,15 @@ export default function SakiaraLandingPage() {
       commercialIntentLabel:
         enterpriseCommercialIntentOptions.find((item) => item.value === enterpriseCommercialIntent)?.label ||
         "A definir",
-      referenceText: cablingPlan.isLargeEnterpriseProject
-        ? "Estimación preliminar con equipos Huawei, módulo Jinko 585 W, canalización mínima empresarial, cable CC mínimo 500 m rojo + 500 m negro y certificación SEC de $2.000.000 neto."
-        : "Estimación preliminar para proyecto pequeño tipo 2× domiciliario, con equipos Huawei, módulo Jinko 585 W, logística igual a Hogar, dupla técnica + dupla jornalera y certificación SEC de $1.000.000 neto.",
+      referenceText: enterpriseEmpalmeSizing
+        ? `Estimación preliminar por empalme ${enterpriseEmpalmeSizing.label}; se selecciona inversor Huawei acorde a una capacidad referencial de ${formatNumber(enterpriseEmpalmeSizing.capacityKw, 1)} kW.`
+        : cablingPlan.isLargeEnterpriseProject
+          ? "Estimación preliminar con equipos Huawei, módulo Jinko 585 W, canalización mínima empresarial, cable CC mínimo 500 m rojo + 500 m negro y certificación SEC de $2.000.000 neto."
+          : "Estimación preliminar para proyecto pequeño tipo 2× domiciliario, con equipos Huawei, módulo Jinko 585 W, logística igual a Hogar, dupla técnica + dupla jornalera y certificación SEC de $1.000.000 neto.",
     };
   }, [
     enterpriseCommercialIntent,
+    enterpriseEmpalmeSizing,
     enterpriseMonthlyBill,
     enterpriseMonthlyConsumption,
     enterpriseProjectType,
@@ -5823,6 +6047,12 @@ export default function SakiaraLandingPage() {
         : []),
       ...(clientRut.trim() ? [{ label: "RUT cliente", value: clientRut.trim() }] : []),
       { label: "Perfil", value: selectedProfile.label },
+      ...(installationMetrics.usesEmpalme
+        ? [
+            { label: "Empalme seleccionado", value: installationMetrics.empalmeLabel },
+            { label: "Inversor seleccionado", value: installationMetrics.selectedHuaweiInverterLabel },
+          ]
+        : []),
       {
         label: "Objetivo de cobertura",
         value: installationMetrics.coverageObjectiveLabel,
@@ -5885,6 +6115,12 @@ export default function SakiaraLandingPage() {
       label: "Consumo mensual estimado",
       value: `${formatNumber(enterpriseMetrics.monthlyConsumption)} kWh/mes`,
     },
+    ...(enterpriseMetrics.usesEmpalme
+      ? [
+          { label: "Empalme seleccionado", value: enterpriseMetrics.empalmeLabel },
+          { label: "Capacidad referencial empalme", value: `${formatNumber(enterpriseMetrics.empalmeCapacityKw, 1)} kW` },
+        ]
+      : []),
     {
       label: "Potencia preliminar sugerida",
       value: `${formatNumber(enterpriseMetrics.roundedPowerKw)} kWp`,
@@ -6559,12 +6795,14 @@ Mensaje: ${message || "-"}`,
 
   const maintenanceNextLabel = "Siguiente";
 
-  const createInstallationOfferOptions = (metrics) => [
-    {
+  const createInstallationOfferOptions = (metrics) => {
+    const huaweiNoBatteryOffer = {
       key: "huaweiNoBattery",
-      title: "Huawei sin batería",
-      subtitle: "Alternativa premium base para una solución on-grid.",
-      badge: "Línea Huawei",
+      title: metrics.usesEmpalme ? "Sistema ideal sin batería" : "Huawei sin batería",
+      subtitle: metrics.usesEmpalme
+        ? `Sistema Huawei ajustado al empalme informado: ${metrics.selectedHuaweiInverterLabel}.`
+        : "Alternativa premium base para una solución on-grid.",
+      badge: metrics.usesEmpalme ? "Calculado por empalme" : "Línea Huawei",
       price: formatCLP(metrics.projectCostHuaweiNoBattery),
       savings: formatCLP(metrics.monthlySavingsNoBattery),
       winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
@@ -6573,28 +6811,15 @@ Mensaje: ${message || "-"}`,
       panelCount: metrics.estimatedPanels,
       systemSizeKwp: metrics.estimatedSystemSizeKwp,
       variant: "huawei",
-    },
-    {
-      key: "solisNoBattery",
-      title: "Solis sin batería",
-      subtitle:
-        "Alternativa eficiente para una solución on-grid con otra línea de inversor.",
-      badge: "Línea Solis",
-      price: formatCLP(metrics.projectCostSolisNoBattery),
-      savings: formatCLP(metrics.monthlySavingsNoBattery),
-      winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
-      summerCompensation: `${formatNumber(metrics.summerCompensationNoBattery)}%`,
-      payback: `${formatNumber(metrics.paybackSolisNoBattery, 1)} años`,
-      panelCount: metrics.estimatedPanels,
-      systemSizeKwp: metrics.estimatedSystemSizeKwp,
-      variant: "solis",
-    },
-    {
+    };
+
+    const huaweiWithBatteryOffer = {
       key: "huaweiWithBattery",
-      title: "Huawei con batería LUNA",
-      subtitle:
-        "Alternativa híbrida para sumar respaldo y mayor aprovechamiento energético.",
-      badge: "Huawei híbrido",
+      title: metrics.usesEmpalme ? "Sistema ideal con batería LUNA" : "Huawei con batería LUNA",
+      subtitle: metrics.usesEmpalme
+        ? "Mismo sistema ideal por empalme, sumando respaldo y mayor autoconsumo con LUNA."
+        : "Alternativa híbrida para sumar respaldo y mayor aprovechamiento energético.",
+      badge: metrics.usesEmpalme ? "Calculado por empalme" : "Huawei híbrido",
       price: formatCLP(metrics.projectCostHuaweiWithBattery),
       savings: formatCLP(metrics.monthlySavingsWithBattery),
       winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
@@ -6603,27 +6828,68 @@ Mensaje: ${message || "-"}`,
       panelCount: metrics.estimatedPanels,
       systemSizeKwp: metrics.estimatedSystemSizeKwp,
       variant: "hybrid",
-    },
-    {
-      key: "solisWithBattery",
-      title: "Solis con batería",
-      subtitle:
-        "Alternativa híbrida referencial para priorizar respaldo y continuidad operativa.",
-      badge: "Solis híbrido",
-      price: formatCLP(metrics.projectCostSolisWithBattery),
-      savings: formatCLP(metrics.monthlySavingsWithBattery),
-      winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
-      summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
-      payback: `${formatNumber(metrics.paybackSolisWithBattery, 1)} años`,
-      panelCount: metrics.estimatedPanels,
-      systemSizeKwp: metrics.estimatedSystemSizeKwp,
-      variant: "solis hybrid",
-    },
-  ];
+    };
 
-  const installationOfferOptions = createInstallationOfferOptions(
-    installationMetrics,
+    if (metrics.usesEmpalme) {
+      return [huaweiNoBatteryOffer, huaweiWithBatteryOffer];
+    }
+
+    return [
+      huaweiNoBatteryOffer,
+      {
+        key: "solisNoBattery",
+        title: "Solis sin batería",
+        subtitle: "Alternativa eficiente para una solución on-grid con otra línea de inversor.",
+        badge: "Línea Solis",
+        price: formatCLP(metrics.projectCostSolisNoBattery),
+        savings: formatCLP(metrics.monthlySavingsNoBattery),
+        winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
+        summerCompensation: `${formatNumber(metrics.summerCompensationNoBattery)}%`,
+        payback: `${formatNumber(metrics.paybackSolisNoBattery, 1)} años`,
+        panelCount: metrics.estimatedPanels,
+        systemSizeKwp: metrics.estimatedSystemSizeKwp,
+        variant: "solis",
+      },
+      huaweiWithBatteryOffer,
+      {
+        key: "solisWithBattery",
+        title: "Solis con batería",
+        subtitle: "Alternativa híbrida referencial para priorizar respaldo y continuidad operativa.",
+        badge: "Solis híbrido",
+        price: formatCLP(metrics.projectCostSolisWithBattery),
+        savings: formatCLP(metrics.monthlySavingsWithBattery),
+        winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
+        summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
+        payback: `${formatNumber(metrics.paybackSolisWithBattery, 1)} años`,
+        panelCount: metrics.estimatedPanels,
+        systemSizeKwp: metrics.estimatedSystemSizeKwp,
+        variant: "solis hybrid",
+      },
+    ];
+  };
+
+  const installationOfferOptions = useMemo(
+    () => createInstallationOfferOptions(installationMetrics),
+    [installationMetrics],
   );
+
+  useEffect(() => {
+    const selectedStillAvailable = installationOfferOptions.some(
+      (offer) => offer.key === selectedInstallationOffer,
+    );
+
+    if (selectedInstallationOffer && !selectedStillAvailable) {
+      setSelectedInstallationOffer("");
+    }
+
+    const expandedStillAvailable = installationOfferOptions.some(
+      (offer) => offer.key === expandedInstallationOffer,
+    );
+
+    if (!expandedStillAvailable) {
+      setExpandedInstallationOffer(installationOfferOptions[0]?.key || "");
+    }
+  }, [expandedInstallationOffer, installationOfferOptions, selectedInstallationOffer]);
 
   const selectedInstallationOfferData =
     installationOfferOptions.find(
@@ -7001,7 +7267,7 @@ Mensaje: ${message || "-"}`,
               <div className="wizard-copy">
                 <h3 className="wizard-title">Define tu punto de partida</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Puedes comenzar con tu boleta, con tu consumo o con ambos datos para construir una evaluación referencial clara y útil desde el inicio.
+                  Puedes comenzar con tu boleta, con tu consumo o con ambos datos. Si además seleccionas amperes de empalme, se activa un camino especial que recomienda el sistema ideal según esa capacidad.
                 </p>
               </div>
 
@@ -7065,6 +7331,49 @@ Mensaje: ${message || "-"}`,
                     <div className="hint">
                       Dato visible en la boleta, expresado en kWh por mes.
                     </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mode-card wizard-highlight-card compact-selector-card">
+                <label className="label">Empalme eléctrico del cliente (opcional)</label>
+                <div className="compact-select-grid">
+                  <div className="field compact-field">
+                    <label className="label">Tipo de empalme</label>
+                    <select
+                      className="select"
+                      value={installationGridPhase}
+                      onChange={(e) => setInstallationGridPhase(e.target.value)}
+                    >
+                      {GRID_CONNECTION_PHASE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field compact-field">
+                    <label className="label">Amperes de empalme</label>
+                    <select
+                      className="select"
+                      value={installationGridAmps}
+                      onChange={(e) => setInstallationGridAmps(e.target.value)}
+                    >
+                      <option value="">No seleccionar amperes</option>
+                      {RESIDENTIAL_GRID_AMP_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option} A
+                        </option>
+                      ))}
+                    </select>
+                    <div className="hint">
+                      Si eliges amperes, se activa el camino de sistema ideal por empalme. Si lo dejas en blanco, el cotizador sigue igual que antes.
+                    </div>
+                  </div>
+                </div>
+                {installationUsesEmpalme && (
+                  <div className="hint">
+                    Empalme seleccionado: {installationEmpalmeSizing.label}. Inversor sugerido: {installationEmpalmeSizing.inverter.shortDescription}.
                   </div>
                 )}
               </div>
@@ -7255,6 +7564,13 @@ Mensaje: ${message || "-"}`,
                   value={selectedInstallationOfferData?.title || "Selecciona una alternativa"}
                   sub={selectedInstallationOfferData?.badge || "antes de continuar"}
                 />
+                {installationMetrics.usesEmpalme && (
+                  <SummaryCard
+                    label="Empalme"
+                    value={installationMetrics.empalmeLabel}
+                    sub={installationMetrics.selectedHuaweiInverterLabel}
+                  />
+                )}
               </div>
 
               <div className="summary-grid compact-grid">
@@ -7309,6 +7625,15 @@ Mensaje: ${message || "-"}`,
                   >
                     Usar cobertura al 100% en invierno
                   </button>
+                </div>
+              )}
+
+              {installationMetrics.usesEmpalme && (
+                <div className="info-card">
+                  <h3 className="info-title">Camino por empalme activado</h3>
+                  <p className="info-text">
+                    Como seleccionaste amperes, el cotizador deja de mostrar alternativas por marca y muestra solo el sistema ideal Huawei con o sin batería.
+                  </p>
                 </div>
               )}
 
@@ -8113,7 +8438,7 @@ Mensaje: ${message || "-"}`,
               <div className="wizard-copy">
                 <h3 className="wizard-title">Define la base energética</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Puedes trabajar con boleta mensual, consumo en kWh o una potencia objetivo. Si ingresas potencia objetivo, esa manda sobre la estimación por consumo.
+                  Puedes trabajar con boleta mensual, consumo en kWh o potencia objetivo. Si seleccionas amperes de empalme, se activa el camino por capacidad de empalme y se escoge el inversor acorde.
                 </p>
               </div>
 
@@ -8156,6 +8481,39 @@ Mensaje: ${message || "-"}`,
                   />
                   <span className="hint">Déjalo en blanco para estimar desde consumo; complétalo si ya quieres una potencia definida.</span>
                 </label>
+
+                <label className="field">
+                  <span className="label">Tipo de empalme empresa</span>
+                  <select
+                    className="select"
+                    value={enterpriseGridPhase}
+                    onChange={(event) => setEnterpriseGridPhase(event.target.value)}
+                  >
+                    {GRID_CONNECTION_PHASE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="hint">Opcional. Si eliges amperes, se prioriza el camino por empalme.</span>
+                </label>
+
+                <label className="field">
+                  <span className="label">Amperes de empalme empresa</span>
+                  <select
+                    className="select"
+                    value={enterpriseGridAmps}
+                    onChange={(event) => setEnterpriseGridAmps(event.target.value)}
+                  >
+                    <option value="">No seleccionar amperes</option>
+                    {ENTERPRISE_GRID_AMP_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option} A
+                      </option>
+                    ))}
+                  </select>
+                  <span className="hint">Con amperes seleccionados, el inversor se elige por capacidad de empalme. Sin amperes, Empresas sigue calculando igual que antes.</span>
+                </label>
               </div>
 
               <div className="summary-grid enterprise-summary-grid">
@@ -8164,6 +8522,13 @@ Mensaje: ${message || "-"}`,
                   value={`${formatNumber(enterpriseMetrics.estimatedSystemSizeKwp, 1)} kWp`}
                   sub={`${formatNumber(enterpriseMetrics.estimatedPanels)} paneles Jinko 585 W`}
                 />
+                {enterpriseMetrics.usesEmpalme && (
+                  <SummaryCard
+                    label="Empalme"
+                    value={enterpriseMetrics.empalmeLabel}
+                    sub={`${formatNumber(enterpriseMetrics.empalmeCapacityKw, 1)} kW referenciales`}
+                  />
+                )}
                 <SummaryCard
                   label="Inversión estimada"
                   value={formatCLP(enterpriseMetrics.referenceInvestment)}
@@ -8341,6 +8706,13 @@ Mensaje: ${message || "-"}`,
                   value={`${formatNumber(enterpriseMetrics.estimatedSystemSizeKwp, 1)} kWp`}
                   sub={`${formatNumber(enterpriseMetrics.inverterPlan.totalAcKw)} kW AC Huawei`}
                 />
+                {enterpriseMetrics.usesEmpalme && (
+                  <SummaryCard
+                    label="Criterio de empalme"
+                    value={enterpriseMetrics.empalmeLabel}
+                    sub={`${formatNumber(enterpriseMetrics.empalmeCapacityKw, 1)} kW referenciales`}
+                  />
+                )}
                 <SummaryCard
                   label="Ahorro mensual"
                   value={formatCLP(enterpriseMetrics.monthlySavings)}
@@ -8360,6 +8732,11 @@ Mensaje: ${message || "-"}`,
                   <p>
                     {enterpriseMetrics.inverterSummary}. {enterpriseMetrics.structurePlan.typeLabel}. {enterpriseMetrics.cablingPlan.isLargeEnterpriseProject ? "Cableado mínimo empresarial" : "Cableado escala tipo Hogar"} de {formatNumber(enterpriseMetrics.cablingPlan.dcCableMetersPerPolarity)} m por polaridad y certificación SEC considerada por {formatCLP(enterpriseMetrics.certificationNet)} neto.
                   </p>
+                  {enterpriseMetrics.usesEmpalme && (
+                    <p>
+                      Camino por empalme activado: la potencia e inversor se priorizan según los amperes seleccionados.
+                    </p>
+                  )}
                 </div>
                 <div className="summary-grid enterprise-summary-grid">
                   <article className="summary-card enterprise-summary-card">
