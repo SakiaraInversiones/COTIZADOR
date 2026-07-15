@@ -2642,11 +2642,12 @@ const buildInstallationQuotationMarkup = ({
           <div class="quote-payment">
             <div class="quote-bottom-title">Pago / Transferencia</div>
             <div class="quote-payment-grid">
-              <span>Métodos de pago</span><strong>Transferencia / Tarjetas</strong>
-              <span>Nombre</span><strong>Rafael Jofré</strong>
-              <span>RUT</span><strong>19544320-3</strong>
-              <span>Cuenta</span><strong>Cuenta Corriente</strong>
-              <span>N°</span><strong>19992073752</strong>
+              <span>Método de pago</span><strong>Mercado Pago</strong>
+              <span>Nombre</span><strong>SAKIARA INVERSIONES SPA</strong>
+              <span>RUT</span><strong>77.703.296-8</strong>
+              <span>Cuenta</span><strong>Cuenta Vista</strong>
+              <span>N°</span><strong>1027338538</strong>
+              <span>Correo</span><strong>e.renovablesparatodos@gmail.com</strong>
             </div>
           </div>
         </section>
@@ -3794,11 +3795,12 @@ const buildEnterpriseQuotationMarkup = ({
           <div class="eq-payment">
             <div class="eq-bottom-title">Pago / Transferencia</div>
             <div class="eq-payment-grid">
-              <span>Métodos</span><strong>Transferencia / Tarjetas</strong>
-              <span>Nombre</span><strong>Rafael Jofré</strong>
-              <span>RUT</span><strong>19544320-3</strong>
-              <span>Cuenta</span><strong>Cuenta Corriente</strong>
-              <span>N°</span><strong>19992073752</strong>
+              <span>Método de pago</span><strong>Mercado Pago</strong>
+              <span>Nombre</span><strong>SAKIARA INVERSIONES SPA</strong>
+              <span>RUT</span><strong>77.703.296-8</strong>
+              <span>Cuenta</span><strong>Cuenta Vista</strong>
+              <span>N°</span><strong>1027338538</strong>
+              <span>Correo</span><strong>e.renovablesparatodos@gmail.com</strong>
             </div>
           </div>
         </section>
