@@ -26,6 +26,11 @@ const ALLOWED_UPLOAD_TYPES = [
 
 
 const sanitizeIntegerInput = (value) => value.replace(/[^\d]/g, "");
+const sanitizeDecimalInput = (value) => {
+  const normalized = String(value || "").replace(",", ".").replace(/[^\d.]/g, "");
+  const [integerPart, ...decimalParts] = normalized.split(".");
+  return decimalParts.length ? `${integerPart}.${decimalParts.join("")}` : integerPart;
+};
 
 const sanitizeFileName = (value) =>
   String(value || "archivo")
@@ -481,6 +486,412 @@ const enterpriseCommercialIntentOptions = [
   { value: "evaluar", label: "Evaluar estructura comercial" },
   { value: "a-definir", label: "A definir en visita" },
 ];
+
+const enterpriseInputModeOptions = {
+  bill: {
+    label: "Solo con la boleta",
+    helper: "Usaremos el monto mensual para estimar el consumo y construir una propuesta preliminar.",
+  },
+  consumption: {
+    label: "Solo con el consumo",
+    helper: "Usaremos los kWh mensuales y una tarifa de referencia para calcular la propuesta.",
+  },
+  combined: {
+    label: "Boleta y consumo",
+    helper: "Es la alternativa recomendada porque permite estimar una tarifa real y mejorar el cálculo económico.",
+  },
+};
+
+const ENTERPRISE_PANEL_POWER_KW = 0.585;
+const ENTERPRISE_MODULE_DIMENSIONS_M = {
+  length: 2.278,
+  width: 1.134,
+  area: 2.278 * 1.134,
+};
+const ENTERPRISE_SYSTEM_MIN_KWP = 3;
+const ENTERPRISE_SYSTEM_MAX_KWP = 500;
+const ENTERPRISE_DC_AC_RATIO_TARGET = 1.22;
+const ENTERPRISE_STRING_PANEL_COUNT = 18;
+const ENTERPRISE_MODULE_SPACING_FACTOR = 1.15;
+const ENTERPRISE_SMALL_PROJECT_CERTIFICATION_NET = 1000000;
+const ENTERPRISE_LARGE_PROJECT_CERTIFICATION_NET = 2000000;
+const ENTERPRISE_ENGINEERING_MIN_NET = 250000;
+const ENTERPRISE_ENGINEERING_FACTOR = 0.05;
+const ENTERPRISE_REFERENCE_SELF_CONSUMPTION_RATE = 0.78;
+const ENTERPRISE_REFERENCE_EXPORT_RATE_FACTOR = 0.55;
+const ENTERPRISE_CANALIZATION_MIN_NET = 1500000;
+const ENTERPRISE_SMALL_PROJECT_CANALIZATION_MIN_NET = 500000;
+const ENTERPRISE_LARGE_PROJECT_MIN_KWP = 30;
+const ENTERPRISE_SMALL_PROJECT_MIN_DC_CABLE_METERS_PER_POLARITY = 120;
+const ENTERPRISE_CANALIZATION_NET_PER_KWP = 35000;
+const ENTERPRISE_MIN_DC_CABLE_METERS_PER_POLARITY = 500;
+const ENTERPRISE_TECH_CREW_PANEL_CAPACITY_PER_DAY = 8;
+const ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY = 140000;
+const ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY = 80000;
+const ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY = 20000;
+const ENTERPRISE_LODGING_CLP_PER_DAY = 70000;
+const ENTERPRISE_REMOTE_DISTANCE_THRESHOLD_KM = 400;
+const ENTERPRISE_REMOTE_TRAVEL_DAYS = 2;
+
+const getEnterpriseCertificationNet = (systemSizeKwp = 0) =>
+  systemSizeKwp >= ENTERPRISE_LARGE_PROJECT_MIN_KWP
+    ? ENTERPRISE_LARGE_PROJECT_CERTIFICATION_NET
+    : ENTERPRISE_SMALL_PROJECT_CERTIFICATION_NET;
+
+const getEnterpriseCommercialFloorNetPerKwp = (systemSizeKwp = 0) => {
+  const size = Number(systemSizeKwp) || 0;
+  if (size <= 30) return 650000;
+  if (size <= 50) return 620000;
+  if (size <= 100) return 590000;
+  if (size <= 300) return 560000;
+  return 540000;
+};
+
+const getEnterpriseProjectTypeFactor = (projectType = "bodega") => {
+  const factors = {
+    bodega: 1,
+    comercio: 1.03,
+    oficina: 1.03,
+    agricola: 1.03,
+    industrial: 1.05,
+    otro: 1.03,
+  };
+  return factors[projectType] || 1.03;
+};
+
+const getEnterpriseSurfaceCommercialFactor = (surfaceType = "cubierta") => {
+  const factors = {
+    cubierta: 1,
+    suelo: 1.04,
+    estacionamiento: 1.12,
+    mixto: 1.06,
+  };
+  return factors[surfaceType] || 1.08;
+};
+
+// Matriz de equipos y costos netos incorporada desde la planilla técnica de Sakiara.
+// Los valores se usan únicamente para calcular el total interno; la cotización no muestra
+// precios por partida ni la antigua columna de valores netos.
+const enterpriseProductPricesNet = {
+  jinko585Panel: 74569.92,
+  cableSolar6mmRedPerMeter: 905.19,
+  cableSolar6mmBlackPerMeter: 927.86,
+  mc4Connector: 613.58,
+  mc4DoublePair: 3983.06,
+  cableClipTwo: 131.45,
+  groundClip: 114.66,
+  railConnectorPro: 1005.38,
+  railAluminumPro5m: 20027.53,
+  midClamp30: 493.3,
+  endClamp30: 646.99,
+  fixingL: 1023.63,
+  groundAnchor: 624.33,
+  railBiposte5m: 38182.89,
+  railConnectorBiposte: 3331.44,
+  biposteSet: 75003.66,
+  biposteRearBase: 5543.89,
+  biposteAngleTensioner: 16556.4,
+  acBreaker4p40: 69522.27,
+  acBreaker4p100: 109670.65,
+  acBreaker4p125: 116434.53,
+  diff4p63Si: 195046,
+  diff4p100Si: 180848.59,
+  diff4p125Si: 634458.18,
+  outdoorBoard24p: 31195.08,
+  smartLogger3000: 545901.54,
+  smartPowerSensorThreePhase250a: 80747.79,
+  riRelay: 562673.1,
+  galvanizedBox150: 12610.53,
+  lamicoidSheet: 27528.35,
+};
+
+const enterpriseHuaweiInverterOptions = [
+  { capacityKw: 15, description: "Huawei SUN2000-15K-MB0", totalNet: 1669086.03 },
+  { capacityKw: 20, description: "Huawei SUN2000-20K-MB0", totalNet: 1809893.86 },
+  { capacityKw: 25, description: "Huawei SUN2000-25K-MB0", totalNet: 1875295 },
+  { capacityKw: 30, description: "Huawei SUN2000-30KTL-M3", totalNet: 2169013.17 },
+  { capacityKw: 36, description: "Huawei SUN2000-36KTL-M3", totalNet: 2445985.23 },
+  { capacityKw: 40, description: "Huawei SUN2000-40KTL-M3", totalNet: 2463583.87 },
+  { capacityKw: 50, description: "Huawei SUN2000-50KTL-M3", totalNet: 2665048.15 },
+  { capacityKw: 100, description: "Huawei SUN2000-100KTL-M2", totalNet: 4522344.15 },
+  { capacityKw: 150, description: "Huawei SUN2000-150K-MG0 PRO", totalNet: 5474847.48 },
+];
+
+const getEnterpriseStringPlan = (panelCount = 0) => {
+  const safePanelCount = Math.max(Math.ceil(Number(panelCount) || 0), 1);
+  const stringCount = Math.max(
+    1,
+    Math.ceil(safePanelCount / ENTERPRISE_STRING_PANEL_COUNT),
+  );
+  const basePanelsPerString = Math.floor(safePanelCount / stringCount);
+  const extraPanels = safePanelCount % stringCount;
+  const strings = Array.from({ length: stringCount }, (_, index) => ({
+    string: index + 1,
+    panels: basePanelsPerString + (index < extraPanels ? 1 : 0),
+  }));
+
+  return {
+    stringCount,
+    panelsPerStringReference: ENTERPRISE_STRING_PANEL_COUNT,
+    strings,
+  };
+};
+
+const getEnterpriseHuaweiInverterPlan = (systemSizeKwp = 0) => {
+  const targetAcKw = Math.max(
+    15,
+    Math.ceil(systemSizeKwp / ENTERPRISE_DC_AC_RATIO_TARGET),
+  );
+  const maxCapacity = Math.max(targetAcKw + 150, 650);
+  const dp = Array.from({ length: maxCapacity + 1 }, () => null);
+  dp[0] = { cost: 0, items: [] };
+
+  for (let capacity = 0; capacity <= maxCapacity; capacity += 1) {
+    const current = dp[capacity];
+    if (!current) continue;
+
+    enterpriseHuaweiInverterOptions.forEach((option) => {
+      const nextCapacity = Math.min(maxCapacity, capacity + option.capacityKw);
+      const nextCost = current.cost + option.totalNet;
+      if (!dp[nextCapacity] || nextCost < dp[nextCapacity].cost) {
+        dp[nextCapacity] = {
+          cost: nextCost,
+          items: [...current.items, option],
+        };
+      }
+    });
+  }
+
+  const selected = dp
+    .map((item, capacity) => ({ ...(item || {}), capacity }))
+    .filter((item) => item.items && item.capacity >= targetAcKw)
+    .sort((a, b) => a.cost - b.cost || a.capacity - b.capacity)[0];
+
+  const groupedItems = (selected?.items || []).reduce((acc, item) => {
+    const key = item.description;
+    if (!acc[key]) {
+      acc[key] = {
+        description: item.description,
+        capacityKw: item.capacityKw,
+        quantity: 0,
+        totalNet: 0,
+      };
+    }
+    acc[key].quantity += 1;
+    acc[key].totalNet += item.totalNet;
+    return acc;
+  }, {});
+
+  const items = Object.values(groupedItems);
+  const totalAcKw = items.reduce(
+    (sum, item) => sum + item.capacityKw * item.quantity,
+    0,
+  );
+  const totalNet = items.reduce((sum, item) => sum + item.totalNet, 0);
+
+  return {
+    targetAcKw,
+    totalAcKw,
+    totalNet,
+    dcAcRatio: systemSizeKwp / Math.max(totalAcKw, 1),
+    inverterCount: items.reduce((sum, item) => sum + item.quantity, 0),
+    items,
+  };
+};
+
+const getEnterpriseStructurePlan = (panelCount = 0, surfaceType = "cubierta") => {
+  const safePanelCount = Math.max(Math.ceil(Number(panelCount) || 0), 1);
+  const isGroundMounted =
+    surfaceType === "suelo" ||
+    surfaceType === "estacionamiento" ||
+    surfaceType === "mixto";
+  const requiredAreaM2 =
+    safePanelCount * ENTERPRISE_MODULE_DIMENSIONS_M.area * ENTERPRISE_MODULE_SPACING_FACTOR;
+  const estimatedRows = Math.max(1, Math.ceil(safePanelCount / 18));
+  const portraitPanelBlocks = Math.ceil(safePanelCount / 4);
+  const railCount = Math.max(2, portraitPanelBlocks * 2);
+
+  if (isGroundMounted) {
+    const biposteSets = Math.ceil(safePanelCount / 2);
+    const railConnectors = Math.max(0, railCount - estimatedRows);
+    const totalNet =
+      biposteSets * enterpriseProductPricesNet.biposteSet +
+      railCount * enterpriseProductPricesNet.railBiposte5m +
+      railConnectors * enterpriseProductPricesNet.railConnectorBiposte +
+      biposteSets * enterpriseProductPricesNet.biposteRearBase +
+      Math.ceil(biposteSets / 2) * enterpriseProductPricesNet.biposteAngleTensioner +
+      safePanelCount * enterpriseProductPricesNet.groundClip;
+
+    return {
+      typeLabel: "Estructura biposte / suelo",
+      requiredAreaM2,
+      railCount,
+      supportCount: biposteSets,
+      totalNet,
+    };
+  }
+
+  const railConnectors = Math.max(0, railCount - estimatedRows);
+  const midClamps = Math.max(0, safePanelCount * 2 - estimatedRows * 2);
+  const endClamps = estimatedRows * 4;
+  const fixingPoints = Math.ceil(safePanelCount * 1.25);
+  const totalNet =
+    railCount * enterpriseProductPricesNet.railAluminumPro5m +
+    railConnectors * enterpriseProductPricesNet.railConnectorPro +
+    midClamps * enterpriseProductPricesNet.midClamp30 +
+    endClamps * enterpriseProductPricesNet.endClamp30 +
+    fixingPoints * enterpriseProductPricesNet.fixingL +
+    safePanelCount * enterpriseProductPricesNet.groundClip +
+    Math.ceil(safePanelCount / 8) * enterpriseProductPricesNet.groundAnchor;
+
+  return {
+    typeLabel: "Estructura sobre cubierta",
+    requiredAreaM2,
+    railCount,
+    supportCount: fixingPoints,
+    totalNet,
+  };
+};
+
+const getEnterpriseCablingPlan = ({
+  systemSizeKwp = 0,
+  stringCount = 1,
+  inverterCount = 1,
+} = {}) => {
+  const isLargeEnterpriseProject =
+    systemSizeKwp >= ENTERPRISE_LARGE_PROJECT_MIN_KWP;
+  const dcCableMetersPerPolarity = Math.ceil(
+    Math.max(
+      isLargeEnterpriseProject
+        ? ENTERPRISE_MIN_DC_CABLE_METERS_PER_POLARITY
+        : ENTERPRISE_SMALL_PROJECT_MIN_DC_CABLE_METERS_PER_POLARITY,
+      stringCount * 35 + inverterCount * 60,
+    ),
+  );
+  const canalizationNet = Math.max(
+    isLargeEnterpriseProject
+      ? ENTERPRISE_CANALIZATION_MIN_NET
+      : ENTERPRISE_SMALL_PROJECT_CANALIZATION_MIN_NET,
+    Math.ceil((systemSizeKwp * ENTERPRISE_CANALIZATION_NET_PER_KWP) / 1000) *
+      1000,
+  );
+  const redCableNet =
+    dcCableMetersPerPolarity * enterpriseProductPricesNet.cableSolar6mmRedPerMeter;
+  const blackCableNet =
+    dcCableMetersPerPolarity * enterpriseProductPricesNet.cableSolar6mmBlackPerMeter;
+  const mc4Connectors = Math.max(4, stringCount * 4);
+  const accessoryBoxes = Math.max(1, Math.ceil(stringCount / 8));
+  const accessoriesNet =
+    mc4Connectors * enterpriseProductPricesNet.mc4Connector +
+    accessoryBoxes * enterpriseProductPricesNet.galvanizedBox150 +
+    accessoryBoxes * enterpriseProductPricesNet.lamicoidSheet +
+    stringCount * 6 * enterpriseProductPricesNet.cableClipTwo;
+
+  return {
+    isLargeEnterpriseProject,
+    dcCableMetersPerPolarity,
+    redCableNet,
+    blackCableNet,
+    canalizationNet,
+    mc4Connectors,
+    accessoryBoxes,
+    accessoriesNet,
+    totalNet: redCableNet + blackCableNet + canalizationNet + accessoriesNet,
+  };
+};
+
+const getEnterpriseAcProtectionPlan = (inverterPlan = {}) => {
+  const lineItems = [];
+  let totalNet = 0;
+
+  (inverterPlan.items || []).forEach((inverter) => {
+    let breakerNet = enterpriseProductPricesNet.acBreaker4p40;
+    let differentialNet = enterpriseProductPricesNet.diff4p63Si;
+    let protectionLabel = "Protección AC trifásica hasta 40 A";
+
+    if (inverter.capacityKw > 30 && inverter.capacityKw <= 50) {
+      breakerNet = enterpriseProductPricesNet.acBreaker4p100;
+      differentialNet = enterpriseProductPricesNet.diff4p100Si;
+      protectionLabel = "Protección AC trifásica hasta 100 A";
+    } else if (inverter.capacityKw > 50) {
+      breakerNet = enterpriseProductPricesNet.acBreaker4p125;
+      differentialNet = enterpriseProductPricesNet.diff4p125Si;
+      protectionLabel = "Tablero y protección AC industrial a dimensionar";
+    }
+
+    const quantity = Math.max(inverter.quantity, 1);
+    totalNet +=
+      quantity *
+      (breakerNet + differentialNet + enterpriseProductPricesNet.outdoorBoard24p);
+    lineItems.push({ description: protectionLabel, quantity });
+  });
+
+  totalNet += enterpriseProductPricesNet.smartPowerSensorThreePhase250a;
+  lineItems.push({ description: "Smart Power Sensor trifásico", quantity: 1 });
+
+  if ((inverterPlan.inverterCount || 0) > 1 || (inverterPlan.totalAcKw || 0) >= 30) {
+    totalNet += enterpriseProductPricesNet.smartLogger3000;
+    lineItems.push({ description: "Huawei SmartLogger 3000", quantity: 1 });
+  }
+
+  if ((inverterPlan.totalAcKw || 0) >= 100) {
+    totalNet += enterpriseProductPricesNet.riRelay;
+    lineItems.push({ description: "Relé de interfaz / protección RI", quantity: 1 });
+  }
+
+  return { totalNet, items: lineItems };
+};
+
+const getEnterpriseProjectExecutionPlan = ({
+  communeConfig,
+  panelCount = 0,
+  systemSizeKwp = 0,
+} = {}) => {
+  const safeCommune = communeConfig || { roundTripKm: 0, tolls: 0 };
+  const travelMetrics = getTravelLogisticsBase(
+    safeCommune.roundTripKm,
+    safeCommune.tolls,
+  );
+  const projectWorkDays = Math.max(
+    5,
+    Math.ceil(
+      Math.max(Number(panelCount) || 0, 1) /
+        ENTERPRISE_TECH_CREW_PANEL_CAPACITY_PER_DAY,
+    ),
+  );
+  const isRemoteProject =
+    Boolean(safeCommune.specialLogistics) ||
+    safeCommune.roundTripKm >= ENTERPRISE_REMOTE_DISTANCE_THRESHOLD_KM;
+  const travelDays = isRemoteProject ? ENTERPRISE_REMOTE_TRAVEL_DAYS : 0;
+  const bufferDays = isRemoteProject
+    ? Math.max(1, Math.ceil(Math.max(systemSizeKwp - 30, 0) / 100))
+    : 0;
+  const projectCalendarDays = projectWorkDays + travelDays + bufferDays;
+  const laborNet =
+    projectCalendarDays *
+    (ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY +
+      ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY);
+  const localLogisticsNet =
+    projectCalendarDays * ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY;
+  const lodgingDays = isRemoteProject ? projectCalendarDays : 0;
+  const lodgingNet = lodgingDays * ENTERPRISE_LODGING_CLP_PER_DAY;
+  const logisticsNet =
+    travelMetrics.logisticsBase + localLogisticsNet + lodgingNet;
+
+  return {
+    ...travelMetrics,
+    isRemoteProject,
+    projectWorkDays,
+    travelDays,
+    bufferDays,
+    projectCalendarDays,
+    laborNet,
+    localLogisticsNet,
+    lodgingDays,
+    lodgingNet,
+    logisticsNet,
+  };
+};
 
 const VEHICLE_EFFICIENCY_KM_PER_L = 8;
 const REFERENCE_FUEL_PRICE_CLP_PER_L = 1300;
@@ -2132,7 +2543,6 @@ const buildInstallationQuotationMarkup = ({
           <td class="quote-col-item">${escapeHtml(row.item)}</td>
           <td>${escapeHtml(row.description)}</td>
           <td class="quote-col-qty">${escapeHtml(formatNumber(row.quantity))}</td>
-          <td class="quote-col-money">${escapeHtml(formatCLP(row.totalNet))}</td>
         </tr>
       `,
     )
@@ -2176,7 +2586,6 @@ const buildInstallationQuotationMarkup = ({
               <th>ITEM</th>
               <th>DESCRIPCIÓN</th>
               <th>CANT.</th>
-              <th>TOTAL NETO</th>
             </tr>
           </thead>
           <tbody>${rowsMarkup}</tbody>
@@ -2213,7 +2622,7 @@ const buildInstallationQuotationMarkup = ({
             ${escapeHtml(formatNumber(metrics.winterGenerationKWh))} kWh en invierno y ${escapeHtml(formatNumber(metrics.summerGenerationKWh))} kWh en verano.
           </div>
           <div class="quote-totals-box">
-            <div><span>TOTAL NETO</span><strong>${escapeHtml(formatCLP(totalNet))}</strong></div>
+            <div><span>SUBTOTAL</span><strong>${escapeHtml(formatCLP(totalNet))}</strong></div>
             <div><span>IVA</span><strong>${escapeHtml(formatCLP(vat))}</strong></div>
             <div class="quote-total-final"><span>TOTAL</span><strong>${escapeHtml(formatCLP(total))}</strong></div>
           </div>
@@ -2400,15 +2809,7 @@ const buildInstallationQuotationMarkup = ({
         }
         .quote-table th:nth-child(3),
         .quote-table td:nth-child(3) {
-          width: 78px;
-        }
-        .quote-table th:nth-child(4),
-        .quote-table td:nth-child(4) {
-          width: 130px;
-        }
-        .quote-col-money {
-          text-align: right;
-          white-space: nowrap;
+          width: 88px;
         }
         .quote-summary-strip {
           display: grid;
@@ -3286,6 +3687,458 @@ const buildInstallationReportMarkup = ({
   `;
 };
 
+
+const buildEnterpriseQuotationMarkup = ({
+  metrics,
+  regionLabel,
+  communeLabel,
+  name,
+  phone,
+  email,
+  clientRut,
+  projectAddress,
+  enterpriseCompany,
+  quoteNumber,
+  quoteDate,
+}) => {
+  const validDays = 15;
+  const quotationItems = metrics.quotationItems || [];
+  const safeName = name?.trim() || "Por completar";
+  const safeRut = clientRut?.trim() || "Por completar";
+  const safePhone = phone?.trim() || "Por completar";
+  const safeEmail = email?.trim() || "Por completar";
+  const safeCompany = enterpriseCompany?.trim() || "Por completar";
+  const addressLabel = projectAddress?.trim() || `${communeLabel}, ${regionLabel}`;
+  const rowsMarkup = quotationItems
+    .map(
+      (row) => `
+        <tr>
+          <td class="eq-item">${escapeHtml(row.item)}</td>
+          <td>${escapeHtml(row.description)}</td>
+          <td class="eq-qty">${escapeHtml(formatNumber(row.quantity))}</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  return `
+    <div class="enterprise-quote-document">
+      <section class="enterprise-quote-page pdf-export-page">
+        <header class="eq-header">
+          <img class="eq-logo" src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
+          <div class="eq-meta">
+            <strong>${escapeHtml(quoteNumber)}</strong>
+            <span>Cotización empresa autogenerada</span>
+          </div>
+        </header>
+
+        <div class="eq-company-bar">SAKIARA INVERSIONES SPA</div>
+
+        <section class="eq-client-grid">
+          <div>
+            <div class="eq-info-row"><span>Empresa</span><strong>${escapeHtml(safeCompany)}</strong></div>
+            <div class="eq-info-row"><span>Contacto</span><strong>${escapeHtml(safeName)}</strong></div>
+            <div class="eq-info-row"><span>RUT</span><strong>${escapeHtml(safeRut)}</strong></div>
+            <div class="eq-info-row"><span>Dirección</span><strong>${escapeHtml(addressLabel)}</strong></div>
+          </div>
+          <div class="eq-client-right">
+            <div class="eq-info-row"><span>N° Cotización</span><strong>${escapeHtml(quoteNumber)}</strong></div>
+            <div class="eq-info-row"><span>Fecha</span><strong>${escapeHtml(formatDateForQuotation(quoteDate))}</strong></div>
+            <div class="eq-info-row"><span>Validez</span><strong>${escapeHtml(validDays)} días</strong></div>
+            <div class="eq-info-row"><span>Moneda</span><strong>CLP</strong></div>
+          </div>
+        </section>
+
+        <div class="eq-section-bar">EQUIPAMIENTO Y ALCANCE PROPUESTO</div>
+        <table class="eq-table">
+          <thead>
+            <tr><th>ITEM</th><th>DESCRIPCIÓN</th><th>CANT.</th></tr>
+          </thead>
+          <tbody>${rowsMarkup}</tbody>
+        </table>
+
+        <section class="eq-kpis">
+          <div><span>Potencia FV</span><strong>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp</strong><small>${escapeHtml(formatNumber(metrics.estimatedPanels))} módulos Jinko 585 W</small></div>
+          <div><span>Potencia inversores</span><strong>${escapeHtml(formatNumber(metrics.inverterPlan.totalAcKw, 0))} kW</strong><small>${escapeHtml(metrics.inverterSummary)}</small></div>
+          <div><span>Generación promedio</span><strong>${escapeHtml(formatNumber(metrics.monthlyGenerationKWh, 0))} kWh/mes</strong><small>Estimación referencial</small></div>
+          <div><span>Retorno</span><strong>${escapeHtml(formatNumber(metrics.paybackYears, 1))} años</strong><small>Según consumo y tarifa ingresados</small></div>
+        </section>
+
+        <section class="eq-total-layout">
+          <div class="eq-note">
+            <strong>Alcance preliminar:</strong>
+            solución on-grid para ${escapeHtml(metrics.projectTypeLabel.toLowerCase())},
+            estructura ${escapeHtml(metrics.surfaceTypeLabel.toLowerCase())},
+            ${escapeHtml(formatNumber(metrics.stringPlan.stringCount))} strings y
+            ${escapeHtml(formatNumber(metrics.executionPlan.projectCalendarDays))} días calendario estimados de ejecución.
+            El precio final queda sujeto a levantamiento técnico, empalme, recorridos, ingeniería y stock.
+          </div>
+          <div class="eq-totals">
+            <div><span>Subtotal</span><strong>${escapeHtml(formatCLP(metrics.totalNet))}</strong></div>
+            <div><span>IVA</span><strong>${escapeHtml(formatCLP(metrics.vat))}</strong></div>
+            <div class="eq-total-final"><span>TOTAL</span><strong>${escapeHtml(formatCLP(metrics.referenceInvestment))}</strong></div>
+          </div>
+        </section>
+
+        <section class="eq-bottom-grid">
+          <div class="eq-conditions">
+            <div class="eq-bottom-title">Condiciones comerciales</div>
+            <ul>
+              <li>Validez de la cotización: ${escapeHtml(validDays)} días desde su emisión.</li>
+              <li>Valores referenciales IVA incluido y sujetos a visita técnica.</li>
+              <li>Sujeta a stock, metrajes, características del empalme y condiciones de montaje.</li>
+              <li>Garantía de construcción: 1 año desde la puesta en marcha.</li>
+              <li>Garantías de equipos según fabricante y condiciones de operación.</li>
+            </ul>
+          </div>
+          <div class="eq-payment">
+            <div class="eq-bottom-title">Pago / Transferencia</div>
+            <div class="eq-payment-grid">
+              <span>Métodos</span><strong>Transferencia / Tarjetas</strong>
+              <span>Nombre</span><strong>Rafael Jofré</strong>
+              <span>RUT</span><strong>19544320-3</strong>
+              <span>Cuenta</span><strong>Cuenta Corriente</strong>
+              <span>N°</span><strong>19992073752</strong>
+            </div>
+          </div>
+        </section>
+
+        <footer class="eq-footer">
+          <div><strong>Contacto</strong><span>${escapeHtml(safePhone)} · ${escapeHtml(safeEmail)}</span></div>
+          <em>Agradecemos la confianza y preferencia por nuestros servicios.</em>
+        </footer>
+      </section>
+
+      <style>
+        .enterprise-quote-document { width:210mm; color:#3f4249; font-family:Arial,Helvetica,sans-serif; background:#fff; }
+        .enterprise-quote-page { width:210mm; height:297mm; min-height:297mm; padding:17mm 9mm 11mm; box-sizing:border-box; background:#fff; }
+        .eq-header,.eq-total-layout,.eq-bottom-grid,.eq-footer { display:flex; align-items:center; }
+        .eq-header { justify-content:space-between; margin-bottom:10px; }
+        .eq-logo { height:14mm; width:auto; max-width:64mm; object-fit:contain; }
+        .eq-meta { text-align:right; }
+        .eq-meta strong,.eq-meta span { display:block; }
+        .eq-meta strong { font-size:13px; color:#4f535d; }
+        .eq-meta span { margin-top:4px; font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:#8a8f9b; }
+        .eq-company-bar,.eq-section-bar,.eq-bottom-title { background:#5a5d65; color:#fff; font-weight:800; text-align:center; letter-spacing:.04em; }
+        .eq-company-bar { padding:6px 8px; font-size:14px; }
+        .eq-client-grid { display:grid; grid-template-columns:1.35fr 1fr; background:#fff4c7; }
+        .eq-client-right { border-left:1px solid #fff; }
+        .eq-info-row { display:grid; grid-template-columns:96px minmax(0,1fr); min-height:24px; align-items:center; }
+        .eq-client-right .eq-info-row { grid-template-columns:112px minmax(0,1fr); }
+        .eq-info-row span { height:100%; display:flex; align-items:center; padding:3px 6px; background:#efefef; font-size:10.5px; font-weight:800; color:#5b5f69; }
+        .eq-info-row strong { padding:3px 6px; font-size:10.5px; line-height:1.3; color:#343841; }
+        .eq-section-bar { margin-top:14px; padding:7px 8px; font-size:12px; }
+        .eq-table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:10.3px; }
+        .eq-table thead { background:#f1ad2f; color:#fff; }
+        .eq-table th { padding:6px; text-align:left; font-size:10.5px; }
+        .eq-table th:first-child,.eq-item,.eq-qty { text-align:center; }
+        .eq-table tbody td { padding:4.5px 6px; border-bottom:1px solid #f2f3f5; background:#f7f7f8; color:#4b4f59; font-weight:600; }
+        .eq-table tbody tr:nth-child(even) td { background:#fbfbfc; }
+        .eq-table th:nth-child(1),.eq-table td:nth-child(1) { width:48px; }
+        .eq-table th:nth-child(3),.eq-table td:nth-child(3) { width:76px; }
+        .eq-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-top:10px; }
+        .eq-kpis>div { border:1px solid #e5e7eb; border-radius:10px; padding:8px; background:#fff; }
+        .eq-kpis span,.eq-kpis small { display:block; color:#7b8090; font-size:7.8px; line-height:1.3; }
+        .eq-kpis strong { display:block; margin:4px 0; color:#343841; font-size:12px; line-height:1.2; }
+        .eq-total-layout { align-items:stretch; justify-content:space-between; gap:10px; margin-top:10px; }
+        .eq-note { flex:1; padding:9px 10px; border-radius:10px; background:#f8fafc; border:1px solid #e5e7eb; font-size:9.4px; line-height:1.45; color:#5b616e; }
+        .eq-note strong { color:#343841; }
+        .eq-totals { width:270px; border:1px solid #e5e7eb; background:#f4f4f5; }
+        .eq-totals>div { display:grid; grid-template-columns:1fr 1fr; align-items:center; min-height:27px; }
+        .eq-totals span,.eq-totals strong { padding:6px 8px; font-size:11px; }
+        .eq-totals span { color:#5b5f69; font-weight:800; }
+        .eq-totals strong { text-align:right; color:#343841; }
+        .eq-total-final span { background:#5a5d65; color:#fff; }
+        .eq-total-final strong { background:#f1ad2f; color:#fff; font-size:12px; }
+        .eq-bottom-grid { align-items:stretch; gap:10px; margin-top:12px; }
+        .eq-conditions,.eq-payment { flex:1; border:1px solid #e5e7eb; background:#fff; }
+        .eq-bottom-title { padding:6px 8px; font-size:11px; }
+        .eq-conditions ul { margin:9px 11px 8px 18px; padding:0; color:#4b4f59; font-size:9.2px; line-height:1.43; }
+        .eq-payment-grid { display:grid; grid-template-columns:1fr 1.35fr; background:#fff4c7; font-size:9.2px; }
+        .eq-payment-grid span,.eq-payment-grid strong { padding:6px 7px; border-bottom:1px solid rgba(255,255,255,.8); }
+        .eq-payment-grid span { background:#f4f4f5; color:#5b5f69; }
+        .eq-payment-grid strong { text-align:right; color:#343841; }
+        .eq-footer { justify-content:space-between; gap:10px; margin-top:11px; padding:8px 9px; background:#f7f7f8; color:#4b4f59; font-size:9.2px; }
+        .eq-footer strong,.eq-footer span { display:block; }
+        .eq-footer em { font-weight:800; color:#5b5f69; text-align:right; }
+      </style>
+    </div>
+  `;
+};
+
+const buildEnterpriseReportMarkup = ({
+  metrics,
+  regionLabel,
+  communeLabel,
+  climateProfile,
+  name,
+  phone,
+  email,
+  enterpriseCompany,
+  projectAddress,
+}) => {
+  const generatedDate = new Intl.DateTimeFormat("es-CL", {
+    dateStyle: "long",
+    timeStyle: "short",
+  }).format(new Date());
+  const safeCompany = enterpriseCompany?.trim() || "Empresa por completar";
+  const safeName = name?.trim() || "Contacto por completar";
+  const addressLabel = projectAddress?.trim() || `${communeLabel}, ${regionLabel}`;
+  const generationChart = buildReportBarChartMarkup({
+    title: "Generación mensual estimada",
+    items: [
+      { label: "Invierno", value: metrics.winterGenerationKWh },
+      { label: "Promedio", value: metrics.monthlyGenerationKWh },
+      { label: "Verano", value: metrics.summerGenerationKWh },
+    ],
+    formatter: (value) => `${formatNumber(value, 0)} kWh`,
+  });
+  const balanceChart = buildReportBarChartMarkup({
+    title: "Balance energético mensual",
+    items: [
+      { label: "Consumo", value: metrics.monthlyConsumption },
+      { label: "Autoconsumo", value: metrics.selfConsumedKWh },
+      { label: "Inyección", value: metrics.exportedKWh },
+    ],
+    formatter: (value) => `${formatNumber(value, 0)} kWh`,
+  });
+  const equipmentRows = (metrics.equipmentItems || [])
+    .map(
+      (item, index) => `
+        <tr>
+          <td>${escapeHtml(index + 1)}</td>
+          <td>${escapeHtml(item.description)}</td>
+          <td>${escapeHtml(formatNumber(item.quantity))}</td>
+        </tr>
+      `,
+    )
+    .join("");
+  const stringSummary = metrics.stringPlan.strings
+    .map((item) => `S${item.string}: ${item.panels} módulos`)
+    .join(" · ");
+
+  return `
+    <div class="enterprise-report-document">
+      <section class="er-page er-cover pdf-export-page">
+        <div class="er-cover-top">
+          <img class="er-logo" src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
+          <span>INFORME PRELIMINAR EMPRESAS</span>
+        </div>
+        <div class="er-cover-content">
+          <p class="er-eyebrow">Evaluación técnico-comercial fotovoltaica</p>
+          <h1>${escapeHtml(safeCompany)}</h1>
+          <p class="er-lead">Propuesta referencial construida con los datos ingresados en el wizard de Sakiara y la matriz de equipos empresariales.</p>
+          <div class="er-cover-grid">
+            <div><span>Ubicación</span><strong>${escapeHtml(addressLabel)}</strong></div>
+            <div><span>Contacto</span><strong>${escapeHtml(safeName)}</strong></div>
+            <div><span>Potencia propuesta</span><strong>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp</strong></div>
+            <div><span>Inversión estimada</span><strong>${escapeHtml(formatCLP(metrics.referenceInvestment))}</strong></div>
+          </div>
+        </div>
+        <div class="er-cover-bottom">
+          <strong>SAKIARA INVERSIONES SPA</strong>
+          <span>Generado el ${escapeHtml(generatedDate)}</span>
+        </div>
+      </section>
+
+      <section class="er-page pdf-export-page">
+        <header class="er-page-header">
+          <img class="er-page-logo" src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara" />
+          <span>1 · Resumen del proyecto</span>
+        </header>
+        <h2>Lectura general de la propuesta</h2>
+        <p class="er-intro">El cálculo combina consumo, ubicación, tipo de montaje, potencia fotovoltaica e inventario técnico. Es una base formal para conversar el proyecto; la ingeniería de detalle se confirma en terreno.</p>
+
+        <div class="er-kpi-grid">
+          <div><span>Consumo mensual</span><strong>${escapeHtml(formatNumber(metrics.monthlyConsumption, 0))} kWh</strong></div>
+          <div><span>Boleta utilizada</span><strong>${escapeHtml(formatCLP(metrics.monthlyBill))}</strong></div>
+          <div><span>Potencia FV DC</span><strong>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp</strong></div>
+          <div><span>Potencia inversores AC</span><strong>${escapeHtml(formatNumber(metrics.inverterPlan.totalAcKw, 0))} kW</strong></div>
+          <div><span>Módulos</span><strong>${escapeHtml(formatNumber(metrics.estimatedPanels))}</strong></div>
+          <div><span>Superficie estimada</span><strong>${escapeHtml(formatNumber(metrics.structurePlan.requiredAreaM2, 0))} m²</strong></div>
+        </div>
+
+        <div class="er-two-columns">
+          <section class="er-card">
+            <h3>Datos de diseño</h3>
+            <div class="er-data-row"><span>Tipo de proyecto</span><strong>${escapeHtml(metrics.projectTypeLabel)}</strong></div>
+            <div class="er-data-row"><span>Montaje</span><strong>${escapeHtml(metrics.structurePlan.typeLabel)}</strong></div>
+            <div class="er-data-row"><span>Configuración de strings</span><strong>${escapeHtml(stringSummary)}</strong></div>
+            <div class="er-data-row"><span>Relación DC/AC</span><strong>${escapeHtml(formatNumber(metrics.inverterPlan.dcAcRatio, 2))}</strong></div>
+            <div class="er-data-row"><span>Plazo estimado</span><strong>${escapeHtml(formatNumber(metrics.executionPlan.projectCalendarDays))} días calendario</strong></div>
+          </section>
+          <section class="er-card">
+            <h3>Ubicación y recurso solar</h3>
+            <div class="er-data-row"><span>Región</span><strong>${escapeHtml(regionLabel)}</strong></div>
+            <div class="er-data-row"><span>Comuna</span><strong>${escapeHtml(communeLabel)}</strong></div>
+            <div class="er-data-row"><span>Referencia solar anual</span><strong>${escapeHtml(formatNumber(metrics.annualProductionFactor, 0))} kWh/kWp-mes</strong></div>
+            <div class="er-data-row"><span>Referencia climática</span><strong>${escapeHtml(climateProfile?.label || regionLabel)}</strong></div>
+            <div class="er-data-row"><span>Condición logística</span><strong>${metrics.executionPlan.isRemoteProject ? "Proyecto con alojamiento" : "Proyecto sin alojamiento"}</strong></div>
+          </section>
+        </div>
+        <div class="er-chart-grid">${generationChart}${balanceChart}</div>
+        <footer class="er-page-footer"><span>Sakiara Energía Solar</span><span>Informe empresas · Página 2</span></footer>
+      </section>
+
+      <section class="er-page pdf-export-page">
+        <header class="er-page-header">
+          <img class="er-page-logo" src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara" />
+          <span>2 · Equipamiento propuesto</span>
+        </header>
+        <h2>Selección de equipos y alcance</h2>
+        <p class="er-intro">La selección cambia automáticamente con la potencia calculada y el tipo de superficie. Los valores individuales no se muestran; la documentación entrega únicamente el total comercial del proyecto.</p>
+
+        <table class="er-equipment-table">
+          <thead><tr><th>ITEM</th><th>DESCRIPCIÓN</th><th>CANT.</th></tr></thead>
+          <tbody>${equipmentRows}</tbody>
+        </table>
+
+        <div class="er-three-grid">
+          <section class="er-card">
+            <h3>Inversores</h3>
+            <p>${escapeHtml(metrics.inverterSummary)}</p>
+            <small>Selección optimizada según potencia DC y relación DC/AC objetivo.</small>
+          </section>
+          <section class="er-card">
+            <h3>Cableado CC</h3>
+            <p>${escapeHtml(formatNumber(metrics.cablingPlan.dcCableMetersPerPolarity))} m rojo + ${escapeHtml(formatNumber(metrics.cablingPlan.dcCableMetersPerPolarity))} m negro.</p>
+            <small>Incluye conectores, accesorios y canalización referencial.</small>
+          </section>
+          <section class="er-card">
+            <h3>Estructura</h3>
+            <p>${escapeHtml(metrics.structurePlan.typeLabel)}</p>
+            <small>${escapeHtml(formatNumber(metrics.structurePlan.railCount))} rieles referenciales y ${escapeHtml(formatNumber(metrics.structurePlan.supportCount))} apoyos/fijaciones.</small>
+          </section>
+        </div>
+
+        <div class="er-note-box">
+          <strong>Validaciones pendientes en visita técnica</strong>
+          <p>Capacidad real del empalme, tensión y protecciones existentes, recorridos AC/DC, estado estructural, sombras, acceso, maniobras, izaje, puesta a tierra, comunicaciones y compatibilidad con Net Billing.</p>
+        </div>
+        <footer class="er-page-footer"><span>Sakiara Energía Solar</span><span>Informe empresas · Página 3</span></footer>
+      </section>
+
+      <section class="er-page pdf-export-page">
+        <header class="er-page-header">
+          <img class="er-page-logo" src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara" />
+          <span>3 · Evaluación económica</span>
+        </header>
+        <h2>Resultado comercial preliminar</h2>
+        <div class="er-commercial-hero">
+          <div><span>Inversión IVA incluido</span><strong>${escapeHtml(formatCLP(metrics.referenceInvestment))}</strong></div>
+          <div><span>Ahorro mensual</span><strong>${escapeHtml(formatCLP(metrics.monthlySavings))}</strong></div>
+          <div><span>Ahorro anual</span><strong>${escapeHtml(formatCLP(metrics.annualSavings))}</strong></div>
+          <div><span>Retorno estimado</span><strong>${escapeHtml(formatNumber(metrics.paybackYears, 1))} años</strong></div>
+        </div>
+
+        <div class="er-two-columns er-commercial-columns">
+          <section class="er-card">
+            <h3>Supuestos del cálculo</h3>
+            <ul>
+              <li>Autoconsumo de referencia: ${escapeHtml(formatNumber(ENTERPRISE_REFERENCE_SELF_CONSUMPTION_RATE * 100))}% de la generación útil, limitado por el consumo.</li>
+              <li>Inyección valorizada al ${escapeHtml(formatNumber(ENTERPRISE_REFERENCE_EXPORT_RATE_FACTOR * 100))}% de la tarifa calculada.</li>
+              <li>Tarifa utilizada: ${escapeHtml(formatCLP(metrics.derivedTariff))}/kWh.</li>
+              <li>Generación estimada con perfil solar de ${escapeHtml(communeLabel)}.</li>
+              <li>Precios sujetos a ingeniería, stock, tipo de cambio y levantamiento final.</li>
+            </ul>
+          </section>
+          <section class="er-card">
+            <h3>Alcance comercial</h3>
+            <ul>
+              <li>Equipos principales, estructura y protecciones.</li>
+              <li>Cableado, canalización y accesorios considerados por escala.</li>
+              <li>Mano de obra técnica y apoyo de instalación.</li>
+              <li>Logística y alojamiento cuando corresponde.</li>
+              <li>Certificación SEC y coordinación técnica preliminar.</li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="er-signoff">
+          <div><span>Empresa</span><strong>${escapeHtml(safeCompany)}</strong></div>
+          <div><span>Contacto</span><strong>${escapeHtml(safeName)}</strong></div>
+          <div><span>Teléfono</span><strong>${escapeHtml(phone?.trim() || "Por completar")}</strong></div>
+          <div><span>Correo</span><strong>${escapeHtml(email?.trim() || "Por completar")}</strong></div>
+        </div>
+
+        <div class="er-final-note">Este informe es una evaluación preliminar generada por el cotizador. La cotización descargable formaliza el valor referencial; ambos documentos deben validarse con visita técnica antes de contratar.</div>
+        <footer class="er-page-footer"><span>Sakiara Energía Solar</span><span>Informe empresas · Página 4</span></footer>
+      </section>
+
+      <style>
+        .enterprise-report-document { width:210mm; font-family:Arial,Helvetica,sans-serif; color:#3d4149; background:#fff; }
+        .er-page { width:210mm; height:297mm; min-height:297mm; box-sizing:border-box; padding:16mm 14mm 12mm; position:relative; overflow:hidden; background:#fff; }
+        .er-cover { padding:18mm; background:linear-gradient(145deg,#fff 0%,#fffdf5 58%,#f8f2d7 100%); display:flex; flex-direction:column; justify-content:space-between; }
+        .er-cover-top,.er-page-header,.er-page-footer { display:flex; justify-content:space-between; align-items:center; }
+        .er-logo { height:19mm; width:auto; max-width:82mm; object-fit:contain; }
+        .er-cover-top span { font-size:10px; font-weight:800; letter-spacing:.16em; color:#777c86; }
+        .er-cover-content { margin:10mm 0 auto; }
+        .er-eyebrow { margin:0 0 10px; color:#b37a00; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+        .er-cover h1 { margin:0; max-width:150mm; font-size:35px; line-height:1.08; color:#30343b; }
+        .er-lead { max-width:145mm; margin:14px 0 0; font-size:16px; line-height:1.65; color:#626772; }
+        .er-cover-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:24mm; }
+        .er-cover-grid>div { padding:14px; border:1px solid rgba(90,93,101,.15); border-radius:14px; background:rgba(255,255,255,.75); }
+        .er-cover-grid span,.er-cover-grid strong { display:block; }
+        .er-cover-grid span { color:#818691; font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+        .er-cover-grid strong { margin-top:7px; color:#30343b; font-size:15px; line-height:1.35; }
+        .er-cover-bottom { padding-top:12px; border-top:1px solid rgba(90,93,101,.2); }
+        .er-cover-bottom strong,.er-cover-bottom span { display:block; }
+        .er-cover-bottom strong { font-size:12px; }
+        .er-cover-bottom span { margin-top:4px; color:#777c86; font-size:10px; }
+        .er-page-header { padding-bottom:9px; border-bottom:1px solid #e5e7eb; }
+        .er-page-logo { height:9mm; width:auto; max-width:46mm; object-fit:contain; }
+        .er-page-header span { color:#757b87; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+        .er-page h2 { margin:14px 0 6px; color:#30343b; font-size:24px; }
+        .er-intro { margin:0 0 14px; color:#646a75; font-size:11.5px; line-height:1.6; }
+        .er-kpi-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+        .er-kpi-grid>div,.er-commercial-hero>div { padding:11px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; }
+        .er-kpi-grid span,.er-commercial-hero span { display:block; color:#858b96; font-size:9px; text-transform:uppercase; letter-spacing:.05em; }
+        .er-kpi-grid strong,.er-commercial-hero strong { display:block; margin-top:6px; color:#30343b; font-size:15px; }
+        .er-two-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:11px; }
+        .er-three-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:12px; }
+        .er-card { padding:11px; border:1px solid #e5e7eb; border-radius:12px; background:#fafafa; }
+        .er-card h3 { margin:0 0 9px; color:#3a3e46; font-size:13px; }
+        .er-card p { margin:0; color:#5e6470; font-size:10.5px; line-height:1.5; }
+        .er-card small { display:block; margin-top:7px; color:#858b96; font-size:9px; line-height:1.45; }
+        .er-card ul { margin:0; padding-left:17px; color:#5e6470; font-size:10.3px; line-height:1.55; }
+        .er-data-row { display:grid; grid-template-columns:1fr 1.35fr; gap:8px; padding:5px 0; border-bottom:1px solid #eceef1; font-size:9.6px; }
+        .er-data-row:last-child { border-bottom:0; }
+        .er-data-row span { color:#7a808b; }
+        .er-data-row strong { color:#3d4149; text-align:right; }
+        .er-chart-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:11px; }
+        .pdf-chart-card { padding:10px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; }
+        .pdf-chart-card h3 { margin:0; color:#3a3e46; font-size:12px; }
+        .pdf-chart-bars { display:flex; align-items:flex-end; justify-content:space-around; gap:10px; height:92mm; margin-top:9px; }
+        .pdf-chart-item { width:30%; text-align:center; }
+        .pdf-chart-bar-wrap { height:58mm; display:flex; align-items:flex-end; justify-content:center; }
+        .pdf-chart-bar { width:22px; max-height:58mm; border-radius:7px 7px 0 0; background:#f1ad2f; }
+        .pdf-chart-item strong,.pdf-chart-item span { display:block; }
+        .pdf-chart-item strong { margin-top:7px; color:#454a53; font-size:9.5px; }
+        .pdf-chart-item span { margin-top:3px; color:#858b96; font-size:8.5px; }
+        .er-equipment-table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:9.5px; }
+        .er-equipment-table thead { background:#5a5d65; color:#fff; }
+        .er-equipment-table th { padding:6px; text-align:left; }
+        .er-equipment-table th:first-child,.er-equipment-table td:first-child,.er-equipment-table th:last-child,.er-equipment-table td:last-child { text-align:center; }
+        .er-equipment-table th:first-child,.er-equipment-table td:first-child { width:48px; }
+        .er-equipment-table th:last-child,.er-equipment-table td:last-child { width:72px; }
+        .er-equipment-table td { padding:5px 6px; border-bottom:1px solid #eceef1; background:#f8f8f9; }
+        .er-equipment-table tr:nth-child(even) td { background:#fff; }
+        .er-note-box { margin-top:12px; padding:12px; border-left:4px solid #f1ad2f; background:#fff9e8; }
+        .er-note-box strong { color:#3a3e46; font-size:12px; }
+        .er-note-box p { margin:6px 0 0; color:#656b76; font-size:10.5px; line-height:1.55; }
+        .er-commercial-hero { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:12px; }
+        .er-commercial-columns { margin-top:15px; }
+        .er-signoff { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:16px; }
+        .er-signoff>div { display:grid; grid-template-columns:90px 1fr; padding:8px; border-bottom:1px solid #e5e7eb; font-size:10px; }
+        .er-signoff span { color:#7b818d; }
+        .er-signoff strong { color:#3d4149; text-align:right; }
+        .er-final-note { margin-top:18px; padding:14px; border-radius:12px; background:#f7f7f8; color:#5f6570; font-size:11px; line-height:1.6; }
+        .er-page-footer { position:absolute; left:14mm; right:14mm; bottom:9mm; padding-top:7px; border-top:1px solid #e5e7eb; color:#838995; font-size:8.8px; }
+      </style>
+    </div>
+  `;
+};
+
 export default function SakiaraLandingPage() {
   const [activeView, setActiveView] = useState(() =>
     getViewFromPath(
@@ -3336,6 +4189,8 @@ export default function SakiaraLandingPage() {
     message: "",
   });
   const [enterpriseCompany, setEnterpriseCompany] = useState("");
+  const [enterpriseStep, setEnterpriseStep] = useState(1);
+  const [enterpriseInputMode, setEnterpriseInputMode] = useState("combined");
   const [enterpriseProjectType, setEnterpriseProjectType] = useState("bodega");
   const [enterpriseSurfaceType, setEnterpriseSurfaceType] = useState("cubierta");
   const [enterpriseCommercialIntent, setEnterpriseCommercialIntent] = useState("evaluar");
@@ -3343,6 +4198,7 @@ export default function SakiaraLandingPage() {
     useState("1200000");
   const [enterpriseMonthlyConsumptionInput, setEnterpriseMonthlyConsumptionInput] =
     useState("4200");
+  const [enterpriseTargetPowerInput, setEnterpriseTargetPowerInput] = useState("");
   const [enterpriseRegion, setEnterpriseRegion] = useState("metropolitana");
   const [enterpriseCommune, setEnterpriseCommune] = useState("colina");
   const [enterpriseSubmitState, setEnterpriseSubmitState] = useState({
@@ -3416,6 +4272,7 @@ export default function SakiaraLandingPage() {
   const maintenanceMonthlySavings = Number(maintenanceMonthlySavingsInput || 0);
   const enterpriseMonthlyBill = Number(enterpriseMonthlyBillInput || 0);
   const enterpriseMonthlyConsumption = Number(enterpriseMonthlyConsumptionInput || 0);
+  const enterpriseTargetPower = Number(enterpriseTargetPowerInput || 0);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -3995,30 +4852,222 @@ export default function SakiaraLandingPage() {
   ]);
 
   const enterpriseMetrics = useMemo(() => {
+    const billIsActive = enterpriseInputMode !== "consumption";
+    const consumptionIsActive = enterpriseInputMode !== "bill";
+    const inputMonthlyBill = billIsActive ? enterpriseMonthlyBill : 0;
+    const inputMonthlyConsumption = consumptionIsActive
+      ? enterpriseMonthlyConsumption
+      : 0;
     const normalizedMonthlyConsumption =
-      enterpriseMonthlyConsumption > 0
-        ? enterpriseMonthlyConsumption
-        : enterpriseMonthlyBill > 0
-          ? enterpriseMonthlyBill / REFERENCE_TARIFF_CLP_PER_KWH
+      inputMonthlyConsumption > 0
+        ? inputMonthlyConsumption
+        : inputMonthlyBill > 0
+          ? inputMonthlyBill / REFERENCE_TARIFF_CLP_PER_KWH
           : 4200;
+    const monthlyBill =
+      inputMonthlyBill > 0
+        ? inputMonthlyBill
+        : normalizedMonthlyConsumption * REFERENCE_TARIFF_CLP_PER_KWH;
+    const rawDerivedTariff =
+      inputMonthlyBill > 0 && inputMonthlyConsumption > 0
+        ? inputMonthlyBill / Math.max(inputMonthlyConsumption, 1)
+        : REFERENCE_TARIFF_CLP_PER_KWH;
+    const derivedTariff = clamp(rawDerivedTariff, 80, 500);
 
-    const suggestedPowerKw = clamp(
+    const consumptionBasedPowerKw =
       normalizedMonthlyConsumption /
-        Math.max(enterpriseSolarProfile.annual * 0.9, 1),
-      15,
-      500,
+      Math.max(enterpriseSolarProfile.annual * 0.9, 1);
+    const requestedPowerKw =
+      enterpriseTargetPower > 0
+        ? enterpriseTargetPower
+        : consumptionBasedPowerKw;
+    const targetSystemSizeKwp = clamp(
+      requestedPowerKw,
+      ENTERPRISE_SYSTEM_MIN_KWP,
+      ENTERPRISE_SYSTEM_MAX_KWP,
     );
-    const roundedPowerKw = Math.ceil(suggestedPowerKw / 5) * 5;
-    const referenceInvestment = roundedPowerKw * 500000;
-    const annualOffset = normalizedMonthlyConsumption * 12 * 0.72;
-    const annualSavings = annualOffset * REFERENCE_TARIFF_CLP_PER_KWH;
+    const estimatedPanels = Math.max(
+      1,
+      Math.ceil(targetSystemSizeKwp / ENTERPRISE_PANEL_POWER_KW),
+    );
+    const roundedPowerKw = estimatedPanels * ENTERPRISE_PANEL_POWER_KW;
+    const stringPlan = getEnterpriseStringPlan(estimatedPanels);
+    const inverterPlan = getEnterpriseHuaweiInverterPlan(roundedPowerKw);
+    const structurePlan = getEnterpriseStructurePlan(
+      estimatedPanels,
+      enterpriseSurfaceType,
+    );
+    const cablingPlan = getEnterpriseCablingPlan({
+      systemSizeKwp: roundedPowerKw,
+      stringCount: stringPlan.stringCount,
+      inverterCount: inverterPlan.inverterCount,
+    });
+    const acProtectionPlan = getEnterpriseAcProtectionPlan(inverterPlan);
+    const executionPlan = getEnterpriseProjectExecutionPlan({
+      communeConfig: selectedEnterpriseCommune,
+      panelCount: estimatedPanels,
+      systemSizeKwp: roundedPowerKw,
+    });
+    const certificationNet = getEnterpriseCertificationNet(roundedPowerKw);
+    const modulesNet = estimatedPanels * enterpriseProductPricesNet.jinko585Panel;
+    const directNet =
+      modulesNet +
+      inverterPlan.totalNet +
+      structurePlan.totalNet +
+      cablingPlan.totalNet +
+      acProtectionPlan.totalNet +
+      executionPlan.laborNet +
+      executionPlan.logisticsNet +
+      certificationNet;
+    const engineeringNet = Math.max(
+      ENTERPRISE_ENGINEERING_MIN_NET,
+      directNet * ENTERPRISE_ENGINEERING_FACTOR,
+    );
+    const rawTotalNet = directNet + engineeringNet;
+    const commercialFactor =
+      getEnterpriseProjectTypeFactor(enterpriseProjectType) *
+      getEnterpriseSurfaceCommercialFactor(enterpriseSurfaceType);
+    const adjustedTotalNet = rawTotalNet * commercialFactor;
+    const commercialFloorNet =
+      roundedPowerKw * getEnterpriseCommercialFloorNetPerKwp(roundedPowerKw);
+    const totalNet = Math.max(adjustedTotalNet, commercialFloorNet);
+    const marketAdjustmentNet = Math.max(totalNet - rawTotalNet, 0);
+    const vat = totalNet * 0.19;
+    const referenceInvestment = totalNet + vat;
+
+    const monthlyGenerationKWh = roundedPowerKw * enterpriseSolarProfile.annual;
+    const winterGenerationKWh = roundedPowerKw * enterpriseSolarProfile.winter;
+    const summerGenerationKWh = roundedPowerKw * enterpriseSolarProfile.summer;
+    const selfConsumedKWh = Math.min(
+      monthlyGenerationKWh * ENTERPRISE_REFERENCE_SELF_CONSUMPTION_RATE,
+      normalizedMonthlyConsumption,
+    );
+    const exportedKWh = Math.max(monthlyGenerationKWh - selfConsumedKWh, 0);
+    const exportRate = derivedTariff * ENTERPRISE_REFERENCE_EXPORT_RATE_FACTOR;
+    const monthlySavings =
+      selfConsumedKWh * derivedTariff + exportedKWh * exportRate;
+    const annualSavings = monthlySavings * 12;
+    const compensationPercent = clamp(
+      (monthlySavings / Math.max(monthlyBill, 1)) * 100,
+      0,
+      100,
+    );
+    const paybackYears = referenceInvestment / Math.max(annualSavings, 1);
+    const inverterSummary = inverterPlan.items
+      .map((item) => `${item.quantity} × ${item.description}`)
+      .join(" · ");
+
+    const quotationItems = [
+      {
+        description: "MÓDULOS JINKO 585 W",
+        quantity: estimatedPanels,
+        totalNet: modulesNet,
+      },
+      ...inverterPlan.items.map((item) => ({
+        description: item.description.toUpperCase(),
+        quantity: item.quantity,
+        totalNet: item.totalNet,
+      })),
+      {
+        description: structurePlan.typeLabel.toUpperCase(),
+        quantity: 1,
+        totalNet: structurePlan.totalNet,
+      },
+      {
+        description: "CABLEADO CC, CONECTORES Y CANALIZACIÓN",
+        quantity: 1,
+        totalNet: cablingPlan.totalNet,
+      },
+      {
+        description: "TABLEROS, PROTECCIONES Y MONITOREO",
+        quantity: 1,
+        totalNet: acProtectionPlan.totalNet,
+      },
+      {
+        description: "MANO DE OBRA TÉCNICA Y APOYO",
+        quantity: executionPlan.projectCalendarDays,
+        totalNet: executionPlan.laborNet,
+      },
+      {
+        description: executionPlan.isRemoteProject
+          ? "LOGÍSTICA, TRASLADOS Y ALOJAMIENTO"
+          : "LOGÍSTICA Y TRASLADOS",
+        quantity: 1,
+        totalNet: executionPlan.logisticsNet,
+      },
+      {
+        description: "CERTIFICACIÓN SEC Y TRAMITACIÓN",
+        quantity: 1,
+        totalNet: certificationNet,
+      },
+      {
+        description: "INGENIERÍA, COORDINACIÓN Y AJUSTE COMERCIAL",
+        quantity: 1,
+        totalNet: engineeringNet + marketAdjustmentNet,
+      },
+    ]
+      .filter((item) => Number.isFinite(item.totalNet) && item.totalNet > 0)
+      .map((item, index) => ({ ...item, item: index + 1 }));
+
+    const equipmentItems = [
+      { description: "Módulo Jinko 585 W", quantity: estimatedPanels },
+      ...inverterPlan.items.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+      })),
+      { description: structurePlan.typeLabel, quantity: 1 },
+      {
+        description: `Cable solar 6 mm² rojo (${cablingPlan.dcCableMetersPerPolarity} m)`,
+        quantity: cablingPlan.dcCableMetersPerPolarity,
+      },
+      {
+        description: `Cable solar 6 mm² negro (${cablingPlan.dcCableMetersPerPolarity} m)`,
+        quantity: cablingPlan.dcCableMetersPerPolarity,
+      },
+      { description: "Canalización y accesorios CC", quantity: 1 },
+      ...acProtectionPlan.items,
+      { description: "Certificación SEC y tramitación", quantity: 1 },
+    ];
 
     return {
+      monthlyBill,
       monthlyConsumption: normalizedMonthlyConsumption,
-      suggestedPowerKw,
+      suggestedPowerKw: consumptionBasedPowerKw,
+      requestedPowerKw,
       roundedPowerKw,
-      referenceInvestment,
+      estimatedPanels,
+      estimatedSystemSizeKwp: roundedPowerKw,
+      monthlyGenerationKWh,
+      winterGenerationKWh,
+      summerGenerationKWh,
+      annualProductionFactor: enterpriseSolarProfile.annual,
+      winterProductionFactor: enterpriseSolarProfile.winter,
+      summerProductionFactor: enterpriseSolarProfile.summer,
+      selfConsumedKWh,
+      exportedKWh,
+      derivedTariff,
+      monthlySavings,
       annualSavings,
+      compensationPercent,
+      paybackYears,
+      referenceInvestment,
+      totalNet,
+      vat,
+      rawTotalNet,
+      marketAdjustmentNet,
+      commercialFloorNet,
+      commercialNetPerKwp: totalNet / Math.max(roundedPowerKw, 1),
+      modulesNet,
+      inverterPlan,
+      inverterSummary,
+      stringPlan,
+      structurePlan,
+      cablingPlan,
+      acProtectionPlan,
+      certificationNet,
+      executionPlan,
+      quotationItems,
+      equipmentItems,
       locationLabel: `${selectedEnterpriseRegion.label} · ${selectedEnterpriseCommune.label}`,
       locationPrimary: selectedEnterpriseRegion.label,
       locationSecondary: selectedEnterpriseCommune.label,
@@ -4031,16 +5080,20 @@ export default function SakiaraLandingPage() {
       commercialIntentLabel:
         enterpriseCommercialIntentOptions.find((item) => item.value === enterpriseCommercialIntent)?.label ||
         "A definir",
-      referenceText: "Desde $500.000 por kWp",
+      referenceText: `Sistema ${formatNumber(roundedPowerKw, 1)} kWp con ${formatNumber(estimatedPanels)} módulos, ${inverterSummary}`,
     };
   }, [
     enterpriseCommercialIntent,
+    enterpriseInputMode,
     enterpriseMonthlyBill,
     enterpriseMonthlyConsumption,
     enterpriseProjectType,
     enterpriseSolarProfile.annual,
+    enterpriseSolarProfile.summer,
+    enterpriseSolarProfile.winter,
     enterpriseSurfaceType,
-    selectedEnterpriseCommune.label,
+    enterpriseTargetPower,
+    selectedEnterpriseCommune,
     selectedEnterpriseRegion.label,
   ]);
 
@@ -4140,32 +5193,29 @@ export default function SakiaraLandingPage() {
   ];
 
   const getEnterpriseSummaryItems = () => [
-    { label: "Servicio", value: "Evaluación solar para empresas" },
+    { label: "Servicio", value: "Cotización de sistema fotovoltaico para empresas" },
     { label: "Empresa", value: enterpriseCompany || "No informada" },
     { label: "Tipo de proyecto", value: enterpriseMetrics.projectTypeLabel },
     { label: "Superficie", value: enterpriseMetrics.surfaceTypeLabel },
     { label: "Ubicación", value: enterpriseMetrics.locationLabel },
-    {
-      label: "Boleta referencial",
-      value: formatCLP(enterpriseMonthlyBill),
-    },
+    ...(projectAddress.trim()
+      ? [{ label: "Dirección del proyecto", value: projectAddress.trim() }]
+      : []),
+    ...(clientRut.trim() ? [{ label: "RUT", value: clientRut.trim() }] : []),
+    { label: "Boleta referencial", value: formatCLP(enterpriseMetrics.monthlyBill) },
     {
       label: "Consumo mensual estimado",
       value: `${formatNumber(enterpriseMetrics.monthlyConsumption)} kWh/mes`,
     },
     {
-      label: "Potencia preliminar sugerida",
-      value: `${formatNumber(enterpriseMetrics.roundedPowerKw)} kWp`,
+      label: "Sistema propuesto",
+      value: `${formatNumber(enterpriseMetrics.estimatedSystemSizeKwp, 1)} kWp · ${formatNumber(enterpriseMetrics.estimatedPanels)} módulos`,
     },
-    {
-      label: "Referencia comercial",
-      value: enterpriseMetrics.referenceText,
-    },
-    {
-      label: "Interés comercial",
-      value: enterpriseMetrics.commercialIntentLabel,
-    },
-    { label: "Acción solicitada", value: "Agendar visita técnica" },
+    { label: "Inversores", value: enterpriseMetrics.inverterSummary },
+    { label: "Inversión IVA incluido", value: formatCLP(enterpriseMetrics.referenceInvestment) },
+    { label: "Ahorro anual referencial", value: formatCLP(enterpriseMetrics.annualSavings) },
+    { label: "Retorno estimado", value: `${formatNumber(enterpriseMetrics.paybackYears, 1)} años` },
+    { label: "Interés comercial", value: enterpriseMetrics.commercialIntentLabel },
   ];
 
   const getLeadSummaryItems = (leadType) => {
@@ -4176,7 +5226,7 @@ export default function SakiaraLandingPage() {
 
   const getLeadSelectedOption = (leadType) => {
     if (leadType === "mantenimiento") return maintenanceMetrics.status;
-    if (leadType === "empresa") return "Visita técnica comercial";
+    if (leadType === "empresa") return enterpriseMetrics.inverterSummary || "Sistema empresarial";
     return selectedInstallationOfferData?.title || "Pendiente";
   };
 
@@ -4559,6 +5609,182 @@ Mensaje: ${message || "-"}`,
     }
   };
 
+  const handleDownloadEnterpriseQuotation = async () => {
+    if (typeof window === "undefined") return;
+
+    let quotationContainer = null;
+    const quotationDate = new Date();
+    const quoteNumber = buildQuotationNumber({
+      name: enterpriseCompany || name,
+      phone,
+      email,
+      date: quotationDate,
+    });
+    const fileNameBase = sanitizeFileName(
+      `cotizacion-empresa-sakiara-${quoteNumber}-${enterpriseCompany || "empresa"}-${selectedEnterpriseCommune.label}`,
+    );
+
+    try {
+      await loadPdfRuntime();
+      const html2canvasLib = window.html2canvas;
+      const JsPdfCtor = window.jspdf?.jsPDF || window.jsPDF;
+      if (!html2canvasLib || !JsPdfCtor) {
+        throw new Error("No se cargaron correctamente los módulos de exportación PDF.");
+      }
+
+      quotationContainer = document.createElement("div");
+      quotationContainer.style.position = "fixed";
+      quotationContainer.style.left = "-200vw";
+      quotationContainer.style.top = "0";
+      quotationContainer.style.width = "210mm";
+      quotationContainer.style.opacity = "0";
+      quotationContainer.style.pointerEvents = "none";
+      quotationContainer.innerHTML = buildEnterpriseQuotationMarkup({
+        metrics: enterpriseMetrics,
+        regionLabel: selectedEnterpriseRegion.label,
+        communeLabel: selectedEnterpriseCommune.label,
+        name,
+        phone,
+        email,
+        clientRut,
+        projectAddress,
+        enterpriseCompany,
+        quoteNumber,
+        quoteDate: quotationDate,
+      });
+      document.body.appendChild(quotationContainer);
+      await waitForNodeImages(quotationContainer);
+
+      const pageNodes = Array.from(
+        quotationContainer.querySelectorAll(".pdf-export-page"),
+      );
+      if (!pageNodes.length) {
+        throw new Error("No se encontraron páginas de la cotización empresa.");
+      }
+
+      const pdf = new JsPdfCtor({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+        compress: true,
+      });
+      for (let pageIndex = 0; pageIndex < pageNodes.length; pageIndex += 1) {
+        const pageNode = pageNodes[pageIndex];
+        const canvas = await html2canvasLib(pageNode, {
+          scale: 1.65,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          imageTimeout: 15000,
+          windowWidth: pageNode.scrollWidth,
+          windowHeight: pageNode.scrollHeight,
+        });
+        const imageData = canvas.toDataURL("image/jpeg", 0.94);
+        if (pageIndex > 0) pdf.addPage("a4", "portrait");
+        pdf.addImage(imageData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+      }
+      savePdfFile(pdf, `${fileNameBase || "cotizacion-empresa-sakiara"}.pdf`);
+    } catch (error) {
+      console.error(error);
+      const detail =
+        error instanceof Error && error.message
+          ? `\n\nDetalle técnico: ${error.message}`
+          : "";
+      window.alert(
+        `No se pudo generar la cotización empresa PDF en este momento.${detail}`,
+      );
+    } finally {
+      if (quotationContainer?.parentNode) {
+        quotationContainer.parentNode.removeChild(quotationContainer);
+      }
+    }
+  };
+
+  const handleDownloadEnterpriseReport = async () => {
+    if (typeof window === "undefined") return;
+
+    let reportContainer = null;
+    const fileNameBase = sanitizeFileName(
+      `informe-empresa-sakiara-${enterpriseCompany || "empresa"}-${selectedEnterpriseCommune.label}`,
+    );
+
+    try {
+      await loadPdfRuntime();
+      const html2canvasLib = window.html2canvas;
+      const JsPdfCtor = window.jspdf?.jsPDF || window.jsPDF;
+      if (!html2canvasLib || !JsPdfCtor) {
+        throw new Error("No se cargaron correctamente los módulos de exportación PDF.");
+      }
+
+      reportContainer = document.createElement("div");
+      reportContainer.style.position = "fixed";
+      reportContainer.style.left = "-200vw";
+      reportContainer.style.top = "0";
+      reportContainer.style.width = "210mm";
+      reportContainer.style.opacity = "0";
+      reportContainer.style.pointerEvents = "none";
+      reportContainer.innerHTML = buildEnterpriseReportMarkup({
+        metrics: enterpriseMetrics,
+        regionLabel: selectedEnterpriseRegion.label,
+        communeLabel: selectedEnterpriseCommune.label,
+        climateProfile:
+          climateReferenceByRegion[enterpriseRegion] ||
+          climateReferenceByRegion.metropolitana,
+        name,
+        phone,
+        email,
+        enterpriseCompany,
+        projectAddress,
+      });
+      document.body.appendChild(reportContainer);
+      await waitForNodeImages(reportContainer);
+
+      const pageNodes = Array.from(
+        reportContainer.querySelectorAll(".pdf-export-page"),
+      );
+      if (!pageNodes.length) {
+        throw new Error("No se encontraron páginas del informe empresa.");
+      }
+
+      const pdf = new JsPdfCtor({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+        compress: true,
+      });
+      for (let pageIndex = 0; pageIndex < pageNodes.length; pageIndex += 1) {
+        const pageNode = pageNodes[pageIndex];
+        const canvas = await html2canvasLib(pageNode, {
+          scale: 1.45,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          imageTimeout: 15000,
+          windowWidth: pageNode.scrollWidth,
+          windowHeight: pageNode.scrollHeight,
+        });
+        const imageData = canvas.toDataURL("image/jpeg", 0.92);
+        if (pageIndex > 0) pdf.addPage("a4", "portrait");
+        pdf.addImage(imageData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+      }
+      savePdfFile(pdf, `${fileNameBase || "informe-empresa-sakiara"}.pdf`);
+    } catch (error) {
+      console.error(error);
+      const detail =
+        error instanceof Error && error.message
+          ? `\n\nDetalle técnico: ${error.message}`
+          : "";
+      window.alert(
+        `No se pudo generar el informe empresa PDF en este momento.${detail}`,
+      );
+    } finally {
+      if (reportContainer?.parentNode) {
+        reportContainer.parentNode.removeChild(reportContainer);
+      }
+    }
+  };
+
+
   const scrollToSection = (sectionId) => {
     if (typeof document === "undefined") return;
 
@@ -4582,7 +5808,7 @@ Mensaje: ${message || "-"}`,
   };
 
   const floatingQuoteLabel =
-    activeView === "empresas" ? "Agendar visita" : "Cotiza ahora";
+    activeView === "empresas" ? "Cotizar empresa" : "Cotiza ahora";
 
   const installationSteps = [
     { id: 1, title: "Modalidad", description: "Cómo quieres cotizar" },
@@ -4606,6 +5832,14 @@ Mensaje: ${message || "-"}`,
       title: "Contacto",
       description: "Solicita tu propuesta personalizada",
     },
+  ];
+
+  const enterpriseSteps = [
+    { id: 1, title: "Consumo", description: "Boleta, consumo y potencia objetivo" },
+    { id: 2, title: "Ubicación", description: "Lugar y tipo de proyecto" },
+    { id: 3, title: "Equipos", description: "Selección técnica automática" },
+    { id: 4, title: "Resultado", description: "Ahorro, inversión y retorno" },
+    { id: 5, title: "Contacto", description: "Documentos y formalización" },
   ];
 
 
@@ -6090,20 +7324,23 @@ Mensaje: ${message || "-"}`,
         <div className="enterprise-hero-image" aria-hidden="true" />
         <div className="hero-banner-inner subview-hero-inner enterprise-hero-inner">
           <div className="hero-banner-copy subview-hero-copy enterprise-hero-copy">
-            <p className="hero-kicker">Energía solar para empresas</p>
+            <p className="hero-kicker">Cotizador solar para empresas</p>
             <h1 className="hero-banner-title subview-hero-title">
-              Proyectos fotovoltaicos evaluados con visita técnica
+              Construye una propuesta empresarial en cinco pasos
             </h1>
             <p className="hero-banner-text subview-hero-text">
-              En proyectos empresariales priorizamos una lectura seria del consumo, el montaje, el empalme y la ejecución antes de cerrar una propuesta comercial.
+              Ingresa el consumo, revisa la selección automática de equipos y descarga al final una cotización y un informe técnico-comercial.
             </p>
             <div className="cta-row enterprise-hero-actions">
               <button
                 className="btn-primary"
                 type="button"
-                onClick={() => scrollToSection("visita-tecnica-empresas")}
+                onClick={() => {
+                  setEnterpriseStep(1);
+                  scrollToSection("wizard-empresas");
+                }}
               >
-                Agendar visita técnica
+                Comenzar cotización
               </button>
               <button
                 className="btn-secondary hero-secondary-btn"
@@ -6117,95 +7354,377 @@ Mensaje: ${message || "-"}`,
         </div>
       </section>
 
-      <section className="section-card enterprise-intro-card">
-        <div className="section-head">
-          <p className="eyebrow">Línea empresas</p>
-          <h2 className="section-title">
-            Una propuesta pensada para operaciones que necesitan más que un valor rápido
-          </h2>
-          <p className="section-text">
-            Mantenemos la línea comercial de Sakiara, pero en empresas el cierre serio parte con una visita técnica. Eso nos permite revisar distancias, tableros, cubiertas, empalme, crecimiento futuro y el mejor alcance del proyecto.
-          </p>
-        </div>
-
-        <div className="enterprise-stat-grid">
-          <article className="summary-card enterprise-stat-card">
-            <span className="enterprise-stat-kicker">Referencia comercial</span>
-            <strong className="enterprise-stat-value">Desde $500.000 por kWp</strong>
-            <p className="enterprise-stat-text">Valor referencial para proyectos on-grid empresariales. Sujeto a visita técnica, equipos, metrajes, estructura y condiciones de montaje.</p>
-          </article>
-          <article className="summary-card enterprise-stat-card">
-            <span className="enterprise-stat-kicker">Potencia preliminar</span>
-            <strong className="enterprise-stat-value">{formatNumber(enterpriseMetrics.roundedPowerKw)} kWp</strong>
-            <p className="enterprise-stat-text">Lectura inicial en base al consumo ingresado y al perfil solar de la ubicación seleccionada.</p>
-          </article>
-          <article className="summary-card enterprise-stat-card">
-            <span className="enterprise-stat-kicker">Inversión base referencial</span>
-            <strong className="enterprise-stat-value">{formatCLP(enterpriseMetrics.referenceInvestment)}</strong>
-            <p className="enterprise-stat-text">Estimación inicial usando la referencia base de Sakiara para apoyar la conversación comercial.</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="section-card enterprise-showcase-card">
-        <div className="enterprise-showcase-layout">
-          <div className="enterprise-showcase-copy">
-            <p className="eyebrow">Proyecto de referencia</p>
-            <h2 className="section-title">
-              Escala mayor, ejecución ordenada y criterio técnico desde el diseño
-            </h2>
-            <p className="section-text">
-              Para la línea empresas tomamos como referencia proyectos de mayor escala, donde el montaje, la distribución de equipos y la lectura del sitio importan tanto como el valor final del sistema.
-            </p>
-            <div className="final-cta-list enterprise-inline-list">
-              <div>Evaluación técnica antes de cerrar propuesta</div>
-              <div>Net Billing y puesta en marcha ordenada</div>
-              <div>Espacio para crecer sin perder control del proyecto</div>
-            </div>
+      <section className="section-card" id="wizard-empresas">
+        <div className="section-head wizard-section-head compact">
+          <div className="back-row">
+            <button className="btn-secondary" type="button" onClick={() => goToView("home")}>
+              ← Volver al inicio
+            </button>
           </div>
-
-          <div className="enterprise-showcase-media">
-            <img
-              className="enterprise-showcase-image"
-              src="/proyectos/empresa-referencia.jpg"
-              alt="Proyecto fotovoltaico empresarial de referencia Sakiara"
-            />
+          <div className="wizard-topbar">
+            <div className="pill">Cotización para empresas</div>
+            <div className="pill">Paso {enterpriseStep} de 5</div>
           </div>
         </div>
-      </section>
 
-      <section className="section-card">
-        <div className="section-head">
-          <p className="eyebrow">Aplicaciones</p>
-          <h2 className="section-title">
-            Proyectos que pueden calzar con esta línea
-          </h2>
-          <p className="section-text">
-            Esta vista está pensada para clientes que requieren una solución más a medida y no una promesa cerrada antes de revisar el lugar.
-          </p>
-        </div>
-
-        <div className="insight-grid enterprise-use-grid">
-          {enterpriseUseCases.map((item) => (
-            <article key={item.title} className="insight-card enterprise-use-card">
-              <h3 className="insight-title">{item.title}</h3>
-              <p className="insight-text">{item.text}</p>
-            </article>
+        <div className="wizard-progress">
+          {enterpriseSteps.map((step) => (
+            <button
+              key={step.id}
+              className={`wizard-step ${enterpriseStep === step.id ? "active" : ""} ${enterpriseStep > step.id ? "completed" : ""}`}
+              type="button"
+              onClick={() => setEnterpriseStep(step.id)}
+            >
+              <span className="wizard-step-index">{step.id}</span>
+              <span className="wizard-step-copy">
+                <strong>{step.title}</strong>
+                <small>{step.description}</small>
+              </span>
+            </button>
           ))}
+        </div>
+
+        <div className="wizard-panel">
+          {enterpriseStep === 1 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Define el consumo de la empresa</h3>
+                <p className="wizard-text mobile-essential-hide">
+                  Igual que en Hogar, puedes comenzar con la boleta, el consumo o ambos. También puedes indicar una potencia objetivo cuando ya existe una demanda o criterio técnico conocido.
+                </p>
+              </div>
+
+              <div className="mode-card compact-selector-card">
+                <label className="label">¿Cómo quieres calcular?</label>
+                <select
+                  className="select"
+                  value={enterpriseInputMode}
+                  onChange={(event) => setEnterpriseInputMode(event.target.value)}
+                >
+                  {Object.entries(enterpriseInputModeOptions).map(([value, option]) => (
+                    <option key={value} value={value}>{option.label}</option>
+                  ))}
+                </select>
+                <div className="hint">{enterpriseInputModeOptions[enterpriseInputMode].helper}</div>
+              </div>
+
+              <div className="fields-grid wizard-fields">
+                {enterpriseInputMode !== "consumption" && (
+                  <div className="field">
+                    <label className="label">Monto mensual de la cuenta</label>
+                    <input
+                      className="input"
+                      type="text"
+                      inputMode="numeric"
+                      value={enterpriseMonthlyBillInput}
+                      onChange={(event) => setEnterpriseMonthlyBillInput(sanitizeIntegerInput(event.target.value))}
+                      placeholder="Ejemplo: 2878920"
+                    />
+                    <div className="hint">Usa el total del mes actual, sin deuda anterior.</div>
+                  </div>
+                )}
+
+                {enterpriseInputMode !== "bill" && (
+                  <div className="field">
+                    <label className="label">Consumo mensual</label>
+                    <input
+                      className="input"
+                      type="text"
+                      inputMode="numeric"
+                      value={enterpriseMonthlyConsumptionInput}
+                      onChange={(event) => setEnterpriseMonthlyConsumptionInput(sanitizeIntegerInput(event.target.value))}
+                      placeholder="Ejemplo: 19495"
+                    />
+                    <div className="hint">Consumo activo expresado en kWh/mes.</div>
+                  </div>
+                )}
+
+                <div className="field">
+                  <label className="label">Potencia FV objetivo (opcional)</label>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="decimal"
+                    value={enterpriseTargetPowerInput}
+                    onChange={(event) => setEnterpriseTargetPowerInput(sanitizeDecimalInput(event.target.value))}
+                    placeholder="Ejemplo: 40"
+                  />
+                  <div className="hint">Déjalo vacío para que la web dimensione desde el consumo.</div>
+                </div>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard label="Consumo usado" value={`${formatNumber(enterpriseMetrics.monthlyConsumption)} kWh/mes`} sub="Base del cálculo" />
+                <SummaryCard label="Tarifa calculada" value={`${formatCLP(enterpriseMetrics.derivedTariff)}/kWh`} sub="Acotada a un rango razonable" />
+                <SummaryCard label="Potencia preliminar" value={`${formatNumber(enterpriseMetrics.estimatedSystemSizeKwp, 1)} kWp`} sub={`${formatNumber(enterpriseMetrics.estimatedPanels)} módulos`} />
+              </div>
+            </>
+          )}
+
+          {enterpriseStep === 2 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Ubicación y condiciones generales</h3>
+                <p className="wizard-text mobile-essential-hide">
+                  La comuna modifica la generación y la logística. El tipo de superficie cambia la estructura y los materiales considerados.
+                </p>
+              </div>
+
+              <div className="fields-grid wizard-fields">
+                <div className="field">
+                  <label className="label">Región</label>
+                  <select
+                    className="select"
+                    value={enterpriseRegion}
+                    onChange={(event) => {
+                      const nextRegion = event.target.value;
+                      setEnterpriseRegion(nextRegion);
+                      const nextCommune = Object.keys(maintenanceRegionData[nextRegion]?.communes || {})[0] || "colina";
+                      setEnterpriseCommune(nextCommune);
+                    }}
+                  >
+                    {maintenanceRegionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label className="label">Comuna</label>
+                  <select className="select" value={enterpriseCommune} onChange={(event) => setEnterpriseCommune(event.target.value)}>
+                    {enterpriseCommuneOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label className="label">Tipo de proyecto</label>
+                  <select className="select" value={enterpriseProjectType} onChange={(event) => setEnterpriseProjectType(event.target.value)}>
+                    {enterpriseProjectTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label className="label">Superficie de instalación</label>
+                  <select className="select" value={enterpriseSurfaceType} onChange={(event) => setEnterpriseSurfaceType(event.target.value)}>
+                    {enterpriseSurfaceTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label className="label">Interés comercial</label>
+                  <select className="select" value={enterpriseCommercialIntent} onChange={(event) => setEnterpriseCommercialIntent(event.target.value)}>
+                    {enterpriseCommercialIntentOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard label="Ubicación" value={selectedEnterpriseCommune.label} sub={selectedEnterpriseRegion.label} />
+                <SummaryCard label="Montaje" value={enterpriseMetrics.structurePlan.typeLabel} sub={`${formatNumber(enterpriseMetrics.structurePlan.requiredAreaM2)} m² estimados`} />
+                <SummaryCard label="Ejecución" value={`${formatNumber(enterpriseMetrics.executionPlan.projectCalendarDays)} días`} sub={enterpriseMetrics.executionPlan.isRemoteProject ? "Incluye alojamiento" : "Sin alojamiento"} />
+              </div>
+            </>
+          )}
+
+          {enterpriseStep === 3 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Equipamiento seleccionado automáticamente</h3>
+                <p className="wizard-text mobile-essential-hide">
+                  La web diferencia equipos según la potencia y la superficie, usando módulos Jinko, inversores Huawei empresariales, estructura, cableado, protecciones y monitoreo.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard label="Generador FV" value={`${formatNumber(enterpriseMetrics.estimatedSystemSizeKwp, 1)} kWp`} sub={`${formatNumber(enterpriseMetrics.estimatedPanels)} módulos Jinko 585 W`} />
+                <SummaryCard label="Inversores" value={`${formatNumber(enterpriseMetrics.inverterPlan.totalAcKw)} kW AC`} sub={`${formatNumber(enterpriseMetrics.inverterPlan.inverterCount)} equipo(s)`} />
+                <SummaryCard label="Strings" value={formatNumber(enterpriseMetrics.stringPlan.stringCount)} sub={`Hasta ${formatNumber(ENTERPRISE_STRING_PANEL_COUNT)} módulos por string`} />
+                <SummaryCard label="Relación DC/AC" value={formatNumber(enterpriseMetrics.inverterPlan.dcAcRatio, 2)} sub="Objetivo técnico referencial" />
+              </div>
+
+              <div className="solution-grid enterprise-equipment-grid">
+                {enterpriseMetrics.equipmentItems.map((item, index) => (
+                  <article key={`${item.description}-${index}`} className="solution-card">
+                    <div className="solution-topline">
+                      <span className="offer-badge">Item {index + 1}</span>
+                    </div>
+                    <h3 className="solution-title">{item.description}</h3>
+                    <p className="solution-text">Cantidad considerada: {formatNumber(item.quantity)}</p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="mode-note">
+                <strong>Inversores seleccionados:</strong> {enterpriseMetrics.inverterSummary}. La protección AC definitiva se valida con tensión, corriente, empalme y selectividad en terreno.
+              </div>
+            </>
+          )}
+
+          {enterpriseStep === 4 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Resultado técnico y económico</h3>
+                <p className="wizard-text mobile-essential-hide">
+                  Revisa el sistema propuesto antes de completar los datos finales. Desde aquí ya puedes descargar el informe preliminar.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard label="Inversión estimada" value={formatCLP(enterpriseMetrics.referenceInvestment)} sub="IVA incluido" />
+                <SummaryCard label="Ahorro mensual" value={formatCLP(enterpriseMetrics.monthlySavings)} sub={`${formatNumber(enterpriseMetrics.compensationPercent)}% de la cuenta`} />
+                <SummaryCard label="Ahorro anual" value={formatCLP(enterpriseMetrics.annualSavings)} sub="Autoconsumo + inyección" />
+                <SummaryCard label="Retorno" value={`${formatNumber(enterpriseMetrics.paybackYears, 1)} años`} sub="Estimación simple" />
+              </div>
+
+              <div className="analysis-grid">
+                <article className="analysis-card">
+                  <span className="summary-kicker">Invierno</span>
+                  <strong>{formatNumber(enterpriseMetrics.winterGenerationKWh)} kWh/mes</strong>
+                  <p>Producción mensual referencial para el periodo de menor recurso solar.</p>
+                </article>
+                <article className="analysis-card">
+                  <span className="summary-kicker">Promedio</span>
+                  <strong>{formatNumber(enterpriseMetrics.monthlyGenerationKWh)} kWh/mes</strong>
+                  <p>Generación mensual utilizada para el balance económico.</p>
+                </article>
+                <article className="analysis-card">
+                  <span className="summary-kicker">Verano</span>
+                  <strong>{formatNumber(enterpriseMetrics.summerGenerationKWh)} kWh/mes</strong>
+                  <p>Producción mensual referencial para el periodo de mayor recurso solar.</p>
+                </article>
+              </div>
+
+              <div className="contact-actions wizard-actions">
+                <button className="wa-btn" type="button" onClick={handleDownloadEnterpriseReport}>
+                  Descargar informe PDF
+                </button>
+                <button className="wa-btn" type="button" onClick={() => setEnterpriseStep(5)}>
+                  Completar datos y cotización
+                </button>
+              </div>
+            </>
+          )}
+
+          {enterpriseStep === 5 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Formaliza la propuesta</h3>
+                <p className="wizard-text mobile-essential-hide">
+                  Completa los datos para que la cotización y el informe queden identificados. Los documentos muestran el itemizado sin la columna de valores netos y solo entregan el total comercial.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard label="Sistema" value={`${formatNumber(enterpriseMetrics.estimatedSystemSizeKwp, 1)} kWp`} sub={`${formatNumber(enterpriseMetrics.estimatedPanels)} módulos`} />
+                <SummaryCard label="Inversores" value={`${formatNumber(enterpriseMetrics.inverterPlan.totalAcKw)} kW`} sub={enterpriseMetrics.inverterSummary} />
+                <SummaryCard label="Inversión" value={formatCLP(enterpriseMetrics.referenceInvestment)} sub="IVA incluido" />
+              </div>
+
+              <form className="wizard-contact-form" onSubmit={(event) => handleLeadSubmit(event, "empresa")}>
+                <div className="contact-grid">
+                  <div className="contact-box">
+                    <label className="label">Empresa</label>
+                    <input className="input" name="empresa" value={enterpriseCompany} onChange={(event) => setEnterpriseCompany(event.target.value)} placeholder="Razón social o nombre comercial" required />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Nombre de contacto</label>
+                    <input className="input" name="nombre" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nombre y apellido" required />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Teléfono</label>
+                    <input className="input" name="telefono" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+56..." required />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Correo</label>
+                    <input className="input" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="correo@empresa.cl" required />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">RUT</label>
+                    <input className="input" name="rut" value={clientRut} onChange={(event) => setClientRut(event.target.value)} placeholder="76.123.456-7" />
+                  </div>
+                  <div className="contact-box">
+                    <label className="label">Dirección del proyecto</label>
+                    <input className="input" name="direccion_proyecto" value={projectAddress} onChange={(event) => setProjectAddress(event.target.value)} placeholder="Calle, número y comuna" />
+                  </div>
+                  <div className="contact-box contact-box-wide">
+                    <label className="label">Comentario</label>
+                    <textarea className="textarea" name="mensaje" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Indica demanda máxima, empalme, horarios, respaldo, restricciones o cualquier antecedente útil." />
+                  </div>
+                </div>
+
+                <div className="contact-grid attachments-grid">
+                  <div className="contact-box attachment-box">
+                    <label className="label">Adjunto 1</label>
+                    <input className="input file-input" type="file" name="adjunto_1" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx" />
+                    <div className="hint">Boleta, diagrama, layout o fotos.</div>
+                  </div>
+                  <div className="contact-box attachment-box">
+                    <label className="label">Adjunto 2</label>
+                    <input className="input file-input" type="file" name="adjunto_2" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx" />
+                    <div className="hint">Hasta 25 MB por archivo.</div>
+                  </div>
+                </div>
+
+                <div className="contact-actions wizard-actions">
+                  <button className="full-btn" type="submit" disabled={enterpriseSubmitState.loading}>
+                    {enterpriseSubmitState.loading ? "Enviando solicitud..." : "Solicitar revisión técnica"}
+                  </button>
+                  <button className="wa-btn" type="button" onClick={handleWhatsApp} disabled={enterpriseSubmitState.loading}>
+                    Hablar por WhatsApp
+                  </button>
+                  <button className="wa-btn" type="button" onClick={handleDownloadEnterpriseQuotation} disabled={enterpriseSubmitState.loading}>
+                    Descargar cotización
+                  </button>
+                  <button className="wa-btn" type="button" onClick={handleDownloadEnterpriseReport} disabled={enterpriseSubmitState.loading}>
+                    Descargar informe PDF
+                  </button>
+                </div>
+
+                {enterpriseSubmitState.message && (
+                  <div className={`submit-feedback ${enterpriseSubmitState.tone}`}>
+                    {enterpriseSubmitState.message}
+                  </div>
+                )}
+              </form>
+            </>
+          )}
+        </div>
+
+        <div className="wizard-nav">
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={() => setEnterpriseStep((current) => Math.max(1, current - 1))}
+            disabled={enterpriseStep === 1}
+          >
+            Atrás
+          </button>
+          {enterpriseStep < enterpriseSteps.length ? (
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={() => setEnterpriseStep((current) => Math.min(enterpriseSteps.length, current + 1))}
+            >
+              Siguiente
+            </button>
+          ) : null}
         </div>
       </section>
 
       <section className="section-card enterprise-evaluation-card">
         <div className="section-head">
-          <p className="eyebrow">Qué revisamos en terreno</p>
-          <h2 className="section-title">
-            La visita técnica es parte de la propuesta, no un paso decorativo
-          </h2>
-          <p className="section-text">
-            Antes de formalizar una oferta revisamos los factores que realmente mueven el costo y la calidad del proyecto.
-          </p>
+          <p className="eyebrow">Validación profesional</p>
+          <h2 className="section-title">El documento se descarga al instante; la ingeniería se confirma en terreno</h2>
+          <p className="section-text">El wizard entrega una base formal y trazable. Antes de ejecutar, Sakiara revisa empalme, estructura, recorridos, tableros, protecciones, sombras y condiciones de acceso.</p>
         </div>
-
         <div className="enterprise-check-grid">
           {enterpriseEvaluationPoints.map((item) => (
             <article key={item} className="enterprise-check-card">
@@ -6213,291 +7732,6 @@ Mensaje: ${message || "-"}`,
               <p className="enterprise-check-text">{item}</p>
             </article>
           ))}
-        </div>
-      </section>
-
-      <section className="section-card emphasis-card">
-        <div className="section-head">
-          <p className="eyebrow">Cómo trabajamos</p>
-          <h2 className="section-title">
-            Un proceso simple para avanzar con orden y criterio comercial
-          </h2>
-          <p className="section-text">
-            La idea es que la empresa entienda rápido si vale la pena avanzar y que el cierre técnico ocurra con información real del lugar.
-          </p>
-        </div>
-
-        <div className="process-grid enterprise-process-grid">
-          {enterpriseProcessSteps.map((item) => (
-            <article key={item.step} className="process-card">
-              <div className="process-step-number">{item.step}</div>
-              <h3 className="process-title">{item.title}</h3>
-              <p className="process-text">{item.text}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="section-card enterprise-visit-card" id="visita-tecnica-empresas">
-        <div className="enterprise-visit-layout">
-          <div>
-            <div className="section-head wizard-section-head compact">
-              <div>
-                <p className="eyebrow">Agenda visita técnica</p>
-                <h2 className="section-title">
-                  Cuéntanos lo básico y coordinamos la evaluación del proyecto
-                </h2>
-                <p className="section-text">
-                  Este formulario está pensado como paso comercial inicial para proyectos empresa. Mientras mejor sea el punto de partida, más útil será la visita y la propuesta posterior.
-                </p>
-              </div>
-            </div>
-
-            <form
-              className="wizard-contact-form"
-              onSubmit={(event) => handleLeadSubmit(event, "empresa")}
-            >
-              <div className="fields-grid enterprise-form-grid">
-                <label className="field">
-                  <span className="label">Empresa</span>
-                  <input
-                    className="input"
-                    type="text"
-                    value={enterpriseCompany}
-                    onChange={(event) => setEnterpriseCompany(event.target.value)}
-                    placeholder="Nombre de la empresa"
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">Nombre de contacto</span>
-                  <input
-                    className="input"
-                    type="text"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Nombre y cargo"
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">Teléfono</span>
-                  <input
-                    className="input"
-                    type="tel"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    placeholder="+56 9 ..."
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">Correo</span>
-                  <input
-                    className="input"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="correo@empresa.cl"
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">Tipo de proyecto</span>
-                  <select
-                    className="select"
-                    value={enterpriseProjectType}
-                    onChange={(event) => setEnterpriseProjectType(event.target.value)}
-                  >
-                    {enterpriseProjectTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span className="label">Superficie disponible</span>
-                  <select
-                    className="select"
-                    value={enterpriseSurfaceType}
-                    onChange={(event) => setEnterpriseSurfaceType(event.target.value)}
-                  >
-                    {enterpriseSurfaceTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span className="label">Región</span>
-                  <select
-                    className="select"
-                    value={enterpriseRegion}
-                    onChange={(event) => {
-                      const nextRegion = event.target.value;
-                      setEnterpriseRegion(nextRegion);
-                      const nextCommune =
-                        Object.keys(
-                          maintenanceRegionData[nextRegion]?.communes || {},
-                        )[0] || "colina";
-                      setEnterpriseCommune(nextCommune);
-                    }}
-                  >
-                    {maintenanceRegionOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span className="label">Comuna</span>
-                  <select
-                    className="select"
-                    value={enterpriseCommune}
-                    onChange={(event) => setEnterpriseCommune(event.target.value)}
-                  >
-                    {enterpriseCommuneOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span className="label">Boleta mensual referencial</span>
-                  <input
-                    className="input"
-                    type="text"
-                    inputMode="numeric"
-                    value={enterpriseMonthlyBillInput}
-                    onChange={(event) => setEnterpriseMonthlyBillInput(sanitizeIntegerInput(event.target.value))}
-                    placeholder="1200000"
-                  />
-                  <span className="hint">Puedes usar una cifra aproximada para iniciar la evaluación.</span>
-                </label>
-
-                <label className="field">
-                  <span className="label">Consumo mensual estimado</span>
-                  <input
-                    className="input"
-                    type="text"
-                    inputMode="numeric"
-                    value={enterpriseMonthlyConsumptionInput}
-                    onChange={(event) => setEnterpriseMonthlyConsumptionInput(sanitizeIntegerInput(event.target.value))}
-                    placeholder="4200"
-                  />
-                  <span className="hint">Si lo conoces, este dato nos ayuda a orientar mejor la potencia preliminar.</span>
-                </label>
-
-                <label className="field">
-                  <span className="label">Interés comercial</span>
-                  <select
-                    className="select"
-                    value={enterpriseCommercialIntent}
-                    onChange={(event) => setEnterpriseCommercialIntent(event.target.value)}
-                  >
-                    {enterpriseCommercialIntentOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field field-full">
-                  <span className="label">Comentario inicial</span>
-                  <textarea
-                    className="textarea"
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    placeholder="Cuéntanos si ya tienen medidor trifásico, tipo de cubierta, restricciones de horario, necesidad de respaldo u otro dato útil."
-                  />
-                </label>
-
-                <label className="field attachment-box">
-                  <span className="label">Adjunto opcional 1</span>
-                  <input className="input file-input" type="file" name="adjunto_1" />
-                  <span className="hint">Cuenta eléctrica, layout o foto general del lugar.</span>
-                </label>
-
-                <label className="field attachment-box">
-                  <span className="label">Adjunto opcional 2</span>
-                  <input className="input file-input" type="file" name="adjunto_2" />
-                  <span className="hint">Imagen adicional, plano o documento complementario.</span>
-                </label>
-              </div>
-
-              <div className="contact-actions wizard-actions enterprise-actions">
-                <button
-                  className="btn-primary"
-                  type="submit"
-                  disabled={enterpriseSubmitState.loading}
-                >
-                  {enterpriseSubmitState.loading
-                    ? "Enviando solicitud..."
-                    : "Solicitar visita técnica"}
-                </button>
-                <button
-                  className="btn-secondary"
-                  type="button"
-                  onClick={handleWhatsApp}
-                >
-                  Coordinar por WhatsApp
-                </button>
-              </div>
-
-              {enterpriseSubmitState.message && (
-                <div className={`submit-feedback ${enterpriseSubmitState.tone}`}>
-                  {enterpriseSubmitState.message}
-                </div>
-              )}
-            </form>
-          </div>
-
-          <aside className="mode-card wizard-highlight-card enterprise-summary-box">
-            <div className="wizard-contact-copy">
-              <div className="offer-badge">Lectura preliminar</div>
-              <h3>Base comercial para la visita</h3>
-              <p>
-                Esta referencia no reemplaza la visita técnica. Solo ordena la conversación comercial con una primera lectura del consumo y la potencia sugerida.
-              </p>
-            </div>
-
-            <div className="summary-grid enterprise-summary-grid">
-              <article className="summary-card enterprise-summary-card enterprise-summary-card-location">
-                <span className="summary-kicker">Ubicación</span>
-                <strong className="enterprise-summary-main">{enterpriseMetrics.locationPrimary}</strong>
-                <span className="enterprise-summary-subline">{enterpriseMetrics.locationSecondary}</span>
-              </article>
-              <article className="summary-card enterprise-summary-card">
-                <span className="summary-kicker">Potencia sugerida</span>
-                <strong className="enterprise-summary-main">{formatNumber(enterpriseMetrics.roundedPowerKw)} kWp</strong>
-              </article>
-              <article className="summary-card enterprise-summary-card">
-                <span className="summary-kicker">Inversión base</span>
-                <strong className="enterprise-summary-main">{formatCLP(enterpriseMetrics.referenceInvestment)}</strong>
-              </article>
-              <article className="summary-card enterprise-summary-card">
-                <span className="summary-kicker">Ahorro anual referencial</span>
-                <strong className="enterprise-summary-main">{formatCLP(enterpriseMetrics.annualSavings)}</strong>
-              </article>
-            </div>
-
-            <div className="mode-note enterprise-note">
-              <strong>Referencia base:</strong> {enterpriseMetrics.referenceText}. El valor final depende de la visita técnica, potencia definitiva, equipamiento, metrajes, estructura, empalme y condiciones de montaje.
-            </div>
-          </aside>
         </div>
       </section>
     </>
