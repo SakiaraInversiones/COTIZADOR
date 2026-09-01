@@ -2161,7 +2161,7 @@ function OfferCard({
       {(!collapsible || isOpen) && (
         <>
           <div className="price-box">
-            <div className="price-label">Valor total IVA incluido</div>
+            <div className="price-label">Precio preferencial contado · IVA incluido</div>
             <div className="price-value">{price}</div>
           </div>
 
@@ -2429,7 +2429,46 @@ const buildReportBarChartMarkup = ({
   `;
 };
 
-const getInstallationQuotationItems = (metrics, selectedOffer) => {
+const INSTALLATION_CARD_PRICE_FACTOR = 1.0195332372933024;
+const INSTALLATION_CARD_FIXED_ADJUSTMENT_CLP = 89.26466448690459;
+const INSTALLATION_CARD_INSTALLMENT_OPTIONS = [12, 18, 24, 36];
+
+const getInstallationCardPrice = (cashPrice = 0) => {
+  const safeCashPrice = Math.max(Number(cashPrice) || 0, 0);
+  if (!safeCashPrice) return 0;
+
+  return (
+    safeCashPrice * INSTALLATION_CARD_PRICE_FACTOR +
+    INSTALLATION_CARD_FIXED_ADJUSTMENT_CLP
+  );
+};
+
+const getRecommendedInstallationInstallments = (
+  cardPrice = 0,
+  monthlyBill = 0,
+) => {
+  const safeCardPrice = Math.max(Number(cardPrice) || 0, 0);
+  const safeMonthlyBill = Math.max(Number(monthlyBill) || 0, 0);
+
+  if (!safeCardPrice || !safeMonthlyBill) {
+    return INSTALLATION_CARD_INSTALLMENT_OPTIONS[1];
+  }
+
+  return (
+    INSTALLATION_CARD_INSTALLMENT_OPTIONS.find(
+      (installments) => safeCardPrice / installments <= safeMonthlyBill,
+    ) ||
+    INSTALLATION_CARD_INSTALLMENT_OPTIONS[
+      INSTALLATION_CARD_INSTALLMENT_OPTIONS.length - 1
+    ]
+  );
+};
+
+const getInstallationQuotationItems = (
+  metrics,
+  selectedOffer,
+  paymentSelection = null,
+) => {
   const costs = metrics.quotationCosts || {};
   const selectedKey = selectedOffer?.key || "huaweiNoBattery";
   const normalizedSelectedKey = selectedKey.toLowerCase();
@@ -2478,6 +2517,11 @@ const getInstallationQuotationItems = (metrics, selectedOffer) => {
       quantity: 1,
       totalNet: costs.certSecNet,
     },
+    {
+      description: "SEÑALÉTICAS",
+      quantity: 1,
+      totalNet: costs.signageNet,
+    },
   ];
 
   if (isHuawei && costs.huaweiSmartPowerSensorNet > 0) {
@@ -2490,7 +2534,9 @@ const getInstallationQuotationItems = (metrics, selectedOffer) => {
 
   if (includesBattery) {
     rows.push({
-      description: isHuawei ? "SISTEMA DE BATERÍA HUAWEI LUNA" : "SISTEMA DE BATERÍA SOLIS / DYNESS",
+      description: isHuawei
+        ? "SISTEMA DE BATERÍA HUAWEI LUNA"
+        : "SISTEMA DE BATERÍA SOLIS / DYNESS",
       quantity: 1,
       totalNet: isHuawei ? costs.huaweiBatteryPackNet : costs.solisBatteryPackNet,
     });
@@ -2502,9 +2548,22 @@ const getInstallationQuotationItems = (metrics, selectedOffer) => {
     totalNet: costs.structureNet,
   });
 
-  return rows
-    .filter((row) => Number.isFinite(row.totalNet) && row.totalNet > 0)
-    .map((row, index) => ({ ...row, item: index + 1 }));
+  const baseRows = rows.filter(
+    (row) => Number.isFinite(row.totalNet) && row.totalNet > 0,
+  );
+  const baseNet = baseRows.reduce((sum, row) => sum + row.totalNet, 0);
+  const targetGross = Math.max(
+    Number(paymentSelection?.finalPrice) || baseNet * 1.19,
+    0,
+  );
+  const targetNet = targetGross / 1.19;
+  const priceScale = baseNet > 0 ? targetNet / baseNet : 1;
+
+  return baseRows.map((row, index) => ({
+    ...row,
+    item: index + 1,
+    totalNet: row.totalNet * priceScale,
+  }));
 };
 
 const buildInstallationQuotationMarkup = ({
@@ -2520,9 +2579,14 @@ const buildInstallationQuotationMarkup = ({
   projectAddress,
   quoteNumber,
   quoteDate,
+  paymentSelection,
 }) => {
   const validDays = 15;
-  const quotationItems = getInstallationQuotationItems(metrics, selectedOffer);
+  const quotationItems = getInstallationQuotationItems(
+    metrics,
+    selectedOffer,
+    paymentSelection,
+  );
   const totalNet = quotationItems.reduce((sum, row) => sum + row.totalNet, 0);
   const vat = totalNet * 0.19;
   const total = totalNet + vat;
@@ -2534,7 +2598,29 @@ const buildInstallationQuotationMarkup = ({
   const safeRut = clientRut?.trim() || "Por completar";
   const safePhone = phone?.trim() || "Por completar";
   const safeEmail = email?.trim() || "Por completar";
-  const selectedInverterLabel = quotationItems.find((row) => row.description.startsWith("INVERSOR"))?.description || "INVERSOR HÍBRIDO 8 KW";
+  const selectedInverterLabel =
+    quotationItems.find((row) => row.description.startsWith("INVERSOR"))
+      ?.description || "INVERSOR HÍBRIDO 8 KW";
+  const isCardPayment = paymentSelection?.method === "card";
+  const paymentMethodLabel = isCardPayment
+    ? "Tarjeta de crédito"
+    : "Precio preferencial contado";
+  const paymentPaybackLabel =
+    paymentSelection?.paybackLabel || selectedOffer?.payback || "Referencial";
+  const paymentRowsMarkup = isCardPayment
+    ? `
+        <span>Método de pago</span><strong>Tarjeta de crédito</strong>
+        <span>Precio con tarjeta</span><strong>${escapeHtml(formatCLP(total))}</strong>
+        <span>Cuotas simuladas</span><strong>${escapeHtml(formatNumber(paymentSelection?.installments || 0))}</strong>
+        <span>Cuota base referencial</span><strong>${escapeHtml(formatCLP(paymentSelection?.installmentAmount || 0))}</strong>
+        <span>Condiciones financieras</span><strong>Según banco emisor</strong>
+      `
+    : `
+        <span>Método de pago</span><strong>Transferencia / contado</strong>
+        <span>Precio preferencial</span><strong>${escapeHtml(formatCLP(total))}</strong>
+        <span>Equipos e insumos</span><strong>Pago inicial</strong>
+        <span>Mano de obra</span><strong>Pago posterior según ejecución</strong>
+      `;
 
   const rowsMarkup = quotationItems
     .map(
@@ -2609,7 +2695,7 @@ const buildInstallationQuotationMarkup = ({
           </div>
           <div>
             <span>Retorno</span>
-            <strong>${escapeHtml(selectedOffer?.payback || "Referencial")}</strong>
+            <strong>${escapeHtml(paymentPaybackLabel)}</strong>
             <small>${escapeHtml(profileLabel)}</small>
           </div>
         </section>
@@ -2637,17 +2723,17 @@ const buildInstallationQuotationMarkup = ({
               <li>Garantía de construcción: 1 año desde la puesta en marcha.</li>
               <li>Garantías de equipos sujetas a fabricante y plan de mantenimiento.</li>
               <li>Valores referenciales IVA incluido, sujetos a visita técnica y validación final.</li>
+              ${
+                isCardPayment
+                  ? "<li>Las cuotas, intereses y condiciones finales dependen del banco emisor y de la tarjeta del cliente.</li>"
+                  : "<li>El precio contado corresponde a la alternativa de menor valor del proyecto.</li>"
+              }
             </ul>
           </div>
           <div class="quote-payment">
-            <div class="quote-bottom-title">Pago / Transferencia</div>
+            <div class="quote-bottom-title">${escapeHtml(paymentMethodLabel)}</div>
             <div class="quote-payment-grid">
-              <span>Método de pago</span><strong>Mercado Pago</strong>
-              <span>Nombre</span><strong>SAKIARA INVERSIONES SPA</strong>
-              <span>RUT</span><strong>77.703.296-8</strong>
-              <span>Cuenta</span><strong>Cuenta Vista</strong>
-              <span>N°</span><strong>1027338538</strong>
-              <span>Correo</span><strong>e.renovablesparatodos@gmail.com</strong>
+              ${paymentRowsMarkup}
             </div>
           </div>
         </section>
@@ -2966,6 +3052,7 @@ const buildInstallationReportMarkup = ({
   name,
   phone,
   email,
+  paymentSelection,
 }) => {
   const generatedDate = new Intl.DateTimeFormat("es-CL", {
     dateStyle: "long",
@@ -2979,10 +3066,23 @@ const buildInstallationReportMarkup = ({
   const highlightedOfferLabel = selectedOffer
     ? selectedOffer.title
     : "Comparativo de alternativas";
+  const isCardPayment = paymentSelection?.method === "card";
+  const paymentSummaryLabel = isCardPayment
+    ? `Tarjeta de crédito · ${formatNumber(paymentSelection?.installments || 0)} cuotas`
+    : "Precio preferencial contado";
+  const paymentSummaryDetail = isCardPayment
+    ? `Cuota base referencial ${formatCLP(paymentSelection?.installmentAmount || 0)}. Interés y condiciones finales según banco emisor.`
+    : "Pago de equipos e insumos al inicio y mano de obra posteriormente según ejecución.";
 
   const alternativesMarkup = offers
-    .map(
-      (offer) => `
+    .map((offer) => {
+      const offerCommercialPrice = isCardPayment
+        ? getInstallationCardPrice(offer.priceValue)
+        : offer.priceValue;
+      const offerPaybackYears =
+        offerCommercialPrice / Math.max(offer.annualSavingsValue || 0, 1);
+
+      return `
         <article class="pdf-offer-card${
           selectedOffer?.key === offer.key ? " is-selected" : ""
         }">
@@ -2999,15 +3099,15 @@ const buildInstallationReportMarkup = ({
             }
           </div>
           <div class="pdf-offer-grid">
-            <div><span>Valor</span><strong>${escapeHtml(offer.price)}</strong></div>
+            <div><span>${isCardPayment ? "Precio tarjeta" : "Precio contado"}</span><strong>${escapeHtml(formatCLP(offerCommercialPrice))}</strong></div>
             <div><span>Ahorro</span><strong>${escapeHtml(offer.savings)}</strong></div>
             <div><span>Invierno</span><strong>${escapeHtml(offer.winterCompensation)}</strong></div>
             <div><span>Verano</span><strong>${escapeHtml(offer.summerCompensation)}</strong></div>
-            <div><span>Retorno</span><strong>${escapeHtml(offer.payback)}</strong></div>
+            <div><span>Retorno</span><strong>${escapeHtml(`${formatNumber(offerPaybackYears, 1)} años`)}</strong></div>
           </div>
         </article>
-      `,
-    )
+      `;
+    })
     .join("");
 
   const generationChart = buildReportBarChartMarkup({
@@ -3077,7 +3177,7 @@ const buildInstallationReportMarkup = ({
           <article class="pdf-card pdf-card--cover">
             <span>Alternativa destacada</span>
             <strong>${escapeHtml(highlightedOfferLabel)}</strong>
-            <small>${escapeHtml(selectedOffer ? "Alternativa seleccionada" : "Comparativo listo para revisar")}</small>
+            <small>${escapeHtml(selectedOffer ? paymentSummaryLabel : "Comparativo listo para revisar")}</small>
           </article>
           <article class="pdf-card pdf-card--cover">
             <span>Invierno</span>
@@ -3144,7 +3244,7 @@ const buildInstallationReportMarkup = ({
           <article class="pdf-card">
             <span>Alternativa destacada</span>
             <strong>${escapeHtml(highlightedOfferLabel)}</strong>
-            <small>${escapeHtml(metrics.coverageObjectiveLabel)}</small>
+            <small>${escapeHtml(`${paymentSummaryLabel} · ${metrics.coverageObjectiveLabel}`)}</small>
           </article>
         </section>
 
@@ -3281,6 +3381,9 @@ const buildInstallationReportMarkup = ({
           <div class="pdf-note-grid">
             <div class="pdf-note">
               <strong>Perfil del hogar:</strong> ${escapeHtml(profileLabel)}. ${escapeHtml(profileDescription)}
+            </div>
+            <div class="pdf-note">
+              <strong>Forma de pago evaluada:</strong> ${escapeHtml(paymentSummaryLabel)}. ${escapeHtml(paymentSummaryDetail)}
             </div>
             <div class="pdf-note">
               <strong>Nota técnica:</strong> ${escapeHtml(metrics.projectExecutionNote)}
@@ -4162,6 +4265,10 @@ export default function SakiaraLandingPage() {
     useState("huaweiNoBattery");
   const [selectedInstallationOffer, setSelectedInstallationOffer] =
     useState("");
+  const [installationPaymentMethod, setInstallationPaymentMethod] =
+    useState("cash");
+  const [installationInstallments, setInstallationInstallments] =
+    useState(24);
   const [profile, setProfile] = useState("outside");
 
   const [maintenanceSystemSizeInput, setMaintenanceSystemSizeInput] =
@@ -4322,17 +4429,21 @@ export default function SakiaraLandingPage() {
   const installationMetrics = useMemo(() => {
     const vatMultiplier = 1.19;
 
-    const moduleSellPerPanel = 79610.79168509509;
-    const huaweiInverterNet = 823740.8226448474;
-    const solisInverterNet = 1318842.105263158;
+    // Valores sincronizados con la planilla maestra de presupuesto.
+    // Los márgenes comerciales ya están incorporados en estos costos de venta netos.
+    const moduleSellPerPanel = 88976.76717745923;
+    const huaweiInverterNet = 977382.3529411765;
+    const solisInverterNet = 1474000;
     const certSecNet = 500000;
     const workbookBaseLogisticsNet = 250000;
-    const ccCablingNet = 418534.8606811147;
-    const acBoardNet = 211518.20728291315;
-    const structureBlockNet = 85536.55904467049;
-    const huaweiSmartPowerSensorNet = 56208.757187085364;
-    const huaweiBatteryPackNet = 2854046.8819106594;
-    const solisBatteryPackNet = 1678947.3684210528;
+    const ccCablingNet = 487052.55561047967;
+    const acBoardNet = 225482.9461196243;
+    const structureBlockNet = 91246.66337123084;
+    const huaweiSmartPowerSensorNet = 62821.55215027188;
+    const huaweiBatteryPackNet = 3201535.459416708;
+    const solisBatteryPackNet = 1876470.5882352942;
+    const signageNet = 100000;
+    const laborGrossMargin = 0.2;
 
     const enteredMonthlyBill = Number(monthlyBillInput || 0);
     const enteredMonthlyConsumptionKWh = Number(billConsumptionInput || 0);
@@ -4509,7 +4620,8 @@ export default function SakiaraLandingPage() {
       selectedInstallationCommune,
       estimatedPanels,
     );
-    const laborNet = installationLogisticsMetrics.laborTotal;
+    const laborNet =
+      installationLogisticsMetrics.laborTotal / Math.max(1 - laborGrossMargin, 0.01);
 
     const monthlyGenerationKWh = estimatedSystemSizeKwp * annualProductionFactor;
     const winterGenerationKWh = estimatedSystemSizeKwp * winterProductionFactor;
@@ -4604,6 +4716,7 @@ export default function SakiaraLandingPage() {
       ccCablingNet +
       acBoardNet +
       certSecNet +
+      signageNet +
       structureBlocks * structureBlockNet;
 
     const projectCostHuaweiNoBatteryGross =
@@ -4693,6 +4806,7 @@ export default function SakiaraLandingPage() {
         ccCablingNet,
         acBoardNet,
         certSecNet,
+        signageNet,
         structureNet: structureBlocks * structureBlockNet,
         huaweiSmartPowerSensorNet,
         huaweiBatteryPackNet,
@@ -5114,8 +5228,36 @@ export default function SakiaraLandingPage() {
   const getInstallationSummaryItems = () => {
     const selectedOfferItems = selectedInstallationOfferData
       ? [
-          { label: "Alternativa seleccionada", value: selectedInstallationOfferData.title },
-          { label: "Inversión referencial", value: selectedInstallationOfferData.price },
+          {
+            label: "Alternativa seleccionada",
+            value: selectedInstallationOfferData.title,
+          },
+          {
+            label: "Forma de pago",
+            value: installationPaymentSelection.methodLabel,
+          },
+          {
+            label: "Inversión referencial",
+            value: formatCLP(installationPaymentSelection.finalPrice),
+          },
+          ...(installationPaymentSelection.method === "card"
+            ? [
+                {
+                  label: "Precio preferencial contado",
+                  value: formatCLP(installationPaymentSelection.cashPrice),
+                },
+                {
+                  label: "Cuotas simuladas",
+                  value: `${formatNumber(installationPaymentSelection.installments)} cuotas`,
+                },
+                {
+                  label: "Cuota base referencial",
+                  value: formatCLP(
+                    installationPaymentSelection.installmentAmount,
+                  ),
+                },
+              ]
+            : []),
           { label: "Ahorro estimado", value: selectedInstallationOfferData.savings },
           {
             label: "Invierno estimado",
@@ -5125,7 +5267,10 @@ export default function SakiaraLandingPage() {
             label: "Verano estimado",
             value: selectedInstallationOfferData.summerCompensation,
           },
-          { label: "Retorno estimado", value: selectedInstallationOfferData.payback },
+          {
+            label: "Retorno estimado",
+            value: installationPaymentSelection.paybackLabel,
+          },
         ]
       : [{ label: "Alternativa seleccionada", value: "Pendiente de selección" }];
 
@@ -5407,6 +5552,7 @@ Mensaje: ${message || "-"}`,
     const reportName = name;
     const reportPhone = phone;
     const reportEmail = email;
+    const reportPaymentSelection = { ...installationPaymentSelection };
 
     try {
       await loadPdfRuntime();
@@ -5437,6 +5583,7 @@ Mensaje: ${message || "-"}`,
         name: reportName,
         phone: reportPhone,
         email: reportEmail,
+        paymentSelection: reportPaymentSelection,
       });
       document.body.appendChild(reportContainer);
 
@@ -5553,6 +5700,7 @@ Mensaje: ${message || "-"}`,
         projectAddress,
         quoteNumber,
         quoteDate: quotationDate,
+        paymentSelection: installationPaymentSelection,
       });
       document.body.appendChild(quotationContainer);
 
@@ -5831,8 +5979,13 @@ Mensaje: ${message || "-"}`,
     },
     {
       id: 5,
+      title: "Financiamiento",
+      description: "Contado o tarjeta de crédito",
+    },
+    {
+      id: 6,
       title: "Contacto",
-      description: "Solicita tu propuesta personalizada",
+      description: "Cotización e informe final",
     },
   ];
 
@@ -5861,6 +6014,8 @@ Mensaje: ${message || "-"}`,
       title: "Huawei sin batería",
       subtitle: "Alternativa premium base para una solución on-grid.",
       badge: "Línea Huawei",
+      priceValue: metrics.projectCostHuaweiNoBattery,
+      annualSavingsValue: metrics.annualSavingsNoBattery,
       price: formatCLP(metrics.projectCostHuaweiNoBattery),
       savings: formatCLP(metrics.monthlySavingsNoBattery),
       winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
@@ -5874,6 +6029,8 @@ Mensaje: ${message || "-"}`,
       subtitle:
         "Alternativa eficiente para una solución on-grid con otra línea de inversor.",
       badge: "Línea Solis",
+      priceValue: metrics.projectCostSolisNoBattery,
+      annualSavingsValue: metrics.annualSavingsNoBattery,
       price: formatCLP(metrics.projectCostSolisNoBattery),
       savings: formatCLP(metrics.monthlySavingsNoBattery),
       winterCompensation: `${formatNumber(metrics.winterCompensationNoBattery)}%`,
@@ -5887,6 +6044,8 @@ Mensaje: ${message || "-"}`,
       subtitle:
         "Alternativa híbrida para sumar respaldo y mayor aprovechamiento energético.",
       badge: "Huawei híbrido",
+      priceValue: metrics.projectCostHuaweiWithBattery,
+      annualSavingsValue: metrics.annualSavingsWithBattery,
       price: formatCLP(metrics.projectCostHuaweiWithBattery),
       savings: formatCLP(metrics.monthlySavingsWithBattery),
       winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
@@ -5900,6 +6059,8 @@ Mensaje: ${message || "-"}`,
       subtitle:
         "Alternativa híbrida referencial para priorizar respaldo y continuidad operativa.",
       badge: "Solis híbrido",
+      priceValue: metrics.projectCostSolisWithBattery,
+      annualSavingsValue: metrics.annualSavingsWithBattery,
       price: formatCLP(metrics.projectCostSolisWithBattery),
       savings: formatCLP(metrics.monthlySavingsWithBattery),
       winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
@@ -5917,9 +6078,54 @@ Mensaje: ${message || "-"}`,
     installationOfferOptions.find(
       (offer) => offer.key === selectedInstallationOffer,
     ) || null;
+
+  const installationCashPrice =
+    selectedInstallationOfferData?.priceValue || 0;
+  const installationCardPrice = getInstallationCardPrice(
+    installationCashPrice,
+  );
+  const recommendedInstallationInstallments =
+    getRecommendedInstallationInstallments(
+      installationCardPrice,
+      installationMetrics.monthlyBill,
+    );
+  const selectedInstallationInstallmentAmount =
+    installationInstallments > 0
+      ? installationCardPrice / installationInstallments
+      : 0;
+  const installationFinalPrice =
+    installationPaymentMethod === "card"
+      ? installationCardPrice
+      : installationCashPrice;
+  const installationPaymentPaybackYears =
+    installationFinalPrice /
+    Math.max(selectedInstallationOfferData?.annualSavingsValue || 0, 1);
+  const installationPaymentSelection = {
+    method: installationPaymentMethod,
+    methodLabel:
+      installationPaymentMethod === "card"
+        ? "Tarjeta de crédito"
+        : "Precio preferencial contado",
+    cashPrice: installationCashPrice,
+    cardPrice: installationCardPrice,
+    finalPrice: installationFinalPrice,
+    installments:
+      installationPaymentMethod === "card" ? installationInstallments : 0,
+    installmentAmount:
+      installationPaymentMethod === "card"
+        ? selectedInstallationInstallmentAmount
+        : 0,
+    recommendedInstallments: recommendedInstallationInstallments,
+    paybackYears: installationPaymentPaybackYears,
+    paybackLabel: selectedInstallationOfferData
+      ? `${formatNumber(installationPaymentPaybackYears, 1)} años`
+      : "Referencial",
+  };
   const canProceedToContact =
-    installationStep !== 4 || Boolean(selectedInstallationOfferData);
-  const installationNextLabel = "Siguiente";
+    ![4, 5].includes(installationStep) ||
+    Boolean(selectedInstallationOfferData);
+  const installationNextLabel =
+    installationStep === 5 ? "Continuar a cotización" : "Siguiente";
 
   const renderHomeView = () => (
     <>
@@ -6262,16 +6468,20 @@ Mensaje: ${message || "-"}`,
           </div>
           <div className="wizard-topbar">
             <div className="pill">Cotización de instalación</div>
-            <div className="pill">Paso {installationStep} de 5</div>
+            <div className="pill">Paso {installationStep} de {installationSteps.length}</div>
           </div>
         </div>
 
-        <div className="wizard-progress">
+        <div className="wizard-progress installation-wizard-progress">
           {installationSteps.map((step) => (
             <button
               key={step.id}
               className={`wizard-step ${installationStep === step.id ? "active" : ""} ${installationStep > step.id ? "completed" : ""}`}
               type="button"
+              disabled={
+                (step.id >= 5 && !selectedInstallationOfferData) ||
+                (step.id === 6 && installationStep < 5)
+              }
               onClick={() => setInstallationStep(step.id)}
             >
               <span className="wizard-step-index">{step.id}</span>
@@ -6627,19 +6837,6 @@ Mensaje: ${message || "-"}`,
                 ))}
               </div>
 
-              <div className="report-actions">
-                <button
-                  className="btn-secondary"
-                  type="button"
-                  onClick={handleDownloadInstallationReport}
-                >
-                  Descargar informe PDF
-                </button>
-                <div className="hint mobile-essential-hide">
-                  Se descarga un informe autogenerado con gráficos, resumen técnico-comercial y datos meteorológicos referenciales.
-                </div>
-              </div>
-
               <div className="note mobile-essential-hide">
                 Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró una RGH referencial de {formatNumber(installationMetrics.annualGhi, 2)} kWh/m²/día y un factor solar de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio, {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno y {formatNumber(installationMetrics.summerProductionFactor, 0)} kWh/kWp/mes en verano para {selectedInstallationCommune.label}.
               </div>
@@ -6649,9 +6846,157 @@ Mensaje: ${message || "-"}`,
           {installationStep === 5 && (
             <>
               <div className="wizard-copy">
+                <h3 className="wizard-title">Elige cómo financiar tu proyecto</h3>
+                <p className="wizard-text mobile-essential-hide">
+                  Compara el precio preferencial contado con la alternativa de tarjeta de crédito.
+                  Si eliges tarjeta, puedes simular una cuota base cercana a lo que hoy pagas mensualmente en electricidad.
+                </p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard
+                  label="Alternativa seleccionada"
+                  value={selectedInstallationOfferData?.title || "Pendiente"}
+                  sub={selectedInstallationOfferData?.badge || "selecciona una alternativa"}
+                />
+                <SummaryCard
+                  label="Cuenta eléctrica actual"
+                  value={formatCLP(installationMetrics.monthlyBill)}
+                  sub="referencia mensual ingresada"
+                />
+                <SummaryCard
+                  label="Proyecto"
+                  value={`${formatNumber(installationMetrics.estimatedPanels)} paneles`}
+                  sub={`${formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
+                />
+              </div>
+
+              <div className="financing-options-grid">
+                <button
+                  className={`financing-option${installationPaymentMethod === "cash" ? " selected" : ""}`}
+                  type="button"
+                  onClick={() => setInstallationPaymentMethod("cash")}
+                >
+                  <div className="financing-option-topline">
+                    <span className="offer-badge">Mejor precio</span>
+                    <span className="financing-check">
+                      {installationPaymentMethod === "cash" ? "Seleccionado" : "Elegir"}
+                    </span>
+                  </div>
+                  <h3>Precio preferencial contado</h3>
+                  <strong className="financing-price">
+                    {formatCLP(installationCashPrice)}
+                  </strong>
+                  <p>
+                    Equipos e insumos se pagan al inicio del proyecto y la mano de obra posteriormente según la ejecución acordada.
+                  </p>
+                </button>
+
+                <button
+                  className={`financing-option${installationPaymentMethod === "card" ? " selected" : ""}`}
+                  type="button"
+                  onClick={() => {
+                    setInstallationPaymentMethod("card");
+                    setInstallationInstallments(
+                      recommendedInstallationInstallments,
+                    );
+                  }}
+                >
+                  <div className="financing-option-topline">
+                    <span className="offer-badge">Financiamiento</span>
+                    <span className="financing-check">
+                      {installationPaymentMethod === "card" ? "Seleccionado" : "Elegir"}
+                    </span>
+                  </div>
+                  <h3>Tarjeta de crédito</h3>
+                  <strong className="financing-price">
+                    {formatCLP(installationCardPrice)}
+                  </strong>
+                  <p>
+                    Permite financiar el valor del proyecto con las cuotas disponibles para la tarjeta del cliente.
+                  </p>
+                </button>
+              </div>
+
+              {installationPaymentMethod === "card" ? (
+                <div className="financing-simulator">
+                  <div className="wizard-copy financing-simulator-head">
+                    <h3 className="wizard-title">Simula tus cuotas</h3>
+                    <p className="wizard-text">
+                      Selecciona una cantidad de cuotas para comparar la cuota base con tu gasto eléctrico mensual actual.
+                    </p>
+                  </div>
+
+                  <div className="installment-options">
+                    {INSTALLATION_CARD_INSTALLMENT_OPTIONS.map((installments) => (
+                      <button
+                        key={installments}
+                        className={`installment-option${installationInstallments === installments ? " selected" : ""}`}
+                        type="button"
+                        onClick={() => setInstallationInstallments(installments)}
+                      >
+                        <strong>{installments} cuotas</strong>
+                        <span>
+                          {formatCLP(installationCardPrice / installments)}
+                        </span>
+                        {recommendedInstallationInstallments === installments && (
+                          <small>Más cercana a tu cuenta</small>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="summary-grid compact-grid financing-comparison">
+                    <SummaryCard
+                      label="Cuenta eléctrica actual"
+                      value={formatCLP(installationMetrics.monthlyBill)}
+                      sub="gasto mensual de referencia"
+                    />
+                    <SummaryCard
+                      label={`${formatNumber(installationInstallments)} cuotas`}
+                      value={formatCLP(selectedInstallationInstallmentAmount)}
+                      sub="+ interés según banco emisor"
+                    />
+                    <SummaryCard
+                      label="Comparación mensual"
+                      value={formatCLP(
+                        Math.abs(
+                          installationMetrics.monthlyBill -
+                            selectedInstallationInstallmentAmount,
+                        ),
+                      )}
+                      sub={
+                        selectedInstallationInstallmentAmount <=
+                        installationMetrics.monthlyBill
+                          ? "por debajo de tu cuenta actual"
+                          : "por sobre tu cuenta actual"
+                      }
+                    />
+                  </div>
+
+                  <div className="mode-note">
+                    <strong>Referencia de financiamiento:</strong>{" "}
+                    La cuota mostrada corresponde al precio del proyecto dividido en las cuotas seleccionadas.
+                    El interés, costo total y número de cuotas efectivamente disponibles dependen del banco emisor y de la tarjeta del cliente.
+                  </div>
+                </div>
+              ) : (
+                <div className="mode-note">
+                  <strong>Alternativa más económica:</strong>{" "}
+                  El pago contado mantiene el menor precio del proyecto.
+                  Frente a la modalidad con tarjeta, la diferencia referencial es de{" "}
+                  <strong>{formatCLP(Math.max(installationCardPrice - installationCashPrice, 0))}</strong>.
+                </div>
+              )}
+            </>
+          )}
+
+          {installationStep === 6 && (
+            <>
+              <div className="wizard-copy">
                 <h3 className="wizard-title">Solicita tu evaluación comercial</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  Ya tienes una alternativa elegida. Déjanos tus datos o escríbenos por WhatsApp y continuaremos la revisión usando exactamente la propuesta seleccionada como base.
+                  Ya elegiste sistema y forma de pago. Déjanos tus datos o escríbenos por WhatsApp; la cotización y el informe se generarán con el valor final de la modalidad seleccionada.
                 </p>
               </div>
 
@@ -6668,8 +7013,25 @@ Mensaje: ${message || "-"}`,
                 />
                 <SummaryCard
                   label="Inversión estimada"
-                  value={selectedInstallationOfferData?.price || "-"}
-                  sub="IVA incluido"
+                  value={
+                    selectedInstallationOfferData
+                      ? formatCLP(installationPaymentSelection.finalPrice)
+                      : "-"
+                  }
+                  sub={
+                    installationPaymentMethod === "card"
+                      ? `${formatNumber(installationInstallments)} cuotas · IVA incluido`
+                      : "precio contado · IVA incluido"
+                  }
+                />
+                <SummaryCard
+                  label="Forma de pago"
+                  value={installationPaymentSelection.methodLabel}
+                  sub={
+                    installationPaymentMethod === "card"
+                      ? `${formatCLP(selectedInstallationInstallmentAmount)} cuota base`
+                      : "alternativa de menor precio"
+                  }
                 />
               </div>
 
@@ -8384,6 +8746,10 @@ Mensaje: ${message || "-"}`,
           margin-top: 24px;
         }
 
+        .installation-wizard-progress {
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+
         .wizard-step {
           display: flex;
           align-items: center;
@@ -8401,6 +8767,12 @@ Mensaje: ${message || "-"}`,
 
         .wizard-step:hover {
           transform: translateY(-1px);
+        }
+
+        .wizard-step:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+          transform: none;
         }
 
         .wizard-step.active {
@@ -9572,6 +9944,152 @@ Mensaje: ${message || "-"}`,
           background: #fffef5;
         }
 
+        .financing-options-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 18px;
+          margin-top: 20px;
+        }
+
+        .financing-option {
+          width: 100%;
+          min-height: 245px;
+          padding: 22px;
+          border: 1px solid rgba(102, 102, 107, 0.14);
+          border-top: 4px solid #d4d4d8;
+          border-radius: 24px;
+          background: #ffffff;
+          color: #66666b;
+          text-align: left;
+          font: inherit;
+          cursor: pointer;
+          transition:
+            transform 0.16s ease,
+            box-shadow 0.16s ease,
+            border-color 0.16s ease,
+            background 0.16s ease;
+        }
+
+        .financing-option:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 28px rgba(17, 24, 39, 0.06);
+        }
+
+        .financing-option.selected {
+          border-color: rgba(241, 212, 51, 0.9);
+          border-top-color: #f1d433;
+          background: #fffef5;
+          box-shadow: 0 18px 30px rgba(241, 212, 51, 0.14);
+        }
+
+        .financing-option-topline {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .financing-check {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #7c7c82;
+        }
+
+        .financing-option.selected .financing-check {
+          color: #6b5f00;
+        }
+
+        .financing-option h3 {
+          margin: 18px 0 0;
+          color: #55555b;
+          font-size: 22px;
+          line-height: 1.2;
+        }
+
+        .financing-price {
+          display: block;
+          margin-top: 10px;
+          color: #2f3338;
+          font-size: 32px;
+          line-height: 1.08;
+          letter-spacing: -0.03em;
+        }
+
+        .financing-option p {
+          margin: 14px 0 0;
+          color: #7c7c82;
+          font-size: 14px;
+          line-height: 1.6;
+        }
+
+        .financing-simulator {
+          margin-top: 20px;
+          padding: 20px;
+          border: 1px solid rgba(102, 102, 107, 0.12);
+          border-radius: 24px;
+          background: #fbfbfc;
+        }
+
+        .financing-simulator-head {
+          margin-bottom: 0;
+        }
+
+        .installment-options {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 10px;
+          margin-top: 16px;
+        }
+
+        .installment-option {
+          min-height: 112px;
+          padding: 14px 10px;
+          border: 1px solid rgba(102, 102, 107, 0.14);
+          border-radius: 16px;
+          background: #ffffff;
+          color: #66666b;
+          font: inherit;
+          text-align: center;
+          cursor: pointer;
+        }
+
+        .installment-option strong,
+        .installment-option span,
+        .installment-option small {
+          display: block;
+        }
+
+        .installment-option strong {
+          font-size: 14px;
+          color: #505056;
+        }
+
+        .installment-option span {
+          margin-top: 8px;
+          font-size: 17px;
+          font-weight: 800;
+          color: #2f3338;
+        }
+
+        .installment-option small {
+          margin-top: 7px;
+          font-size: 10px;
+          line-height: 1.25;
+          color: #8b8b91;
+        }
+
+        .installment-option.selected {
+          border-color: #f1d433;
+          background: #fff9d9;
+          box-shadow: 0 10px 20px rgba(241, 212, 51, 0.12);
+        }
+
+        .financing-comparison {
+          margin-top: 16px;
+        }
+
         .offer-title {
           margin: 0;
           font-size: 26px;
@@ -9727,7 +10245,8 @@ Mensaje: ${message || "-"}`,
           .enterprise-check-grid,
           .enterprise-showcase-layout,
           .enterprise-visit-layout,
-          .enterprise-summary-grid {
+          .enterprise-summary-grid,
+          .financing-options-grid {
             grid-template-columns: 1fr;
           }
         }
@@ -9809,6 +10328,25 @@ Mensaje: ${message || "-"}`,
           .mode-buttons {
             gap: 8px;
             margin-top: 10px;
+          }
+
+          .installment-options {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .financing-option {
+            min-height: 0;
+            padding: 16px;
+            border-radius: 18px;
+          }
+
+          .financing-price {
+            font-size: 28px;
+          }
+
+          .financing-simulator {
+            padding: 14px;
+            border-radius: 18px;
           }
 
           .goal-card .mode-buttons {
