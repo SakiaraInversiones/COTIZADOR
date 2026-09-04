@@ -3066,13 +3066,169 @@ const buildInstallationReportMarkup = ({
   const highlightedOfferLabel = selectedOffer
     ? selectedOffer.title
     : "Comparativo de alternativas";
+  const selectedKey = selectedOffer?.key || "huaweiNoBattery";
+  const selectedIncludesBattery = selectedKey.toLowerCase().includes("withbattery");
   const isCardPayment = paymentSelection?.method === "card";
   const paymentSummaryLabel = isCardPayment
     ? `Tarjeta de crédito · ${formatNumber(paymentSelection?.installments || 0)} cuotas`
     : "Precio preferencial contado";
   const paymentSummaryDetail = isCardPayment
-    ? `Cuota base referencial ${formatCLP(paymentSelection?.installmentAmount || 0)}. Interés y condiciones finales según banco emisor.`
-    : "Pago de equipos e insumos al inicio y mano de obra posteriormente según ejecución.";
+    ? `Cuota base estimada ${formatCLP(paymentSelection?.installmentAmount || 0)}. El banco emisor puede aplicar intereses, impuestos u otras condiciones.`
+    : "La cotización mantiene disponible una simulación de pago con tarjeta para comparar alternativas.";
+
+  const reportConfigurationByKey = {
+    huaweiNoBattery: {
+      inverter: "Huawei híbrido",
+      storage: "Sin batería",
+      storageShort: "Sin almacenamiento",
+      batteryKWh: 0,
+      components:
+        "Inversor Huawei híbrido + Smart Power Sensor. Esta alternativa no incorpora batería ni respaldo energético.",
+      purpose:
+        "Prioriza generación diurna, autoconsumo directo e inyección de excedentes a red.",
+    },
+    solisNoBattery: {
+      inverter: "Solis S6 Plus híbrido",
+      storage: "Sin batería",
+      storageShort: "Sin almacenamiento",
+      batteryKWh: 0,
+      components:
+        "Inversor Solis S6 Plus híbrido. Esta alternativa no incorpora batería; permite evaluar almacenamiento compatible en una ampliación posterior.",
+      purpose:
+        "Prioriza autoconsumo directo e inyección de excedentes, con una plataforma híbrida preparada para futuras ampliaciones compatibles.",
+    },
+    huaweiWithBattery: {
+      inverter: "Huawei híbrido",
+      storage: "1 batería Huawei LUNA · 5 kWh",
+      storageShort: "1 × LUNA 5 kWh",
+      batteryKWh: 5,
+      components:
+        "Incluye 1 batería Huawei LUNA de 5 kWh + módulo de potencia (DC/DC) + Smart Guard + Smart Power Sensor, según la arquitectura considerada.",
+      purpose:
+        "Aumenta el autoconsumo, desplaza energía solar hacia la tarde/noche y habilita respaldo según la configuración final de cargas críticas.",
+    },
+    solisWithBattery: {
+      inverter: "Solis S6 Plus híbrido",
+      storage: "1 batería Dyness PowerBrick · ~15 kWh",
+      storageShort: "1 × PowerBrick ~15 kWh",
+      batteryKWh: 14.336,
+      components:
+        "Incluye 1 batería Dyness PowerBrick (clase ~15 kWh; 14,336 kWh nominales) con comunicación BMS al inversor Solis S6 Plus híbrido.",
+      purpose:
+        "Aumenta el aprovechamiento de la generación solar fuera del horario de producción y reduce la compra de energía desde la red.",
+    },
+  };
+
+  const getReportConfiguration = (key) =>
+    reportConfigurationByKey[key] || reportConfigurationByKey.huaweiNoBattery;
+
+  const selectedConfiguration = getReportConfiguration(selectedKey);
+
+  const selectedSelfConsumedKWh = selectedIncludesBattery
+    ? metrics.selfConsumedWithBattery
+    : metrics.selfConsumedNoBattery;
+  const selectedExportedKWh = selectedIncludesBattery
+    ? metrics.exportedWithBattery
+    : metrics.exportedNoBattery;
+  const selectedWinterSelfConsumedKWh = selectedIncludesBattery
+    ? metrics.winterSelfConsumedWithBattery
+    : metrics.winterSelfConsumedNoBattery;
+  const selectedWinterExportedKWh = selectedIncludesBattery
+    ? metrics.winterExportedWithBattery
+    : metrics.winterExportedNoBattery;
+  const selectedSummerSelfConsumedKWh = selectedIncludesBattery
+    ? metrics.summerSelfConsumedWithBattery
+    : metrics.summerSelfConsumedNoBattery;
+  const selectedSummerExportedKWh = selectedIncludesBattery
+    ? metrics.summerExportedWithBattery
+    : metrics.summerExportedNoBattery;
+  const selectedMonthlySavings = selectedIncludesBattery
+    ? metrics.monthlySavingsWithBattery
+    : metrics.monthlySavingsNoBattery;
+  const selectedWinterCompensation = selectedIncludesBattery
+    ? metrics.winterCompensationWithBattery
+    : metrics.winterCompensationNoBattery;
+  const selectedSummerCompensation = selectedIncludesBattery
+    ? metrics.summerCompensationWithBattery
+    : metrics.summerCompensationNoBattery;
+
+  const selectedGridImportKWh = Math.max(
+    metrics.monthlyConsumptionKWh - selectedSelfConsumedKWh,
+    0,
+  );
+  const selectedWinterGridImportKWh = Math.max(
+    metrics.monthlyConsumptionKWh - selectedWinterSelfConsumedKWh,
+    0,
+  );
+  const selectedSummerGridImportKWh = Math.max(
+    metrics.monthlyConsumptionKWh - selectedSummerSelfConsumedKWh,
+    0,
+  );
+
+  const selectedEnergyCoverage = clamp(
+    (selectedSelfConsumedKWh / Math.max(metrics.monthlyConsumptionKWh, 1)) * 100,
+    0,
+    100,
+  );
+  const selectedWinterEnergyCoverage = clamp(
+    (selectedWinterSelfConsumedKWh / Math.max(metrics.monthlyConsumptionKWh, 1)) * 100,
+    0,
+    100,
+  );
+  const selectedSummerEnergyCoverage = clamp(
+    (selectedSummerSelfConsumedKWh / Math.max(metrics.monthlyConsumptionKWh, 1)) * 100,
+    0,
+    100,
+  );
+  const selectedSelfConsumptionRatio = clamp(
+    (selectedSelfConsumedKWh / Math.max(metrics.monthlyGenerationKWh, 1)) * 100,
+    0,
+    100,
+  );
+  const estimatedBillAfterSolar = Math.max(
+    metrics.monthlyBill - selectedMonthlySavings,
+    0,
+  );
+
+  const noBatteryEnergyCoverage = clamp(
+    (metrics.selfConsumedNoBattery / Math.max(metrics.monthlyConsumptionKWh, 1)) * 100,
+    0,
+    100,
+  );
+  const withBatteryEnergyCoverage = clamp(
+    (metrics.selfConsumedWithBattery / Math.max(metrics.monthlyConsumptionKWh, 1)) * 100,
+    0,
+    100,
+  );
+  const noBatteryGridImportKWh = Math.max(
+    metrics.monthlyConsumptionKWh - metrics.selfConsumedNoBattery,
+    0,
+  );
+  const withBatteryGridImportKWh = Math.max(
+    metrics.monthlyConsumptionKWh - metrics.selfConsumedWithBattery,
+    0,
+  );
+  const noBatterySelfConsumptionRatio = clamp(
+    (metrics.selfConsumedNoBattery / Math.max(metrics.monthlyGenerationKWh, 1)) * 100,
+    0,
+    100,
+  );
+  const withBatterySelfConsumptionRatio = clamp(
+    (metrics.selfConsumedWithBattery / Math.max(metrics.monthlyGenerationKWh, 1)) * 100,
+    0,
+    100,
+  );
+
+  const referenceInstallments = Math.max(
+    Number(
+      isCardPayment
+        ? paymentSelection?.installments
+        : paymentSelection?.recommendedInstallments,
+    ) || 0,
+    1,
+  );
+  const referenceCardInstallment =
+    (paymentSelection?.cardPrice || 0) / referenceInstallments;
 
   const alternativesMarkup = offers
     .map((offer) => {
@@ -3081,6 +3237,14 @@ const buildInstallationReportMarkup = ({
         : offer.priceValue;
       const offerPaybackYears =
         offerCommercialPrice / Math.max(offer.annualSavingsValue || 0, 1);
+      const offerConfig = getReportConfiguration(offer.key);
+      const offerUsesBattery = offer.key.toLowerCase().includes("withbattery");
+      const offerWinterCoverage = offerUsesBattery
+        ? metrics.winterCompensationWithBattery
+        : metrics.winterCompensationNoBattery;
+      const offerSummerCoverage = offerUsesBattery
+        ? metrics.summerCompensationWithBattery
+        : metrics.summerCompensationNoBattery;
 
       return `
         <article class="pdf-offer-card${
@@ -3090,7 +3254,8 @@ const buildInstallationReportMarkup = ({
             <div>
               <div class="pdf-offer-badge">${escapeHtml(offer.badge)}</div>
               <h4>${escapeHtml(offer.title)}</h4>
-              <p>${escapeHtml(offer.subtitle)}</p>
+              <p>${escapeHtml(offerConfig.storage)} · ${escapeHtml(offerConfig.inverter)}</p>
+              <small class="pdf-offer-detail">${escapeHtml(offerConfig.components)}</small>
             </div>
             ${
               selectedOffer?.key === offer.key
@@ -3100,9 +3265,9 @@ const buildInstallationReportMarkup = ({
           </div>
           <div class="pdf-offer-grid">
             <div><span>${isCardPayment ? "Precio tarjeta" : "Precio contado"}</span><strong>${escapeHtml(formatCLP(offerCommercialPrice))}</strong></div>
-            <div><span>Ahorro</span><strong>${escapeHtml(offer.savings)}</strong></div>
-            <div><span>Invierno</span><strong>${escapeHtml(offer.winterCompensation)}</strong></div>
-            <div><span>Verano</span><strong>${escapeHtml(offer.summerCompensation)}</strong></div>
+            <div><span>Valor solar mensual</span><strong>${escapeHtml(offer.savings)}</strong></div>
+            <div><span>Compensación invierno</span><strong>${escapeHtml(`${formatNumber(offerWinterCoverage)}%`)}</strong></div>
+            <div><span>Compensación verano</span><strong>${escapeHtml(`${formatNumber(offerSummerCoverage)}%`)}</strong></div>
             <div><span>Retorno</span><strong>${escapeHtml(`${formatNumber(offerPaybackYears, 1)} años`)}</strong></div>
           </div>
         </article>
@@ -3120,23 +3285,64 @@ const buildInstallationReportMarkup = ({
     formatter: (value) => `${formatNumber(value, 0)} kWh`,
   });
 
-  const productionFactorChart = buildReportBarChartMarkup({
-    title: "Potencial solar por temporada",
+  const gridBeforeAfterChart = buildReportBarChartMarkup({
+    title: "Compra de energía a la red · antes / después",
     items: [
-      { label: "Invierno", value: metrics.winterProductionFactor },
-      { label: "Promedio", value: metrics.annualProductionFactor },
-      { label: "Verano", value: metrics.summerProductionFactor },
+      { label: "Antes", value: metrics.monthlyConsumptionKWh },
+      { label: "Después", value: selectedGridImportKWh },
     ],
-    formatter: (value) => `${formatNumber(value, 0)} kWh/kWp`,
+    formatter: (value) => `${formatNumber(value, 0)} kWh`,
   });
 
-  const compensationChart = buildReportBarChartMarkup({
-    title: "Desempeño estimado de la cuenta",
+  const billBeforeAfterChart = buildReportBarChartMarkup({
+    title: "Costo energético mensual · antes / después",
     items: [
-      { label: "Invierno", value: metrics.winterCompensationNoBattery },
-      { label: "Promedio", value: metrics.compensationNoBattery },
-      { label: "Verano", value: metrics.summerCompensationNoBattery },
+      { label: "Antes", value: metrics.monthlyBill },
+      { label: "Después", value: estimatedBillAfterSolar },
     ],
+    formatter: (value) => formatCLP(value),
+  });
+
+  const seasonalCoverageChart = buildReportBarChartMarkup({
+    title: `Cobertura energética · ${selectedIncludesBattery ? "con batería" : "sin batería"}`,
+    items: [
+      { label: "Invierno", value: selectedWinterEnergyCoverage },
+      { label: "Promedio", value: selectedEnergyCoverage },
+      { label: "Verano", value: selectedSummerEnergyCoverage },
+    ],
+    formatter: (value) => `${formatNumber(value, 0)}%`,
+  });
+
+  const batteryImpactCoverageChart = buildReportBarChartMarkup({
+    title: "Cobertura energética promedio",
+    items: selectedIncludesBattery
+      ? [
+          { label: "Sin batería", value: noBatteryEnergyCoverage },
+          { label: "Con batería", value: withBatteryEnergyCoverage },
+        ]
+      : [{ label: "Sistema", value: noBatteryEnergyCoverage }],
+    formatter: (value) => `${formatNumber(value, 0)}%`,
+  });
+
+  const batteryImpactGridChart = buildReportBarChartMarkup({
+    title: "Compra mensual estimada a la red",
+    items: selectedIncludesBattery
+      ? [
+          { label: "Sin batería", value: noBatteryGridImportKWh },
+          { label: "Con batería", value: withBatteryGridImportKWh },
+        ]
+      : [{ label: "Sistema", value: noBatteryGridImportKWh }],
+    formatter: (value) => `${formatNumber(value, 0)} kWh`,
+  });
+
+  const batteryImpactSelfConsumptionChart = buildReportBarChartMarkup({
+    title: "Autoconsumo de la generación solar",
+    items: selectedIncludesBattery
+      ? [
+          { label: "Sin batería", value: noBatterySelfConsumptionRatio },
+          { label: "Con batería", value: withBatterySelfConsumptionRatio },
+        ]
+      : [{ label: "Sistema", value: noBatterySelfConsumptionRatio }],
     formatter: (value) => `${formatNumber(value, 0)}%`,
   });
 
@@ -3145,9 +3351,8 @@ const buildInstallationReportMarkup = ({
       <section class="pdf-cover pdf-export-page">
         <div class="pdf-cover-top">
           <div class="pdf-brand-lockup">
-            <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+            <img src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
             <div>
-              <strong>Sakiara Solar</strong>
               <span>Ejecutamos proyectos, desarrollamos inversiones.</span>
             </div>
           </div>
@@ -3163,8 +3368,8 @@ const buildInstallationReportMarkup = ({
           <h1>${escapeHtml(reportTitle)}</h1>
           <p>
             Propuesta referencial para ${escapeHtml(communeLabel)}, ${escapeHtml(regionLabel)}.
-            El informe resume generación esperada, lectura estacional, alternativa destacada y supuestos
-            de diseño con una presentación clara para compartir con el cliente.
+            El informe reúne la configuración seleccionada, producción esperada, consumo antes y después,
+            aporte del almacenamiento, alternativas comerciales y forma de pago evaluada.
           </p>
         </div>
 
@@ -3177,17 +3382,17 @@ const buildInstallationReportMarkup = ({
           <article class="pdf-card pdf-card--cover">
             <span>Alternativa destacada</span>
             <strong>${escapeHtml(highlightedOfferLabel)}</strong>
-            <small>${escapeHtml(selectedOffer ? paymentSummaryLabel : "Comparativo listo para revisar")}</small>
+            <small>${escapeHtml(selectedConfiguration.storageShort)} · ${escapeHtml(paymentSummaryLabel)}</small>
           </article>
           <article class="pdf-card pdf-card--cover">
-            <span>Invierno</span>
-            <strong>${escapeHtml(formatNumber(metrics.winterCompensationNoBattery, 0))}%</strong>
-            <small>Compensación referencial sin batería</small>
+            <span>Cobertura energética invierno</span>
+            <strong>${escapeHtml(formatNumber(selectedWinterEnergyCoverage, 0))}%</strong>
+            <small>${escapeHtml(selectedIncludesBattery ? "Solar aprovechada considerando la batería incluida" : "Solar aprovechada sin almacenamiento")}</small>
           </article>
           <article class="pdf-card pdf-card--cover">
-            <span>Verano</span>
-            <strong>${escapeHtml(formatNumber(metrics.summerCompensationNoBattery, 0))}%</strong>
-            <small>Compensación referencial sin batería</small>
+            <span>Cobertura energética verano</span>
+            <strong>${escapeHtml(formatNumber(selectedSummerEnergyCoverage, 0))}%</strong>
+            <small>${escapeHtml(selectedIncludesBattery ? "Solar aprovechada considerando la batería incluida" : "Solar aprovechada sin almacenamiento")}</small>
           </article>
         </div>
 
@@ -3205,21 +3410,19 @@ const buildInstallationReportMarkup = ({
         </div>
       </section>
 
-
       <section class="pdf-page pdf-page--content pdf-export-page">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Resumen técnico y comercial</div>
-            <h2>Dimensionamiento y lectura estacional del proyecto</h2>
+            <h2>Impacto energético del proyecto</h2>
             <p class="pdf-subtitle">
-              Valores orientativos con IVA incluido, perfil de consumo declarado y supuestos de producción
-              estacional para comunicar el proyecto de forma clara, creíble y profesional.
+              Comparación simple entre la situación actual y el escenario solar seleccionado: consumo,
+              generación, energía comprada a la red y efecto económico mensual estimado.
             </p>
           </div>
           <div class="pdf-header-brand">
-            <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+            <img src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
             <div>
-              <strong>Sakiara Solar</strong>
               <span>${escapeHtml(generatedDate)}</span>
             </div>
           </div>
@@ -3227,54 +3430,135 @@ const buildInstallationReportMarkup = ({
 
         <section class="pdf-grid pdf-grid--summary">
           <article class="pdf-card pdf-card--accent">
-            <span>Ubicación evaluada</span>
-            <strong>${escapeHtml(communeLabel)}</strong>
-            <small>${escapeHtml(regionLabel)}</small>
+            <span>Consumo actual</span>
+            <strong>${escapeHtml(formatNumber(metrics.monthlyConsumptionKWh, 0))} kWh/mes</strong>
+            <small>Base declarada o estimada desde la boleta</small>
           </article>
           <article class="pdf-card">
-            <span>Proyecto sugerido</span>
-            <strong>${escapeHtml(formatNumber(metrics.estimatedPanels))} paneles</strong>
-            <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp estimados</small>
+            <span>Generación promedio</span>
+            <strong>${escapeHtml(formatNumber(metrics.monthlyGenerationKWh, 0))} kWh/mes</strong>
+            <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp instalados</small>
           </article>
           <article class="pdf-card">
-            <span>Boleta evaluada</span>
-            <strong>${escapeHtml(formatCLP(metrics.monthlyBill))}</strong>
-            <small>Consumo ${escapeHtml(formatNumber(metrics.monthlyConsumptionKWh, 0))} kWh/mes</small>
+            <span>Compra a red estimada</span>
+            <strong>${escapeHtml(formatNumber(selectedGridImportKWh, 0))} kWh/mes</strong>
+            <small>Después de autoconsumo y almacenamiento seleccionado</small>
           </article>
           <article class="pdf-card">
-            <span>Alternativa destacada</span>
-            <strong>${escapeHtml(highlightedOfferLabel)}</strong>
-            <small>${escapeHtml(`${paymentSummaryLabel} · ${metrics.coverageObjectiveLabel}`)}</small>
+            <span>Costo energético estimado después</span>
+            <strong>${escapeHtml(formatCLP(estimatedBillAfterSolar))}</strong>
+            <small>Estimación energética; la boleta real puede mantener cargos fijos u otros conceptos.</small>
           </article>
         </section>
 
         <section class="pdf-section">
           <div class="pdf-section-head">
-            <h3>Gráficos de generación y desempeño</h3>
-            <p>Se prioriza la lectura de generación del sistema y potencial solar por temporada.</p>
+            <h3>Antes y después</h3>
+            <p>La energía comprada a la red y el monto de la boleta evolucionan de forma distinta porque la simulación considera autoconsumo y créditos por excedentes. Los cargos fijos u otros conceptos pueden permanecer.</p>
           </div>
           <div class="pdf-charts-grid">
             ${generationChart}
-            ${productionFactorChart}
-            ${compensationChart}
+            ${gridBeforeAfterChart}
+            ${billBeforeAfterChart}
+          </div>
+        </section>
+
+        <section class="pdf-section pdf-section--tight-top">
+          <div class="pdf-mini-grid">
+            <div class="pdf-mini-card"><span>Cobertura energética</span><strong>${escapeHtml(formatNumber(selectedEnergyCoverage, 0))}%</strong><small>Parte del consumo abastecida por energía solar aprovechada.</small></div>
+            <div class="pdf-mini-card"><span>Autoconsumo solar</span><strong>${escapeHtml(formatNumber(selectedSelfConsumptionRatio, 0))}%</strong><small>Parte de la generación utilizada en el inmueble.</small></div>
+            <div class="pdf-mini-card"><span>Excedentes a la red</span><strong>${escapeHtml(formatNumber(selectedExportedKWh, 0))} kWh/mes</strong><small>Energía solar referencial no consumida localmente.</small></div>
+            <div class="pdf-mini-card"><span>Compensación económica</span><strong>${escapeHtml(formatNumber(clamp((selectedMonthlySavings / Math.max(metrics.monthlyBill, 1)) * 100, 0, 100), 0))}%</strong><small>Impacto estimado en el costo energético; no equivale a independencia de red.</small></div>
           </div>
         </section>
       </section>
 
+      <section class="pdf-page pdf-page--content pdf-export-page">
+        <header class="pdf-header">
+          <div>
+            <div class="pdf-kicker">Configuración seleccionada</div>
+            <h2>Configuración de la solución y almacenamiento</h2>
+            <p class="pdf-subtitle">
+              Detalle del equipamiento principal incluido en la alternativa seleccionada y del efecto
+              energético que se atribuye al almacenamiento dentro de esta estimación preliminar.
+            </p>
+          </div>
+          <div class="pdf-header-brand">
+            <img src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
+            <div>
+              <span>${escapeHtml(highlightedOfferLabel)}</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="pdf-system-hero">
+          <div class="pdf-system-main">
+            <span>Solución seleccionada</span>
+            <h3>${escapeHtml(highlightedOfferLabel)}</h3>
+            <p>${escapeHtml(selectedConfiguration.purpose)}</p>
+          </div>
+          <div class="pdf-system-storage">
+            <span>Almacenamiento</span>
+            <strong>${escapeHtml(selectedConfiguration.storage)}</strong>
+            <small>${escapeHtml(selectedIncludesBattery ? "Capacidad de almacenamiento incluida en la cotización" : "Esta alternativa no incorpora almacenamiento")}</small>
+          </div>
+        </section>
+
+        <section class="pdf-section pdf-section--tight-top">
+          <div class="pdf-grid pdf-grid--equipment">
+            <article class="pdf-card">
+              <span>Campo fotovoltaico</span>
+              <strong>${escapeHtml(formatNumber(metrics.estimatedPanels))} × 585 W</strong>
+              <small>${escapeHtml(formatNumber(metrics.estimatedSystemSizeKwp, 1))} kWp nominales</small>
+            </article>
+            <article class="pdf-card">
+              <span>Inversor</span>
+              <strong>${escapeHtml(selectedConfiguration.inverter)}</strong>
+              <small>Equipo considerado en la configuración comercial seleccionada</small>
+            </article>
+            <article class="pdf-card">
+              <span>Batería</span>
+              <strong>${escapeHtml(selectedConfiguration.storageShort)}</strong>
+              <small>${escapeHtml(selectedConfiguration.components)}</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="pdf-section">
+          <div class="pdf-section-head">
+            <h3>Impacto estimado del almacenamiento</h3>
+            <p>${escapeHtml(selectedIncludesBattery ? "Se compara el mismo campo fotovoltaico con y sin almacenamiento para mostrar su efecto estimado sobre cobertura, autoconsumo y compra de red." : "La alternativa seleccionada no incluye batería; los indicadores reflejan el aprovechamiento directo del sistema fotovoltaico.")}</p>
+          </div>
+          <div class="pdf-charts-grid">
+            ${batteryImpactCoverageChart}
+            ${batteryImpactGridChart}
+            ${batteryImpactSelfConsumptionChart}
+          </div>
+        </section>
+
+        <section class="pdf-section pdf-section--tight-top">
+          <div class="pdf-definition-grid">
+            <div class="pdf-note"><strong>Uso de la batería:</strong> desplaza parte de la energía solar hacia horas en que el campo fotovoltaico produce menos o no produce.</div>
+            <div class="pdf-note"><strong>Respaldo:</strong> la autonomía ante cortes depende de cargas críticas, potencia simultánea, estado de carga y configuración final del tablero.</div>
+            <div class="pdf-note"><strong>Capacidad vs. potencia:</strong> la batería almacena energía en kWh; la potencia instantánea disponible se expresa en kW y depende del inversor, batería y configuración.</div>
+            <div class="pdf-note"><strong>Modelación:</strong> el efecto de la batería es una estimación comercial. La ingeniería final debe validar perfil horario, estrategia de carga/descarga y límites reales del equipo.</div>
+          </div>
+        </section>
+      </section>
 
       <section class="pdf-page pdf-page--content pdf-export-page">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Contexto solar del proyecto</div>
-            <h2>Datos meteorológicos y lectura de generación</h2>
+            <h2>Base solar y supuestos de generación</h2>
             <p class="pdf-subtitle">
-              Referencias estacionales iniciales para sostener la lectura técnica del dimensionamiento y la producción esperada.
+              Parámetros regionales usados por el cotizador para construir una estimación preliminar de
+              producción. La ingeniería de detalle debe validar el sitio específico.
             </p>
           </div>
           <div class="pdf-header-brand">
-            <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+            <img src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
             <div>
-              <strong>Sakiara Solar</strong>
               <span>${escapeHtml(communeLabel)} · ${escapeHtml(regionLabel)}</span>
             </div>
           </div>
@@ -3282,83 +3566,73 @@ const buildInstallationReportMarkup = ({
 
         <section class="pdf-section">
           <div class="pdf-section-head">
-            <h3>Datos meteorológicos y solares referenciales</h3>
-            <p>Lectura climática inicial para reforzar credibilidad y contexto técnico del informe.</p>
+            <h3>Recurso solar y producción específica</h3>
+            <p>Se muestran sólo las variables que participan directamente en la lectura energética de la precotización.</p>
           </div>
           <div class="pdf-grid pdf-grid--climate">
             <article class="pdf-card">
-              <span>RGH promedio</span>
+              <span>Irradiación solar promedio</span>
               <strong>${escapeHtml(formatNumber(metrics.annualGhi, 2))} kWh/m²/día</strong>
-              <small>Radiación global horizontal estimada</small>
+              <small>Radiación global horizontal regional de referencia</small>
             </article>
             <article class="pdf-card">
-              <span>RGH invierno</span>
+              <span>Irradiación invierno</span>
               <strong>${escapeHtml(formatNumber(metrics.winterGhi, 2))} kWh/m²/día</strong>
-              <small>Meses de menor recurso solar</small>
+              <small>Referencia para los meses de menor recurso solar</small>
             </article>
             <article class="pdf-card">
-              <span>RGH verano</span>
+              <span>Irradiación verano</span>
               <strong>${escapeHtml(formatNumber(metrics.summerGhi, 2))} kWh/m²/día</strong>
-              <small>Meses de mayor recurso solar</small>
+              <small>Referencia para los meses de mayor recurso solar</small>
             </article>
             <article class="pdf-card">
-              <span>Factor solar promedio</span>
+              <span>Producción específica promedio</span>
               <strong>${escapeHtml(formatNumber(metrics.annualProductionFactor, 0))} kWh/kWp/mes</strong>
-              <small>Promedio anual referencial</small>
+              <small>Factor mensual promedio utilizado por el cotizador</small>
             </article>
             <article class="pdf-card">
-              <span>Factor solar invierno</span>
+              <span>Producción específica invierno</span>
               <strong>${escapeHtml(formatNumber(metrics.winterProductionFactor, 0))} kWh/kWp/mes</strong>
-              <small>Meses más exigentes</small>
+              <small>Factor de los meses más exigentes</small>
             </article>
             <article class="pdf-card">
-              <span>Factor solar verano</span>
+              <span>Producción específica verano</span>
               <strong>${escapeHtml(formatNumber(metrics.summerProductionFactor, 0))} kWh/kWp/mes</strong>
-              <small>Meses de mayor producción</small>
+              <small>Factor de los meses de mayor producción</small>
             </article>
             <article class="pdf-card">
-              <span>Temperatura estival</span>
-              <strong>${escapeHtml(formatNumber(climateProfile.summerTemp, 0))} °C</strong>
-              <small>Promedio ambiente referencial</small>
+              <span>Generación anual estimada</span>
+              <strong>${escapeHtml(formatNumber(metrics.monthlyGenerationKWh * 12, 0))} kWh/año</strong>
+              <small>Promedio mensual modelado multiplicado por 12</small>
             </article>
             <article class="pdf-card">
-              <span>Temperatura invernal</span>
-              <strong>${escapeHtml(formatNumber(climateProfile.winterTemp, 0))} °C</strong>
-              <small>Promedio ambiente referencial</small>
-            </article>
-            <article class="pdf-card">
-              <span>Nubosidad referencial</span>
-              <strong>${escapeHtml(formatNumber(climateProfile.cloudiness, 0))}%</strong>
-              <small>Cobertura media estimada</small>
-            </article>
-            <article class="pdf-card">
-              <span>Horas de sol útiles</span>
-              <strong>${escapeHtml(formatNumber(climateProfile.sunHours, 1))} h/día</strong>
-              <small>Promedio anual orientativo</small>
-            </article>
-            <article class="pdf-card">
-              <span>Lectura estacional</span>
-              <strong>${escapeHtml(climateProfile.rainfall)}</strong>
-              <small>${escapeHtml(climateProfile.seasonality)}</small>
+              <span>Variación estacional</span>
+              <strong>${escapeHtml(formatNumber(metrics.summerProductionFactor / Math.max(metrics.winterProductionFactor, 1), 1))}×</strong>
+              <small>Relación referencial entre producción específica de verano e invierno</small>
             </article>
           </div>
         </section>
-      </section>
 
+        <section class="pdf-section pdf-section--tight-top">
+          <div class="pdf-method-box">
+            <strong>Cómo se construye esta estimación</strong>
+            <p>El cotizador combina consumo declarado, perfil horario, ubicación y factores regionales de producción. Esta etapa es una precotización: la producción real depende de orientación, inclinación, sombras, temperatura, pérdidas eléctricas y condiciones meteorológicas. La ingeniería de detalle debe contrastar el diseño con una simulación específica del sitio y condiciones reales de montaje.</p>
+          </div>
+        </section>
+      </section>
 
       <section class="pdf-page pdf-page--content pdf-export-page">
         <header class="pdf-header">
           <div>
             <div class="pdf-kicker">Comparativo comercial</div>
-            <h2>Alternativas y supuestos de diseño</h2>
+            <h2>Alternativas y componentes incluidos</h2>
             <p class="pdf-subtitle">
-              Comparación resumida de líneas ofertadas con foco en valor, ahorro y lectura invierno/verano.
+              Comparación resumida de líneas ofertadas. Las alternativas con batería muestran la capacidad y los componentes de almacenamiento considerados.
             </p>
           </div>
           <div class="pdf-header-brand">
-            <img src="${escapeHtml(sakiaraLogo)}" alt="Sakiara Solar" />
+            <img src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
             <div>
-              <strong>Sakiara Solar</strong>
               <span>Informe autogenerado</span>
             </div>
           </div>
@@ -3367,16 +3641,113 @@ const buildInstallationReportMarkup = ({
         <section class="pdf-section">
           <div class="pdf-section-head">
             <h3>Alternativas evaluadas</h3>
-            <p>Comparación resumida de líneas ofertadas para una decisión más clara.</p>
+            <p>Cada alternativa muestra precio, equipamiento y desempeño coherentes con su propia configuración de almacenamiento.</p>
           </div>
           <div class="pdf-offer-stack">
             ${alternativesMarkup}
           </div>
         </section>
+      </section>
 
-        <section class="pdf-section pdf-section--tight-top">
+      <section class="pdf-page pdf-page--content pdf-export-page">
+        <header class="pdf-header">
+          <div>
+            <div class="pdf-kicker">Pago, financiamiento y supuestos</div>
+            <h2>Inversión y alternativas de pago</h2>
+            <p class="pdf-subtitle">
+              Se presentan el precio preferencial contado y una referencia de pago con tarjeta para que el cliente compare inversión, cuota y desempeño energético en una misma lectura.
+            </p>
+          </div>
+          <div class="pdf-header-brand">
+            <img src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
+            <div>
+              <span>${escapeHtml(highlightedOfferLabel)}</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="pdf-finance-hero">
+          <div>
+            <span>Alternativa seleccionada</span>
+            <strong>${escapeHtml(highlightedOfferLabel)}</strong>
+            <small>${escapeHtml(selectedConfiguration.storageShort)} · ${escapeHtml(selectedConfiguration.inverter)}</small>
+          </div>
+          <div>
+            <span>Forma de pago evaluada</span>
+            <strong>${escapeHtml(paymentSummaryLabel)}</strong>
+            <small>${escapeHtml(paymentSummaryDetail)}</small>
+          </div>
+        </section>
+
+        <section class="pdf-section">
+          <div class="pdf-grid pdf-grid--finance">
+            <article class="pdf-card pdf-card--accent">
+              <span>Precio preferencial contado</span>
+              <strong>${escapeHtml(formatCLP(paymentSelection?.cashPrice || selectedOffer?.priceValue || 0))}</strong>
+              <small>Valor preferencial de la alternativa seleccionada</small>
+            </article>
+            <article class="pdf-card">
+              <span>Monto con tarjeta</span>
+              <strong>${escapeHtml(formatCLP(paymentSelection?.cardPrice || 0))}</strong>
+              <small>Valor total del proyecto al elegir pago con tarjeta</small>
+            </article>
+            <article class="pdf-card">
+              <span>Plazo de referencia</span>
+              <strong>${escapeHtml(formatNumber(referenceInstallments))} cuotas</strong>
+              <small>${escapeHtml(isCardPayment ? "Plazo seleccionado por el cliente" : "Simulación de referencia para comparar alternativas")}</small>
+            </article>
+            <article class="pdf-card">
+              <span>Cuota base referencial</span>
+              <strong>${escapeHtml(formatCLP(referenceCardInstallment))}</strong>
+              <small>La cuota real puede variar por intereses, impuestos o condiciones del banco emisor</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="pdf-section">
           <div class="pdf-section-head">
-            <h3>Perfil y supuestos de diseño</h3>
+            <h3>Lectura económica mensual</h3>
+            <p>El valor económico modelado combina autoconsumo y valorización referencial de excedentes. Puede superar el monto de la boleta sin representar un pago en efectivo; la compensación de la cuenta se limita a 100%. La boleta real puede mantener cargos fijos y la cuota de tarjeta es independiente.</p>
+          </div>
+          <div class="pdf-finance-comparison">
+            <div><span>Boleta actual</span><strong>${escapeHtml(formatCLP(metrics.monthlyBill))}</strong></div>
+            <div><span>Costo energético estimado después</span><strong>${escapeHtml(formatCLP(estimatedBillAfterSolar))}</strong></div>
+            <div><span>Valor económico solar modelado</span><strong>${escapeHtml(formatCLP(selectedMonthlySavings))}</strong></div>
+            <div><span>Compensación económica invierno</span><strong>${escapeHtml(formatNumber(selectedWinterCompensation, 0))}%</strong></div>
+            <div><span>Compensación económica verano</span><strong>${escapeHtml(formatNumber(selectedSummerCompensation, 0))}%</strong></div>
+            <div><span>Retorno simple referencial</span><strong>${escapeHtml(selectedOffer ? `${formatNumber((isCardPayment ? paymentSelection?.finalPrice : selectedOffer.priceValue) / Math.max(selectedOffer.annualSavingsValue || 0, 1), 1)} años` : "Por definir")}</strong></div>
+          </div>
+        </section>
+
+        <footer class="pdf-footer">
+          <strong>Sakiara Solar</strong>
+          <span>Contacto: ${escapeHtml(contactEmail)} · +56 9 7580 7224</span>
+          <span>sakiarainversiones.com</span>
+        </footer>
+      </section>
+
+      <section class="pdf-page pdf-page--content pdf-export-page">
+        <header class="pdf-header">
+          <div>
+            <div class="pdf-kicker">Alcance y supuestos</div>
+            <h2>Supuestos, validaciones y alcance</h2>
+            <p class="pdf-subtitle">
+              Trazabilidad de los datos usados en la propuesta y de las variables que deben confirmarse
+              en visita técnica e ingeniería de detalle antes de ejecutar.
+            </p>
+          </div>
+          <div class="pdf-header-brand">
+            <img src="${escapeHtml(sakiaraPdfLogo)}" alt="Sakiara Energía Solar" />
+            <div>
+              <span>${escapeHtml(communeLabel)} · ${escapeHtml(regionLabel)}</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="pdf-section">
+          <div class="pdf-section-head">
+            <h3>Datos considerados en esta estimación</h3>
+            <p>Estos antecedentes permiten entender de dónde salen los resultados y qué puede cambiar después del levantamiento técnico.</p>
           </div>
           <div class="pdf-note-grid">
             <div class="pdf-note">
@@ -3386,12 +3757,41 @@ const buildInstallationReportMarkup = ({
               <strong>Forma de pago evaluada:</strong> ${escapeHtml(paymentSummaryLabel)}. ${escapeHtml(paymentSummaryDetail)}
             </div>
             <div class="pdf-note">
-              <strong>Nota técnica:</strong> ${escapeHtml(metrics.projectExecutionNote)}
+              <strong>Datos energéticos:</strong> ${escapeHtml(formatNumber(metrics.monthlyConsumptionKWh, 0))} kWh/mes y ${escapeHtml(formatCLP(metrics.monthlyBill))} de boleta mensual utilizados como base de cálculo.
             </div>
-            <div class="pdf-note pdf-note--full">
-              <strong>Descargo:</strong> Este documento es referencial y se ajusta con visita técnica,
-              ingeniería de detalle, tablero disponible, trazado efectivo, sombras y condiciones reales del sitio.
+            <div class="pdf-note">
+              <strong>Almacenamiento considerado:</strong> ${escapeHtml(selectedConfiguration.components)}
             </div>
+          </div>
+        </section>
+
+        <section class="pdf-section">
+          <div class="pdf-section-head">
+            <h3>Cómo interpretar las cifras del informe</h3>
+          </div>
+          <div class="pdf-note-grid">
+            <div class="pdf-note">
+              <strong>Cobertura energética:</strong> porcentaje del consumo mensual estimado que es abastecido por la energía solar aprovechada por el cliente.
+            </div>
+            <div class="pdf-note">
+              <strong>Autoconsumo solar:</strong> porcentaje de la generación fotovoltaica que se utiliza en la instalación, directa o posteriormente mediante batería.
+            </div>
+            <div class="pdf-note">
+              <strong>Compra a la red:</strong> energía que aún debe ser suministrada por la distribuidora después del aporte fotovoltaico estimado.
+            </div>
+            <div class="pdf-note">
+              <strong>Compensación económica:</strong> reducción estimada de la boleta considerando autoconsumo e inyección valorizada; no equivale necesariamente a independencia energética.
+            </div>
+          </div>
+        </section>
+
+        <section class="pdf-section">
+          <div class="pdf-method-box">
+            <strong>Validaciones previas a la ejecución</strong>
+            <p>La ingeniería final confirma orientación e inclinación, sombras, superficie útil, canalizaciones, protecciones, capacidad del tablero, configuración de cargas críticas, potencia disponible y condiciones de conexión. En sistemas con batería, también se valida autonomía, potencia de respaldo, estado de carga y estrategia de operación.</p>
+          </div>
+          <div class="pdf-note pdf-note--full pdf-final-disclaimer">
+            <strong>Alcance de la estimación:</strong> Este documento es preliminar. Los resultados pueden ajustarse por visita técnica, ingeniería de detalle, sombras, orientación, trazado, tablero disponible, configuración de respaldo, cargos tarifarios, condiciones del sitio y desempeño real de los equipos.
           </div>
         </section>
 
@@ -3413,6 +3813,7 @@ const buildInstallationReportMarkup = ({
       .pdf-report {
         width: 210mm;
         background: #ffffff;
+        counter-reset: reportPage 1;
       }
       .pdf-cover,
       .pdf-page {
@@ -3450,14 +3851,28 @@ const buildInstallationReportMarkup = ({
       .pdf-header-brand {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
       }
       .pdf-brand-lockup img,
       .pdf-header-brand img {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
         display: block;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        object-position: left center;
+        border-radius: 0;
+        image-rendering: auto;
+        flex: 0 0 auto;
+      }
+      .pdf-brand-lockup img {
+        width: 116px;
+        max-width: 116px;
+        max-height: 53px;
+      }
+      .pdf-header-brand img {
+        width: 90px;
+        max-width: 90px;
+        max-height: 41px;
       }
       .pdf-brand-lockup strong,
       .pdf-brand-lockup span,
@@ -3472,7 +3887,7 @@ const buildInstallationReportMarkup = ({
       }
       .pdf-brand-lockup span,
       .pdf-header-brand span {
-        margin-top: 4px;
+        margin-top: 0;
         font-size: 10px;
         line-height: 1.45;
         color: #6b7280;
@@ -3523,7 +3938,9 @@ const buildInstallationReportMarkup = ({
       .pdf-section-head p,
       .pdf-offer-card p,
       .pdf-note,
-      .pdf-footer span {
+      .pdf-footer span,
+      .pdf-system-main p,
+      .pdf-method-box p {
         color: #5b616e;
       }
       .pdf-cover-copy p {
@@ -3534,7 +3951,10 @@ const buildInstallationReportMarkup = ({
       .pdf-cover-grid,
       .pdf-grid,
       .pdf-offer-grid,
-      .pdf-note-grid {
+      .pdf-note-grid,
+      .pdf-mini-grid,
+      .pdf-definition-grid,
+      .pdf-finance-comparison {
         display: grid;
         gap: 10px;
       }
@@ -3548,12 +3968,23 @@ const buildInstallationReportMarkup = ({
       .pdf-grid--climate {
         grid-template-columns: repeat(4, minmax(0, 1fr));
       }
+      .pdf-grid--equipment {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .pdf-grid--finance {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
       .pdf-card,
       .pdf-offer-card,
       .pdf-note,
       .pdf-client-box,
       .pdf-meta-box,
-      .pdf-chart-card {
+      .pdf-chart-card,
+      .pdf-mini-card,
+      .pdf-system-hero,
+      .pdf-finance-hero,
+      .pdf-method-box,
+      .pdf-finance-comparison > div {
         border: 1px solid #e5e7eb;
         border-radius: 16px;
         background: #ffffff;
@@ -3573,11 +4004,15 @@ const buildInstallationReportMarkup = ({
       .pdf-card span,
       .pdf-offer-grid span,
       .pdf-client-box span,
-      .pdf-meta-box span {
+      .pdf-meta-box span,
+      .pdf-mini-card span,
+      .pdf-system-hero span,
+      .pdf-finance-hero span,
+      .pdf-finance-comparison span {
         display: block;
         font-size: 9px;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.065em;
         color: #7b8090;
       }
       .pdf-card strong,
@@ -3593,7 +4028,11 @@ const buildInstallationReportMarkup = ({
       .pdf-card small,
       .pdf-client-box small,
       .pdf-meta-box small,
-      .pdf-offer-grid strong {
+      .pdf-offer-grid strong,
+      .pdf-mini-card small,
+      .pdf-system-hero small,
+      .pdf-finance-hero small,
+      .pdf-finance-comparison small {
         display: block;
         margin-top: 6px;
         font-size: 10px;
@@ -3608,14 +4047,20 @@ const buildInstallationReportMarkup = ({
         flex: 1;
         padding: 12px;
       }
-      .pdf-page-break {
-        page-break-after: always;
-        break-after: page;
-      }
       .pdf-page {
-        padding: 14mm;
+        padding: 14mm 14mm 22mm;
         background: #ffffff;
         box-sizing: border-box;
+        counter-increment: reportPage;
+      }
+      .pdf-page::after {
+        content: "Sakiara Energía Solar · Página " counter(reportPage) " de 7";
+        position: absolute;
+        right: 14mm;
+        bottom: 8mm;
+        font-size: 8.5px;
+        color: #9ca3af;
+        letter-spacing: 0.02em;
       }
       .pdf-page--content {
         height: 297mm;
@@ -3641,7 +4086,7 @@ const buildInstallationReportMarkup = ({
         border-radius: 14px;
       }
       .pdf-section {
-        margin-top: 10mm;
+        margin-top: 9mm;
         break-inside: avoid;
         page-break-inside: avoid;
       }
@@ -3653,11 +4098,19 @@ const buildInstallationReportMarkup = ({
       .pdf-offer-card h4 {
         margin: 0;
       }
+      .pdf-section-head > * {
+        min-width: 0;
+      }
+      .pdf-section-head h3 {
+        flex: 1 1 48%;
+        max-width: 48%;
+      }
       .pdf-section-head p {
+        flex: 1 1 48%;
         margin: 5px 0 0;
-        font-size: 12px;
-        line-height: 1.6;
-        max-width: 420px;
+        font-size: 11px;
+        line-height: 1.55;
+        max-width: 48%;
       }
       .pdf-charts-grid {
         display: grid;
@@ -3669,52 +4122,114 @@ const buildInstallationReportMarkup = ({
         padding: 12px;
       }
       .pdf-chart-card h3 {
-        font-size: 13px;
-        line-height: 1.4;
+        font-size: 12px;
+        line-height: 1.35;
+        min-height: 32px;
       }
       .pdf-chart-bars {
         display: flex;
         align-items: flex-end;
         justify-content: space-between;
-        gap: 10px;
-        margin-top: 16px;
-        min-height: 168px;
+        gap: 8px;
+        margin-top: 10px;
+        min-height: 156px;
       }
       .pdf-chart-item {
         flex: 1;
         text-align: center;
       }
       .pdf-chart-bar-wrap {
-        height: 152px;
+        height: 148px;
         display: flex;
         align-items: flex-end;
         justify-content: center;
       }
       .pdf-chart-bar {
-        width: 34px;
+        width: 30px;
         border-radius: 12px 12px 0 0;
         background: linear-gradient(180deg, #f1d433 0%, #d3a900 100%);
       }
       .pdf-chart-item strong {
         display: block;
-        margin-top: 9px;
-        font-size: 11px;
+        margin-top: 8px;
+        font-size: 10px;
         color: #1f2937;
       }
       .pdf-chart-item span {
         display: block;
         margin-top: 4px;
-        font-size: 10px;
+        font-size: 9px;
         line-height: 1.35;
         color: #6b7280;
       }
+      .pdf-mini-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .pdf-mini-card {
+        padding: 10px;
+        background: #f8fafc;
+      }
+      .pdf-mini-card strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 16px;
+        color: #1f2937;
+      }
+      .pdf-system-hero,
+      .pdf-finance-hero {
+        margin-top: 9mm;
+        padding: 14px;
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 12px;
+        background: #fffced;
+        border-color: #ead675;
+      }
+      .pdf-system-main h3 {
+        margin: 7px 0 0;
+        font-size: 23px;
+      }
+      .pdf-system-main p {
+        margin: 7px 0 0;
+        font-size: 11px;
+        line-height: 1.55;
+      }
+      .pdf-system-storage,
+      .pdf-finance-hero > div {
+        padding-left: 12px;
+        border-left: 1px solid #ead675;
+      }
+      .pdf-system-storage strong,
+      .pdf-finance-hero strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 17px;
+        line-height: 1.3;
+        color: #1f2937;
+      }
+      .pdf-definition-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .pdf-method-box {
+        padding: 13px;
+        background: #f8fafc;
+      }
+      .pdf-method-box strong {
+        color: #1f2937;
+        font-size: 12px;
+      }
+      .pdf-method-box p {
+        margin: 6px 0 0;
+        font-size: 10.5px;
+        line-height: 1.55;
+      }
       .pdf-offer-stack {
         display: grid;
-        gap: 10px;
+        gap: 9px;
         margin-top: 10px;
       }
       .pdf-offer-card {
-        padding: 12px;
+        padding: 11px;
       }
       .pdf-offer-card.is-selected {
         border-color: #ead675;
@@ -3742,25 +4257,33 @@ const buildInstallationReportMarkup = ({
         background: #dcfce7;
       }
       .pdf-offer-card h4 {
-        margin-top: 10px;
-        font-size: 18px;
+        margin-top: 8px;
+        font-size: 16px;
       }
       .pdf-offer-card p {
-        margin: 6px 0 0;
-        font-size: 12px;
-        line-height: 1.6;
+        margin: 5px 0 0;
+        font-size: 10.5px;
+        line-height: 1.45;
+      }
+      .pdf-offer-detail {
+        display: block;
+        margin-top: 4px;
+        max-width: 560px;
+        color: #7b8090;
+        font-size: 9.2px;
+        line-height: 1.42;
       }
       .pdf-offer-grid {
         grid-template-columns: repeat(5, minmax(0, 1fr));
-        margin-top: 12px;
+        margin-top: 9px;
       }
       .pdf-offer-grid > div {
-        padding-top: 10px;
+        padding-top: 8px;
         border-top: 1px solid #eceff3;
       }
       .pdf-offer-grid strong {
-        margin-top: 6px;
-        font-size: 13px;
+        margin-top: 5px;
+        font-size: 11px;
         color: #1f2937;
       }
       .pdf-note-grid {
@@ -3768,15 +4291,29 @@ const buildInstallationReportMarkup = ({
         margin-top: 10px;
       }
       .pdf-note {
-        padding: 12px;
-        font-size: 12px;
-        line-height: 1.7;
+        padding: 11px;
+        font-size: 10.5px;
+        line-height: 1.55;
       }
       .pdf-note--full {
         grid-column: 1 / -1;
       }
+      .pdf-finance-comparison {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-top: 10px;
+      }
+      .pdf-finance-comparison > div {
+        padding: 11px;
+        background: #f8fafc;
+      }
+      .pdf-finance-comparison strong {
+        display: block;
+        margin-top: 7px;
+        color: #1f2937;
+        font-size: 15px;
+      }
       .pdf-footer {
-        margin-top: 12mm;
+        margin-top: 8mm;
         padding-top: 10px;
         border-top: 1px solid #e5e7eb;
       }
@@ -3790,7 +4327,6 @@ const buildInstallationReportMarkup = ({
     </style>
   `;
 };
-
 
 const buildEnterpriseQuotationMarkup = ({
   metrics,
@@ -4812,6 +5348,18 @@ export default function SakiaraLandingPage() {
         huaweiBatteryPackNet,
         solisBatteryPackNet,
       },
+      selfConsumedNoBattery,
+      exportedNoBattery,
+      winterSelfConsumedNoBattery,
+      winterExportedNoBattery,
+      summerSelfConsumedNoBattery,
+      summerExportedNoBattery,
+      selfConsumedWithBattery,
+      exportedWithBattery,
+      winterSelfConsumedWithBattery,
+      winterExportedWithBattery,
+      summerSelfConsumedWithBattery,
+      summerExportedWithBattery,
       monthlySavingsNoBattery,
       monthlySavingsWithBattery,
       annualSavingsNoBattery,
