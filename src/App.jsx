@@ -3451,48 +3451,51 @@ const buildInstallationReportMarkup = ({
       <section class="cp-cover pdf-export-page">
         <div class="cp-cover-top">
           ${brandMarkup}
-          <div class="cp-pill">Propuesta autogenerada</div>
+          <div class="cp-pill">Propuesta personalizada</div>
         </div>
 
-        <div class="cp-cover-main">
-          <div class="cp-cover-copy">
-            <div class="cp-kicker">Propuesta comercial de energía solar</div>
-            <h1>Una solución solar diseñada para tu consumo</h1>
-            <p>
-              Evaluación preliminar personalizada para ${escapeHtml(communeLabel)}, ${escapeHtml(regionLabel)}.
-              El documento se construye automáticamente con los datos ingresados en el cotizador Sakiara.
-            </p>
+        <div class="cp-cover-intro">
+          <div class="cp-kicker">Propuesta comercial de energía solar</div>
+          <h1>Una solución solar diseñada para tu consumo</h1>
+          <p>
+            Evaluación preliminar personalizada para ${escapeHtml(communeLabel)}, ${escapeHtml(regionLabel)}.
+            Este informe se genera automáticamente con la información ingresada en el cotizador Sakiara.
+          </p>
+        </div>
 
-            <div class="cp-client-card">
-              <div>
-                <span>Cliente</span>
-                <strong>${escapeHtml(safeClientName)}</strong>
-              </div>
-              <div>
-                <span>Ubicación</span>
-                <strong>${escapeHtml(communeLabel)}</strong>
-                <small>${escapeHtml(regionLabel)}</small>
-              </div>
-              <div>
-                <span>Fecha</span>
-                <strong>${escapeHtml(generatedDate)}</strong>
-              </div>
-            </div>
+        <div class="cp-cover-banner">
+          <img src="/home/sakiara-hero-sunset-wide.jpg" alt="Paneles solares al atardecer" />
+          <div class="cp-cover-banner-shade"></div>
+          <div class="cp-cover-banner-copy">
+            <span>Diseño solar a tu medida</span>
+            <strong>Tu consumo guía el proyecto.</strong>
           </div>
+        </div>
 
-          <div class="cp-cover-visual">
-            <img src="/home/sakiara-hero-sunset-wide.jpg" alt="Energía solar residencial Sakiara" />
-            <div class="cp-cover-visual-copy">
-              <span>Energía solar</span>
-              <strong>para un Chile más brillante</strong>
-            </div>
+        <div class="cp-client-card">
+          <div>
+            <span>Cliente</span>
+            <strong>${escapeHtml(safeClientName)}</strong>
+          </div>
+          <div>
+            <span>Ubicación</span>
+            <strong>${escapeHtml(communeLabel)}</strong>
+            <small>${escapeHtml(regionLabel)}</small>
+          </div>
+          <div>
+            <span>Fecha</span>
+            <strong>${escapeHtml(generatedDate)}</strong>
           </div>
         </div>
 
         <div class="cp-cover-benefits">
-          <div><b>01</b><span>Ahorro energético con una solución dimensionada para tu consumo.</span></div>
-          <div><b>02</b><span>Equipamiento confiable, instalación profesional y respaldo técnico.</span></div>
-          <div><b>03</b><span>Lectura clara de inversión, producción y alcance del proyecto.</span></div>
+          <div><b>01</b><span>Dimensionamiento basado en tu consumo y perfil de uso.</span></div>
+          <div><b>02</b><span>Equipamiento, instalación y respaldo técnico en una sola propuesta.</span></div>
+          <div><b>03</b><span>Producción, ahorro e inversión explicados con claridad.</span></div>
+        </div>
+
+        <div class="cp-cover-note">
+          Informe dinámico: los valores, equipos y secciones se ajustan automáticamente a la alternativa seleccionada en el wizard.
         </div>
 
         ${pageFooter(1)}
@@ -3866,23 +3869,21 @@ const buildInstallationReportMarkup = ({
       <section class="cp-page cp-closing-page pdf-export-page">
         ${sectionHeader(
           "Siguientes pasos",
-          "Te acompañamos desde la evaluación hasta la puesta en marcha",
-          "Sakiara no solo suministra equipos: ejecuta el proyecto, valida la solución en terreno y acompaña la implementación.",
+          "Del análisis a un proyecto listo para ejecutar",
+          "Cada etapa confirma los datos del sitio y convierte la evaluación inicial en una solución técnicamente definida.",
         )}
 
-        <div class="cp-timeline">
-          <div><b>01</b><strong>Evaluación</strong><small>Consumo, necesidades y alternativa preliminar.</small></div>
+        <div class="cp-timeline cp-timeline--four">
+          <div><b>01</b><strong>Evaluación</strong><small>Revisamos consumo, objetivos y antecedentes disponibles.</small></div>
           <span>→</span>
-          <div><b>02</b><strong>Visita técnica</strong><small>Validación del sitio, tablero y trazados.</small></div>
+          <div><b>02</b><strong>Validación técnica</strong><small>Confirmamos sitio, tablero, trazados y condiciones reales de instalación.</small></div>
           <span>→</span>
-          <div><b>03</b><strong>Ingeniería</strong><small>Ajuste final de equipos, protecciones y configuración.</small></div>
+          <div><b>03</b><strong>Ingeniería final</strong><small>Definimos equipos, protecciones, configuración y detalles de ejecución.</small></div>
           <span>→</span>
-          <div><b>04</b><strong>Instalación</strong><small>Ejecución, pruebas y puesta en marcha.</small></div>
-          <span>→</span>
-          <div><b>05</b><strong>Conexión y soporte</strong><small>Monitoreo inicial y acompañamiento postventa.</small></div>
+          <div><b>04</b><strong>Instalación y puesta en marcha</strong><small>Ejecutamos, probamos, configuramos y dejamos el sistema operativo.</small></div>
         </div>
 
-        <div class="cp-two-column">
+        <div class="cp-two-column cp-closing-info-grid">
           <article class="cp-info-panel">
             <div class="cp-section-title">Garantías y respaldo</div>
             <ul class="cp-check-list">
@@ -3892,37 +3893,39 @@ const buildInstallationReportMarkup = ({
               <li>Orientación para la operación del sistema.</li>
             </ul>
           </article>
-          <article class="cp-info-panel cp-info-panel--warm">
+          <article class="cp-info-panel cp-info-panel--warm cp-next-step-card">
             <div class="cp-section-title">Próximo paso recomendado</div>
             <p class="cp-body-copy">
-              Agendar visita técnica o revisión final de la alternativa seleccionada para transformar esta propuesta preliminar en un proyecto definido.
+              Coordinar una visita técnica o revisión final de la alternativa seleccionada para confirmar el diseño y preparar la ejecución del proyecto.
             </p>
-            <div class="cp-cta">Coordinar siguiente etapa →</div>
+            <div class="cp-contact-inline">
+              <span>+56 9 7580 7224</span>
+              <span>${escapeHtml(contactEmail)}</span>
+            </div>
           </article>
         </div>
 
-        <div class="cp-closing-hero">
-          <img src="/home/sakiara-hero-sunset-wide.jpg" alt="Proyecto solar Sakiara" />
-          <div class="cp-closing-overlay">
-            <div class="cp-closing-message">
-              <span>La energía solar hoy.</span>
-              <strong>Un mejor mañana.</strong>
-            </div>
-            <div class="cp-contact-card">
-              ${brandMarkup}
-              <div class="cp-contact-lines">
-                <span>sakiarainversiones.com</span>
-                <span>+56 9 7580 7224</span>
-                <span>${escapeHtml(contactEmail)}</span>
-              </div>
-            </div>
+        <div class="cp-closing-banner">
+          <img src="/home/sakiara-hero-sunset-wide.jpg" alt="Paneles solares al atardecer" />
+          <div class="cp-closing-banner-shade"></div>
+          <div class="cp-closing-message">
+            <span>Sakiara Energía Solar</span>
+            <strong>Tu proyecto, definido para ejecutarse bien.</strong>
           </div>
         </div>
 
-        <div class="cp-final-meta">
-          <div><span>Perfil de consumo</span><strong>${escapeHtml(profileLabel || "Perfil residencial")}</strong><small>${escapeHtml(profileDescription || "")}</small></div>
-          <div><span>Ubicación evaluada</span><strong>${escapeHtml(communeLabel)}</strong><small>${escapeHtml(regionLabel)}</small></div>
-          <div><span>Base del cálculo</span><strong>${escapeHtml(metrics.modeSummaryLabel || "Datos del wizard")}</strong><small>${escapeHtml(metrics.modeSummaryHint || "")}</small></div>
+        <div class="cp-closing-contact">
+          <div class="cp-closing-brand">${brandMarkup}</div>
+          <div class="cp-closing-contact-data">
+            <div><span>Sitio web</span><strong>sakiarainversiones.com</strong></div>
+            <div><span>Teléfono</span><strong>+56 9 7580 7224</strong></div>
+            <div><span>Correo</span><strong>${escapeHtml(contactEmail)}</strong></div>
+          </div>
+        </div>
+
+        <div class="cp-closing-note">
+          <strong>Evaluación dinámica Sakiara.</strong>
+          <span>Los valores y configuraciones de este informe se generan con los datos del cotizador y pueden ajustarse después de la validación técnica.</span>
         </div>
 
         ${pageFooter(7)}
@@ -3963,7 +3966,6 @@ const buildInstallationReportMarkup = ({
       .cp-cover-top,
       .cp-page-header,
       .cp-brand,
-      .cp-client-card,
       .cp-now-grid,
       .cp-day-flow,
       .cp-system-flow,
@@ -3972,7 +3974,6 @@ const buildInstallationReportMarkup = ({
       .cp-price-grid,
       .cp-return-card,
       .cp-timeline,
-      .cp-closing-overlay,
       .cp-final-meta {
         display: flex;
       }
@@ -4034,43 +4035,83 @@ const buildInstallationReportMarkup = ({
         color: #6d7481;
         font-weight: 700;
       }
-      .cp-cover-main {
-        display: grid;
-        grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-        gap: 11mm;
-        align-items: stretch;
-        margin-top: 18mm;
+      .cp-cover-intro {
+        margin-top: 15mm;
+        max-width: 170mm;
       }
-      .cp-cover-copy {
-        padding-top: 4mm;
-      }
-      .cp-cover-copy h1 {
+      .cp-cover-intro h1 {
         margin: 8px 0 0;
-        font-size: 30px;
-        line-height: 1.04;
+        max-width: 165mm;
+        font-size: 32px;
+        line-height: 1.02;
         letter-spacing: -0.045em;
         color: #161d2e;
       }
-      .cp-cover-copy > p {
-        margin: 11px 0 0;
-        font-size: 11px;
-        line-height: 1.62;
+      .cp-cover-intro > p {
+        margin: 10px 0 0;
+        max-width: 154mm;
+        font-size: 10.5px;
+        line-height: 1.55;
         color: #626b79;
       }
+      .cp-cover-banner {
+        position: relative;
+        height: 58mm;
+        margin-top: 10mm;
+        border-radius: 18px;
+        overflow: hidden;
+        background: #f3f4f6;
+      }
+      .cp-cover-banner > img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        object-position: center 58%;
+      }
+      .cp-cover-banner-shade {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(10,16,28,0.50) 0%, rgba(10,16,28,0.14) 42%, rgba(10,16,28,0.03) 74%);
+      }
+      .cp-cover-banner-copy {
+        position: absolute;
+        left: 14px;
+        bottom: 13px;
+        max-width: 72mm;
+        padding-left: 10px;
+        border-left: 3px solid #f5bd20;
+        color: #ffffff;
+      }
+      .cp-cover-banner-copy span,
+      .cp-cover-banner-copy strong {
+        display: block;
+      }
+      .cp-cover-banner-copy span {
+        font-size: 7.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+      }
+      .cp-cover-banner-copy strong {
+        margin-top: 4px;
+        font-size: 16px;
+        line-height: 1.15;
+      }
       .cp-client-card {
-        margin-top: 12mm;
-        flex-direction: column;
-        gap: 0;
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-top: 8mm;
         border: 1px solid #e6e8ec;
         border-radius: 14px;
         background: #f8f9fa;
         overflow: hidden;
       }
       .cp-client-card > div {
-        padding: 9px 11px;
-        border-bottom: 1px solid #e6e8ec;
+        min-height: 28mm;
+        padding: 11px 12px;
+        border-right: 1px solid #e6e8ec;
       }
-      .cp-client-card > div:last-child { border-bottom: 0; }
+      .cp-client-card > div:last-child { border-right: 0; }
       .cp-client-card span,
       .cp-solution-hero span,
       .cp-impact-strip span,
@@ -4087,81 +4128,46 @@ const buildInstallationReportMarkup = ({
         display: block;
       }
       .cp-client-card strong {
-        margin-top: 4px;
+        margin-top: 5px;
         font-size: 12px;
+        line-height: 1.25;
         color: #182034;
       }
       .cp-client-card small {
         margin-top: 3px;
-        font-size: 8.5px;
+        font-size: 8.2px;
         color: #697281;
-      }
-      .cp-cover-visual {
-        position: relative;
-        border-radius: 22px 0 22px 22px;
-        overflow: hidden;
-        min-height: 152mm;
-        background: #f3f4f6;
-      }
-      .cp-cover-visual::before {
-        content: "";
-        position: absolute;
-        z-index: 1;
-        inset: 0;
-        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(7,13,25,0.18));
-      }
-      .cp-cover-visual img {
-        width: 100%;
-        height: 100%;
-        min-height: 152mm;
-        object-fit: cover;
-        display: block;
-      }
-      .cp-cover-visual-copy {
-        position: absolute;
-        z-index: 2;
-        left: 16px;
-        bottom: 17px;
-        right: 16px;
-        padding-left: 10px;
-        border-left: 3px solid #f6c431;
-        color: #ffffff;
-      }
-      .cp-cover-visual-copy span,
-      .cp-cover-visual-copy strong {
-        display: block;
-      }
-      .cp-cover-visual-copy span {
-        font-size: 8px;
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-      }
-      .cp-cover-visual-copy strong {
-        margin-top: 4px;
-        font-size: 16px;
-        line-height: 1.15;
       }
       .cp-cover-benefits {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
-        margin-top: 11mm;
+        margin-top: 7mm;
       }
       .cp-cover-benefits > div {
         display: flex;
         gap: 9px;
-        padding: 10px;
-        min-height: 52px;
+        padding: 9px 10px;
+        min-height: 43px;
         border-top: 1px solid #dfe2e6;
       }
       .cp-cover-benefits b {
         color: #e6ad08;
-        font-size: 12px;
+        font-size: 11px;
       }
       .cp-cover-benefits span {
-        font-size: 8.8px;
-        line-height: 1.45;
+        font-size: 8.2px;
+        line-height: 1.42;
         color: #505968;
+      }
+      .cp-cover-note {
+        margin-top: 5mm;
+        padding-left: 9px;
+        border-left: 2px solid #f1bd25;
+        max-width: 158mm;
+        font-size: 7.5px;
+        line-height: 1.45;
+        color: #7a8290;
       }
       .cp-page-header {
         padding-bottom: 6mm;
@@ -4802,40 +4808,60 @@ const buildInstallationReportMarkup = ({
         line-height: 1.35;
         color: #6d7684;
       }
-      .cp-cta {
-        margin-top: 10px;
-        padding: 8px 10px;
-        border-radius: 999px;
-        background: #f5bf24;
-        color: #152033;
-        text-align: center;
-        font-size: 9px;
-        font-weight: 800;
+      .cp-timeline--four > div {
+        min-height: 39mm;
       }
-      .cp-closing-hero {
+      .cp-closing-info-grid {
+        margin-top: 7mm;
+      }
+      .cp-next-step-card {
+        display: flex;
+        flex-direction: column;
+      }
+      .cp-contact-inline {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+        margin-top: auto;
+        padding-top: 8px;
+      }
+      .cp-contact-inline span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 23px;
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.72);
+        border: 1px solid rgba(196,153,18,0.18);
+        color: #5f6877;
+        font-size: 7.4px;
+        font-weight: 700;
+      }
+      .cp-closing-banner {
         position: relative;
-        height: 77mm;
-        margin-top: 8mm;
-        border-radius: 17px;
+        height: 39mm;
+        margin-top: 7mm;
+        border-radius: 16px;
         overflow: hidden;
         background: #eef0f2;
       }
-      .cp-closing-hero > img {
+      .cp-closing-banner > img {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        object-position: center 58%;
         display: block;
       }
-      .cp-closing-overlay {
+      .cp-closing-banner-shade {
         position: absolute;
         inset: 0;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 13px;
-        background: linear-gradient(90deg, rgba(9,15,27,0.48), rgba(9,15,27,0.05) 55%, rgba(255,255,255,0.06));
+        background: linear-gradient(90deg, rgba(9,15,27,0.54), rgba(9,15,27,0.12) 55%, rgba(9,15,27,0.02));
       }
       .cp-closing-message {
+        position: absolute;
+        left: 13px;
+        bottom: 12px;
+        max-width: 100mm;
         color: #ffffff;
         padding-left: 9px;
         border-left: 3px solid #f5bd20;
@@ -4845,31 +4871,75 @@ const buildInstallationReportMarkup = ({
         display: block;
       }
       .cp-closing-message span {
-        font-size: 8px;
+        font-size: 7.5px;
         text-transform: uppercase;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.14em;
       }
       .cp-closing-message strong {
         margin-top: 4px;
-        font-size: 18px;
+        font-size: 16px;
+        line-height: 1.12;
       }
-      .cp-contact-card {
-        width: 68mm;
-        padding: 10px;
+      .cp-closing-contact {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10mm;
+        margin-top: 7mm;
+        padding: 10px 12px;
+        border: 1px solid #e5e7eb;
         border-radius: 14px;
-        background: rgba(255,255,255,0.94);
+        background: #ffffff;
       }
-      .cp-contact-card .cp-brand-copy small { display: none; }
-      .cp-contact-lines {
-        margin-top: 9px;
-        padding-top: 8px;
-        border-top: 1px solid #e5e7eb;
+      .cp-closing-brand {
+        flex: 0 0 auto;
       }
-      .cp-contact-lines span {
+      .cp-closing-brand .cp-brand-copy small {
+        display: none;
+      }
+      .cp-closing-contact-data {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        flex: 1;
+      }
+      .cp-closing-contact-data > div {
+        min-width: 0;
+        padding-left: 8px;
+        border-left: 1px solid #e7e9ec;
+      }
+      .cp-closing-contact-data span,
+      .cp-closing-contact-data strong {
         display: block;
+      }
+      .cp-closing-contact-data span {
+        font-size: 6.8px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #8a919d;
+      }
+      .cp-closing-contact-data strong {
         margin-top: 4px;
-        font-size: 7.7px;
-        color: #5c6573;
+        font-size: 7.6px;
+        line-height: 1.25;
+        color: #222b3b;
+        overflow-wrap: anywhere;
+      }
+      .cp-closing-note {
+        display: flex;
+        gap: 7px;
+        margin-top: 5mm;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #fff8df;
+        border: 1px solid #f0df9d;
+        font-size: 7.3px;
+        line-height: 1.4;
+        color: #6a6248;
+      }
+      .cp-closing-note strong {
+        flex: 0 0 auto;
+        color: #3d3a30;
       }
       .cp-final-meta {
         gap: 7px;
