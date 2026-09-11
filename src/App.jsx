@@ -530,7 +530,15 @@ const ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY = 140000;
 const ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY = 80000;
 const ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY = 20000;
 const ENTERPRISE_LODGING_CLP_PER_DAY = 70000;
-const ENTERPRISE_REMOTE_DISTANCE_THRESHOLD_KM = 400;
+
+// Política logística Sakiara: el cálculo combina distancia y tiempo real de traslado.
+// - Local: hasta 30 min por sentido.
+// - Intermedia: más de 30 min por sentido, sin requerir alojamiento.
+// - Con alojamiento: fuera de la RM sobre 60 min por sentido, o 300 km+ ida/vuelta.
+const LOGISTICS_INTERMEDIATE_MIN_ONE_WAY_MINUTES = 30;
+const LOGISTICS_LODGING_MIN_ONE_WAY_MINUTES = 60;
+const LOGISTICS_REMOTE_DISTANCE_THRESHOLD_KM = 300;
+const LOGISTICS_STANDARD_WORKDAY_HOURS = 8;
 const ENTERPRISE_REMOTE_TRAVEL_DAYS = 2;
 
 const getEnterpriseCertificationNet = (systemSizeKwp = 0) =>
@@ -852,6 +860,7 @@ const getEnterpriseProjectExecutionPlan = ({
     safeCommune.roundTripKm,
     safeCommune.tolls,
   );
+  const logisticsMode = getProjectLogisticsMode(safeCommune);
   const projectWorkDays = Math.max(
     5,
     Math.ceil(
@@ -859,36 +868,51 @@ const getEnterpriseProjectExecutionPlan = ({
         ENTERPRISE_TECH_CREW_PANEL_CAPACITY_PER_DAY,
     ),
   );
-  const isRemoteProject =
-    Boolean(safeCommune.specialLogistics) ||
-    safeCommune.roundTripKm >= ENTERPRISE_REMOTE_DISTANCE_THRESHOLD_KM;
-  const travelDays = isRemoteProject ? ENTERPRISE_REMOTE_TRAVEL_DAYS : 0;
-  const bufferDays = isRemoteProject
+  const travelDays =
+    logisticsMode.isRemoteProject && logisticsMode.isLongDistanceRemote
+      ? ENTERPRISE_REMOTE_TRAVEL_DAYS
+      : 0;
+  const bufferDays = logisticsMode.isRemoteProject
     ? Math.max(1, Math.ceil(Math.max(systemSizeKwp - 30, 0) / 100))
     : 0;
   const projectCalendarDays = projectWorkDays + travelDays + bufferDays;
-  const laborNet =
-    projectCalendarDays *
-    (ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY +
-      ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY);
+  const crewDailyRate =
+    ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY +
+    ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY;
+  const laborNet = projectCalendarDays * crewDailyRate;
   const localLogisticsNet =
     projectCalendarDays * ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY;
-  const lodgingDays = isRemoteProject ? projectCalendarDays : 0;
-  const lodgingNet = lodgingDays * ENTERPRISE_LODGING_CLP_PER_DAY;
+  const lodgingNights = logisticsMode.isRemoteProject
+    ? Math.max(projectCalendarDays - 1, 1)
+    : 0;
+  const lodgingNet = lodgingNights * ENTERPRISE_LODGING_CLP_PER_DAY;
+  const travelBaseNet = logisticsMode.isRemoteProject
+    ? travelMetrics.logisticsBase
+    : travelMetrics.logisticsBase * projectWorkDays;
+  const travelTimeLaborNet = logisticsMode.isIntermediateProject
+    ? getTravelTimeLaborCost({
+        oneWayMinutes: logisticsMode.oneWayMinutes,
+        projectWorkDays,
+        crewDailyRate,
+      })
+    : 0;
   const logisticsNet =
-    travelMetrics.logisticsBase + localLogisticsNet + lodgingNet;
+    travelBaseNet + localLogisticsNet + lodgingNet + travelTimeLaborNet;
 
   return {
     ...travelMetrics,
-    isRemoteProject,
+    ...logisticsMode,
     projectWorkDays,
     travelDays,
     bufferDays,
     projectCalendarDays,
     laborNet,
     localLogisticsNet,
-    lodgingDays,
+    lodgingDays: lodgingNights,
+    lodgingNights,
     lodgingNet,
+    travelBaseNet,
+    travelTimeLaborNet,
     logisticsNet,
   };
 };
@@ -904,7 +928,6 @@ const INSTALLATION_PANEL_CREW_CAPACITY_PER_DAY = 8;
 const INSTALLATION_REMOTE_TRAVEL_DAYS = 2;
 const INSTALLATION_REMOTE_BASE_BUFFER_DAYS = 1;
 const INSTALLATION_REMOTE_PANEL_BUFFER_BLOCK = 16;
-const INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM = 400;
 const INSTALLATION_REMOTE_DISTANCE_BUFFER_THRESHOLD_KM = 1200;
 const INSTALLATION_REMOTE_DISTANCE_BUFFER_BLOCK_KM = 800;
 const INSTALLATION_TECH_CREW_LABOR_CLP_PER_DAY = 140000;
@@ -928,6 +951,63 @@ const getTravelLogisticsBase = (roundTripKm, tolls = 0) => {
     commercialTravelFee,
     logisticsBase: Math.max(internalTravelEstimate, commercialTravelFee),
   };
+};
+
+const getProjectLogisticsMode = (communeConfig = {}) => {
+  const roundTripKm = Math.max(Number(communeConfig.roundTripKm) || 0, 0);
+  const oneWayMinutes = Math.max(Number(communeConfig.oneWayMinutes) || 0, 0);
+  const isOutsideMetropolitana = communeConfig.regionKey !== "metropolitana";
+  const isRemoteByDistance =
+    roundTripKm >= LOGISTICS_REMOTE_DISTANCE_THRESHOLD_KM;
+  const isRemoteByTime =
+    isOutsideMetropolitana &&
+    oneWayMinutes > LOGISTICS_LODGING_MIN_ONE_WAY_MINUTES;
+  const isRemoteProject =
+    Boolean(communeConfig.specialLogistics) ||
+    isRemoteByDistance ||
+    isRemoteByTime;
+  const isIntermediateProject =
+    !isRemoteProject &&
+    oneWayMinutes > LOGISTICS_INTERMEDIATE_MIN_ONE_WAY_MINUTES;
+  const logisticsTier = isRemoteProject
+    ? "lodging"
+    : isIntermediateProject
+      ? "intermediate"
+      : "local";
+  const logisticsLabel = isRemoteProject
+    ? "Proyecto con alojamiento"
+    : isIntermediateProject
+      ? "Logística intermedia"
+      : "Logística local";
+
+  return {
+    oneWayMinutes,
+    isOutsideMetropolitana,
+    isRemoteByDistance,
+    isRemoteByTime,
+    isRemoteProject,
+    isIntermediateProject,
+    isLongDistanceRemote:
+      Boolean(communeConfig.specialLogistics) || isRemoteByDistance,
+    logisticsTier,
+    logisticsLabel,
+  };
+};
+
+const getTravelTimeLaborCost = ({
+  oneWayMinutes = 0,
+  projectWorkDays = 0,
+  crewDailyRate = 0,
+} = {}) => {
+  const dailyRoundTripHours = (Math.max(oneWayMinutes, 0) * 2) / 60;
+  const hourlyCrewRate =
+    Math.max(crewDailyRate, 0) / LOGISTICS_STANDARD_WORKDAY_HOURS;
+
+  return Math.round(
+    dailyRoundTripHours *
+      Math.max(projectWorkDays, 0) *
+      hourlyCrewRate,
+  );
 };
 
 const getInstallationWorkDaysFromPanels = (panelCount = 0) => {
@@ -961,19 +1041,19 @@ const getInstallationProjectLogistics = (communeConfig, panelCount = 0) => {
     safeCommune.roundTripKm,
     safeCommune.tolls,
   );
-  const isRemoteProject =
-    Boolean(safeCommune.specialLogistics) ||
-    safeCommune.roundTripKm >= INSTALLATION_REMOTE_DISTANCE_THRESHOLD_KM;
+  const logisticsMode = getProjectLogisticsMode(safeCommune);
   const projectWorkDays = getInstallationWorkDaysFromPanels(panelCount);
 
-  if (isRemoteProject) {
-    const travelDays = INSTALLATION_REMOTE_TRAVEL_DAYS;
+  if (logisticsMode.isRemoteProject) {
+    const travelDays = logisticsMode.isLongDistanceRemote
+      ? INSTALLATION_REMOTE_TRAVEL_DAYS
+      : 0;
     const bufferDays = getInstallationRemoteBufferDays(
       panelCount,
       safeCommune.roundTripKm,
     );
     const projectCalendarDays = projectWorkDays + travelDays + bufferDays;
-    const lodgingDays = projectCalendarDays;
+    const lodgingNights = Math.max(projectCalendarDays - 1, 1);
     const localLogistics =
       projectCalendarDays * INSTALLATION_LOCAL_LOGISTICS_CLP_PER_DAY;
     const laborDays = projectCalendarDays;
@@ -981,22 +1061,24 @@ const getInstallationProjectLogistics = (communeConfig, panelCount = 0) => {
 
     return {
       ...travelMetrics,
+      ...logisticsMode,
       roundTripKm: safeCommune.roundTripKm,
       tolls: safeCommune.tolls,
-      isRemoteProject,
       panelCount: Math.max(Math.ceil(Number(panelCount) || 0), 1),
       projectWorkDays,
       travelDays,
       bufferDays,
       projectCalendarDays,
-      lodgingDays,
-      lodgingNights: lodgingDays,
+      lodgingDays: lodgingNights,
+      lodgingNights,
       localLogistics,
       laborDays,
       laborTotal,
+      travelBaseNet: travelMetrics.logisticsBase,
+      travelTimeLaborNet: 0,
       logisticsTotal:
         travelMetrics.logisticsBase +
-        lodgingDays * INSTALLATION_REMOTE_LODGING_CLP_PER_DAY +
+        lodgingNights * INSTALLATION_REMOTE_LODGING_CLP_PER_DAY +
         localLogistics,
     };
   }
@@ -1004,12 +1086,20 @@ const getInstallationProjectLogistics = (communeConfig, panelCount = 0) => {
   const projectCalendarDays = projectWorkDays;
   const laborDays = projectCalendarDays;
   const laborTotal = laborDays * INSTALLATION_TECH_CREW_LABOR_CLP_PER_DAY;
+  const travelTimeLaborNet = logisticsMode.isIntermediateProject
+    ? getTravelTimeLaborCost({
+        oneWayMinutes: logisticsMode.oneWayMinutes,
+        projectWorkDays,
+        crewDailyRate: INSTALLATION_TECH_CREW_LABOR_CLP_PER_DAY,
+      })
+    : 0;
+  const travelBaseNet = travelMetrics.logisticsBase * projectWorkDays;
 
   return {
     ...travelMetrics,
+    ...logisticsMode,
     roundTripKm: safeCommune.roundTripKm,
     tolls: safeCommune.tolls,
-    isRemoteProject,
     panelCount: Math.max(Math.ceil(Number(panelCount) || 0), 1),
     projectWorkDays,
     travelDays: 0,
@@ -1020,7 +1110,9 @@ const getInstallationProjectLogistics = (communeConfig, panelCount = 0) => {
     localLogistics: 0,
     laborDays,
     laborTotal,
-    logisticsTotal: travelMetrics.logisticsBase * projectWorkDays,
+    travelBaseNet,
+    travelTimeLaborNet,
+    logisticsTotal: travelBaseNet + travelTimeLaborNet,
   };
 };
 
@@ -1780,16 +1872,16 @@ const COMMUNE_LOGISTICS_OVERRIDES = {
   atacama: { copiapo: { roundTripKm: 1660, tolls: 30000 }, vallenar: { roundTripKm: 1320, tolls: 26000 } },
   coquimbo: { "la-serena": { roundTripKm: 940, tolls: 18000 }, coquimbo: { roundTripKm: 950, tolls: 18000 }, ovalle: { roundTripKm: 780, tolls: 16000 }, vicuna: { roundTripKm: 1040, tolls: 22000 }, paihuano: { roundTripKm: 1120, tolls: 22000 } },
   valparaiso: {
-    valparaiso: { roundTripKm: 300, tolls: 12000 },
+    valparaiso: { roundTripKm: 278, tolls: 12000, oneWayMinutes: 90 },
     "vina-del-mar": { roundTripKm: 310, tolls: 12000 },
     quilpue: { roundTripKm: 290, tolls: 10000 },
     concon: { roundTripKm: 320, tolls: 12000 },
-    "los-andes": { roundTripKm: 220, tolls: 9000 },
-    "san-felipe": { roundTripKm: 200, tolls: 9000 },
+    "los-andes": { roundTripKm: 96, tolls: 9000, oneWayMinutes: 41 },
+    "san-felipe": { roundTripKm: 114, tolls: 9000, oneWayMinutes: 55 },
     "juan-fernandez": { roundTripKm: 1320, tolls: 0, specialLogistics: true },
     "isla-de-pascua": { roundTripKm: 7500, tolls: 0, specialLogistics: true },
   },
-  ohiggins: { rancagua: { roundTripKm: 170, tolls: 6000 }, machali: { roundTripKm: 180, tolls: 6000 }, "san-fernando": { roundTripKm: 280, tolls: 9000 }, pichilemu: { roundTripKm: 430, tolls: 13000 } },
+  ohiggins: { rancagua: { roundTripKm: 228, tolls: 6000, oneWayMinutes: 80 }, machali: { roundTripKm: 240, tolls: 6000, oneWayMinutes: 90 }, "san-fernando": { roundTripKm: 330, tolls: 9000, oneWayMinutes: 120 }, pichilemu: { roundTripKm: 430, tolls: 13000, oneWayMinutes: 180 } },
   maule: { talca: { roundTripKm: 510, tolls: 14000 }, curico: { roundTripKm: 380, tolls: 11000 }, linares: { roundTripKm: 620, tolls: 16000 } },
   nuble: { chillan: { roundTripKm: 800, tolls: 19000 }, "san-carlos": { roundTripKm: 740, tolls: 18000 } },
   biobio: { concepcion: { roundTripKm: 1040, tolls: 24000 }, talcahuano: { roundTripKm: 1060, tolls: 24000 }, "los-angeles": { roundTripKm: 900, tolls: 21000 } },
@@ -1862,6 +1954,26 @@ const estimateTollsFromDistance = (regionKey, roundTripKm, coordinates) => {
   return roundToNearest(clamp(estimatedTolls, 0, 65000), 1000);
 };
 
+const estimateOneWayTravelMinutes = (regionKey, roundTripKm, coordinates) => {
+  if (coordinates?.island) return 360;
+
+  const oneWayKm = Math.max(Number(roundTripKm) || 0, 0) / 2;
+  if (oneWayKm <= 5) return Math.round(oneWayKm * 3);
+
+  const averageSpeedKmh =
+    regionKey === "metropolitana"
+      ? oneWayKm <= 40
+        ? 48
+        : 60
+      : oneWayKm <= 80
+        ? 70
+        : 80;
+  const accessMinutes = regionKey === "metropolitana" ? 10 : 8;
+  const estimatedMinutes = (oneWayKm / averageSpeedKmh) * 60 + accessMinutes;
+
+  return Math.max(10, roundToNearest(estimatedMinutes, 5));
+};
+
 const estimateSolarProfileFromCoordinates = (regionKey, coordinates) => {
   const reference =
     solarGhiReferenceByRegion[regionKey] || solarGhiReferenceByRegion.metropolitana;
@@ -1903,13 +2015,18 @@ const buildCommuneConfig = (regionKey, communeLabel, index, total) => {
     estimateRoundTripKmFromCoordinates(regionKey, coordinates);
   const tolls =
     logisticsOverride?.tolls ?? estimateTollsFromDistance(regionKey, roundTripKm, coordinates);
+  const oneWayMinutes =
+    logisticsOverride?.oneWayMinutes ??
+    estimateOneWayTravelMinutes(regionKey, roundTripKm, coordinates);
 
   return [
     communeKey,
     {
       label: communeLabel,
+      regionKey,
       roundTripKm,
       tolls,
+      oneWayMinutes,
       specialLogistics: Boolean(logisticsOverride?.specialLogistics || coordinates.island),
       coordinates,
       solarProfile: estimateSolarProfileFromCoordinates(regionKey, coordinates),
@@ -2498,7 +2615,11 @@ const getInstallationQuotationItems = (
       totalNet: costs.laborNet,
     },
     {
-      description: "LOGÍSTICA DEL PROYECTO",
+      description: metrics.isRemoteProject
+        ? "LOGÍSTICA, TRASLADOS Y ALOJAMIENTO"
+        : metrics.isIntermediateProject
+          ? "LOGÍSTICA INTERMEDIA Y TRASLADOS"
+          : "LOGÍSTICA DEL PROYECTO",
       quantity: 1,
       totalNet: costs.logisticsNet,
     },
@@ -5202,7 +5323,8 @@ const buildEnterpriseQuotationMarkup = ({
             solución on-grid para ${escapeHtml(metrics.projectTypeLabel.toLowerCase())},
             estructura ${escapeHtml(metrics.surfaceTypeLabel.toLowerCase())},
             ${escapeHtml(formatNumber(metrics.stringPlan.stringCount))} strings y
-            ${escapeHtml(formatNumber(metrics.executionPlan.projectCalendarDays))} días calendario estimados de ejecución.
+            ${escapeHtml(formatNumber(metrics.executionPlan.projectCalendarDays))} días calendario estimados de ejecución,
+            con ${escapeHtml((metrics.executionPlan.logisticsLabel || "logística local").toLowerCase())}.
             El precio final queda sujeto a levantamiento técnico, empalme, recorridos, ingeniería y stock.
           </div>
           <div class="eq-totals">
@@ -5406,7 +5528,7 @@ const buildEnterpriseReportMarkup = ({
             <div class="er-data-row"><span>Comuna</span><strong>${escapeHtml(communeLabel)}</strong></div>
             <div class="er-data-row"><span>Referencia solar anual</span><strong>${escapeHtml(formatNumber(metrics.annualProductionFactor, 0))} kWh/kWp-mes</strong></div>
             <div class="er-data-row"><span>Referencia climática</span><strong>${escapeHtml(climateProfile?.label || regionLabel)}</strong></div>
-            <div class="er-data-row"><span>Condición logística</span><strong>${metrics.executionPlan.isRemoteProject ? "Proyecto con alojamiento" : "Proyecto sin alojamiento"}</strong></div>
+            <div class="er-data-row"><span>Condición logística</span><strong>${escapeHtml(metrics.executionPlan.logisticsLabel || (metrics.executionPlan.isRemoteProject ? "Proyecto con alojamiento" : "Logística local"))}</strong></div>
           </section>
         </div>
         <div class="er-chart-grid">${generationChart}${balanceChart}</div>
@@ -6095,8 +6217,10 @@ export default function SakiaraLandingPage() {
     );
 
     const projectExecutionNote = installationLogisticsMetrics.isRemoteProject
-      ? "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica, alcance real del proyecto y validación final del sitio."
-      : "La propuesta considera una base residencial referencial y puede ajustarse según evaluación técnica y validación final del sitio.";
+      ? "La propuesta incorpora alojamiento por distancia o tiempo de traslado y puede ajustarse según evaluación técnica, alcance real del proyecto y validación final del sitio."
+      : installationLogisticsMetrics.isIntermediateProject
+        ? "La propuesta incorpora logística intermedia por tiempo de traslado diario y puede ajustarse según evaluación técnica y validación final del sitio."
+        : "La propuesta considera logística local referencial y puede ajustarse según evaluación técnica y validación final del sitio.";
 
     const coverageObjectiveLabel = isWinterGoal
       ? `Cobertura invernal objetivo ${formatNumber(winterCoverageTargetPercent)}%`
@@ -6184,7 +6308,12 @@ export default function SakiaraLandingPage() {
       bufferDays: installationLogisticsMetrics.bufferDays,
       projectCalendarDays: installationLogisticsMetrics.projectCalendarDays,
       lodgingDays: installationLogisticsMetrics.lodgingDays,
+      lodgingNights: installationLogisticsMetrics.lodgingNights,
       isRemoteProject: installationLogisticsMetrics.isRemoteProject,
+      isIntermediateProject: installationLogisticsMetrics.isIntermediateProject,
+      logisticsTier: installationLogisticsMetrics.logisticsTier,
+      logisticsLabel: installationLogisticsMetrics.logisticsLabel,
+      oneWayTravelMinutes: installationLogisticsMetrics.oneWayMinutes,
       projectExecutionNote,
       annualProductionFactor,
       winterProductionFactor,
@@ -6447,7 +6576,9 @@ export default function SakiaraLandingPage() {
       {
         description: executionPlan.isRemoteProject
           ? "LOGÍSTICA, TRASLADOS Y ALOJAMIENTO"
-          : "LOGÍSTICA Y TRASLADOS",
+          : executionPlan.isIntermediateProject
+            ? "LOGÍSTICA INTERMEDIA Y TRASLADOS"
+            : "LOGÍSTICA Y TRASLADOS",
         quantity: 1,
         totalNet: executionPlan.logisticsNet,
       },
@@ -6626,6 +6757,7 @@ export default function SakiaraLandingPage() {
         value: `${formatNumber(installationMetrics.monthlyConsumptionKWh)} kWh/mes`,
       },
       { label: "Ubicación", value: installationMetrics.locationLabel },
+      { label: "Logística", value: installationMetrics.logisticsLabel },
       ...(projectAddress.trim()
         ? [{ label: "Dirección del proyecto", value: projectAddress.trim() }]
         : []),
@@ -6685,6 +6817,7 @@ export default function SakiaraLandingPage() {
     { label: "Tipo de proyecto", value: enterpriseMetrics.projectTypeLabel },
     { label: "Superficie", value: enterpriseMetrics.surfaceTypeLabel },
     { label: "Ubicación", value: enterpriseMetrics.locationLabel },
+    { label: "Logística", value: enterpriseMetrics.executionPlan.logisticsLabel },
     ...(projectAddress.trim()
       ? [{ label: "Dirección del proyecto", value: projectAddress.trim() }]
       : []),
@@ -7283,6 +7416,62 @@ Mensaje: ${message || "-"}`,
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
+
+  const scrollToWizardStep = (sectionId) => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const section = document.getElementById(sectionId);
+    const target = section?.querySelector(".wizard-panel") || section;
+    if (!target) return;
+
+    const headerOffset = window.innerWidth <= 760 ? 88 : 108;
+    const targetTop =
+      target.getBoundingClientRect().top + window.scrollY - headerOffset;
+
+    window.scrollTo({
+      top: Math.max(targetTop, 0),
+      behavior: "smooth",
+    });
+
+    const progress = section?.querySelector(".wizard-progress");
+    const activeStep = progress?.querySelector(".wizard-step.active");
+    if (progress && activeStep) {
+      const centeredLeft =
+        activeStep.offsetLeft -
+        (progress.clientWidth - activeStep.clientWidth) / 2;
+      progress.scrollTo({
+        left: Math.max(centeredLeft, 0),
+        behavior: "smooth",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (activeView !== "instalacion" || typeof window === "undefined") return undefined;
+    const timer = window.setTimeout(
+      () => scrollToWizardStep("wizard-instalacion"),
+      70,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeView, installationStep]);
+
+  useEffect(() => {
+    if (activeView !== "mantenimiento" || typeof window === "undefined") return undefined;
+    const timer = window.setTimeout(
+      () => scrollToWizardStep("wizard-mantenimiento"),
+      70,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeView, maintenanceStep]);
+
+  useEffect(() => {
+    if (activeView !== "empresas" || typeof window === "undefined") return undefined;
+    const timer = window.setTimeout(
+      () => scrollToWizardStep("wizard-empresas"),
+      70,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeView, enterpriseStep]);
 
   const handleFloatingQuote = () => {
     if (activeView !== "home") return;
@@ -9233,7 +9422,7 @@ Mensaje: ${message || "-"}`,
               <div className="summary-grid">
                 <SummaryCard label="Ubicación" value={selectedEnterpriseCommune.label} sub={selectedEnterpriseRegion.label} />
                 <SummaryCard label="Montaje" value={enterpriseMetrics.structurePlan.typeLabel} sub={`${formatNumber(enterpriseMetrics.structurePlan.requiredAreaM2)} m² estimados`} />
-                <SummaryCard label="Ejecución" value={`${formatNumber(enterpriseMetrics.executionPlan.projectCalendarDays)} días`} sub={enterpriseMetrics.executionPlan.isRemoteProject ? "Incluye alojamiento" : "Sin alojamiento"} />
+                <SummaryCard label="Ejecución" value={`${formatNumber(enterpriseMetrics.executionPlan.projectCalendarDays)} días`} sub={enterpriseMetrics.executionPlan.logisticsLabel} />
               </div>
             </>
           )}
