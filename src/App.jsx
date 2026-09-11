@@ -3488,14 +3488,62 @@ const buildInstallationReportMarkup = ({
           </div>
         </div>
 
+        <div class="cp-cover-benefits-head">
+          <div class="cp-cover-benefits-title">
+            <i></i>
+            <strong>Por qué esta propuesta está pensada para ti</strong>
+          </div>
+          <p>La evaluación se construye con tu consumo, tu ubicación y la alternativa seleccionada.</p>
+        </div>
+
         <div class="cp-cover-benefits">
-          <div><b>01</b><span>Dimensionamiento basado en tu consumo y perfil de uso.</span></div>
-          <div><b>02</b><span>Equipamiento, instalación y respaldo técnico en una sola propuesta.</span></div>
-          <div><b>03</b><span>Producción, ahorro e inversión explicados con claridad.</span></div>
+          <article class="cp-cover-benefit">
+            <div class="cp-cover-benefit-top">
+              <span class="cp-cover-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M5 19V9m7 10V5m7 14v-7" />
+                  <path d="M3.5 19.5h17" />
+                </svg>
+              </span>
+              <b>01</b>
+            </div>
+            <strong>Dimensionamiento a tu medida</strong>
+            <p>La solución se calcula según tu consumo y tu perfil de uso.</p>
+          </article>
+
+          <article class="cp-cover-benefit">
+            <div class="cp-cover-benefit-top">
+              <span class="cp-cover-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3.5 19 6v5.1c0 4.6-2.9 7.7-7 9.4-4.1-1.7-7-4.8-7-9.4V6l7-2.5Z" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+              </span>
+              <b>02</b>
+            </div>
+            <strong>Equipamiento y respaldo</strong>
+            <p>Equipos, instalación y soporte técnico presentados con un alcance claro.</p>
+          </article>
+
+          <article class="cp-cover-benefit">
+            <div class="cp-cover-benefit-top">
+              <span class="cp-cover-benefit-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M4 18.5h16" />
+                  <path d="M6 16v-4m5 4V9m5 7V6" />
+                  <path d="m5.5 8.5 4-3 3 2 5-4" />
+                </svg>
+              </span>
+              <b>03</b>
+            </div>
+            <strong>Ahorro con claridad</strong>
+            <p>Producción, ahorro e inversión explicados de forma simple y entendible.</p>
+          </article>
         </div>
 
         <div class="cp-cover-note">
-          Informe dinámico: los valores, equipos y secciones se ajustan automáticamente a la alternativa seleccionada en el wizard.
+          <strong>Informe dinámico.</strong>
+          <span>Valores, equipos y secciones se ajustan automáticamente según la configuración elegida en Sakiara.</span>
         </div>
 
         ${pageFooter(1)}
@@ -4021,9 +4069,9 @@ const buildInstallationReportMarkup = ({
       .cp-pill {
         padding: 7px 10px;
         border-radius: 999px;
-        background: #fff7d9;
-        border: 1px solid #f2df91;
-        color: #69550d;
+        background: #fff8df;
+        border: 1px solid #f1df9d;
+        color: #725b09;
         font-size: 8px;
         font-weight: 700;
         letter-spacing: 0.04em;
@@ -4056,8 +4104,8 @@ const buildInstallationReportMarkup = ({
       }
       .cp-cover-banner {
         position: relative;
-        height: 58mm;
-        margin-top: 10mm;
+        height: 52mm;
+        margin-top: 9mm;
         border-radius: 18px;
         overflow: hidden;
         background: #f3f4f6;
@@ -4080,7 +4128,7 @@ const buildInstallationReportMarkup = ({
         bottom: 13px;
         max-width: 72mm;
         padding-left: 10px;
-        border-left: 3px solid #f5bd20;
+        border-left: 3px solid #f2b61c;
         color: #ffffff;
       }
       .cp-cover-banner-copy span,
@@ -4101,14 +4149,14 @@ const buildInstallationReportMarkup = ({
         display: grid !important;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         margin-top: 8mm;
-        border: 1px solid #e6e8ec;
+        border: 1px solid #e4e7ec;
         border-radius: 14px;
-        background: #f8f9fa;
+        background: #fafbfc;
         overflow: hidden;
       }
       .cp-client-card > div {
-        min-height: 28mm;
-        padding: 11px 12px;
+        min-height: 25mm;
+        padding: 10px 12px;
         border-right: 1px solid #e6e8ec;
       }
       .cp-client-card > div:last-child { border-right: 0; }
@@ -4138,36 +4186,123 @@ const buildInstallationReportMarkup = ({
         font-size: 8.2px;
         color: #697281;
       }
+      .cp-cover-benefits-head {
+        margin-top: 6mm;
+      }
+      .cp-cover-benefits-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .cp-cover-benefits-title i {
+        width: 12px;
+        height: 3px;
+        flex: 0 0 auto;
+        border-radius: 99px;
+        background: #f2b61c;
+      }
+      .cp-cover-benefits-title strong {
+        font-size: 11.5px;
+        line-height: 1.15;
+        letter-spacing: -0.015em;
+        color: #172033;
+      }
+      .cp-cover-benefits-head > p {
+        margin: 4px 0 0 20px;
+        font-size: 7.5px;
+        line-height: 1.35;
+        color: #707887;
+      }
       .cp-cover-benefits {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-        margin-top: 7mm;
+        gap: 8px;
+        margin-top: 4mm;
       }
-      .cp-cover-benefits > div {
+      .cp-cover-benefit {
+        min-height: 31mm;
+        padding: 9px 10px 10px;
+        border: 1px solid #e5e8ed;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+        box-shadow: 0 3px 10px rgba(20, 28, 45, 0.035);
+      }
+      .cp-cover-benefit-top {
         display: flex;
-        gap: 9px;
-        padding: 9px 10px;
-        min-height: 43px;
-        border-top: 1px solid #dfe2e6;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 7px;
       }
-      .cp-cover-benefits b {
-        color: #e6ad08;
-        font-size: 11px;
+      .cp-cover-benefit-icon {
+        display: inline-flex;
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #fff4c9;
+        color: #e6a900;
       }
-      .cp-cover-benefits span {
-        font-size: 8.2px;
-        line-height: 1.42;
-        color: #505968;
+      .cp-cover-benefit-icon svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .cp-cover-benefit b {
+        display: inline-flex;
+        min-width: 27px;
+        min-height: 19px;
+        padding: 3px 7px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: #fff8df;
+        border: 1px solid #f1df9d;
+        color: #9a7600;
+        font-size: 7.6px;
+        line-height: 1;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      .cp-cover-benefit > strong {
+        display: block;
+        font-size: 9.2px;
+        line-height: 1.18;
+        color: #182034;
+        letter-spacing: -0.012em;
+      }
+      .cp-cover-benefit > p {
+        margin: 5px 0 0;
+        font-size: 7.2px;
+        line-height: 1.38;
+        color: #687282;
       }
       .cp-cover-note {
-        margin-top: 5mm;
-        padding-left: 9px;
-        border-left: 2px solid #f1bd25;
-        max-width: 158mm;
-        font-size: 7.5px;
-        line-height: 1.45;
-        color: #7a8290;
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin-top: 4mm;
+        padding: 8px 10px;
+        border: 1px solid #f0df9d;
+        border-left: 3px solid #f2b61c;
+        border-radius: 9px;
+        background: #fffbec;
+        font-size: 7.1px;
+        line-height: 1.35;
+        color: #687080;
+      }
+      .cp-cover-note strong {
+        flex: 0 0 auto;
+        color: #2e3442;
+      }
+      .cp-cover-note span {
+        min-width: 0;
       }
       .cp-page-header {
         padding-bottom: 6mm;
