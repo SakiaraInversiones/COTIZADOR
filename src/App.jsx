@@ -7490,32 +7490,14 @@ Mensaje: ${message || "-"}`,
     activeView === "empresas" ? "Cotizar empresa" : "Cotiza ahora";
 
   const installationSteps = [
-    { id: 1, title: "Modalidad", description: "Cómo quieres cotizar" },
-    {
-      id: 2,
-      title: "Ubicación",
-      description: "Dónde se desarrollará el proyecto",
-    },
-    {
-      id: 3,
-      title: "Perfil",
-      description: "Cómo se comporta el consumo del hogar",
-    },
-    {
-      id: 4,
-      title: "Resultado",
-      description: "Alternativas claras para comparar",
-    },
-    {
-      id: 5,
-      title: "Financiamiento",
-      description: "Contado o tarjeta de crédito",
-    },
-    {
-      id: 6,
-      title: "Contacto",
-      description: "Cotización e informe final",
-    },
+    { id: 1, title: "Modalidad", description: "Elige cómo quieres cotizar" },
+    { id: 2, title: "Consumo", description: "Ingresa boleta, kWh o ambos" },
+    { id: 3, title: "Objetivo", description: "Define cuánto quieres compensar" },
+    { id: 4, title: "Ubicación", description: "Región y comuna del proyecto" },
+    { id: 5, title: "Perfil", description: "Cuándo consumes más energía" },
+    { id: 6, title: "Propuesta", description: "Compara las alternativas" },
+    { id: 7, title: "Financiamiento", description: "Contado o tarjeta de crédito" },
+    { id: 8, title: "Contacto", description: "Cotización e informe final" },
   ];
 
   const enterpriseSteps = [
@@ -7650,11 +7632,36 @@ Mensaje: ${message || "-"}`,
       ? `${formatNumber(installationPaymentPaybackYears, 1)} años`
       : "Referencial",
   };
-  const canProceedToContact =
-    ![4, 5].includes(installationStep) ||
-    Boolean(selectedInstallationOfferData);
+  const hasInstallationUsageData = (() => {
+    const hasBill = Number(monthlyBillInput) > 0;
+    const hasConsumption = Number(billConsumptionInput) > 0;
+
+    if (installationInputMode === "bill") return hasBill;
+    if (installationInputMode === "consumption") return hasConsumption;
+    return hasBill && hasConsumption;
+  })();
+
+  const canProceedInstallation =
+    installationStep !== 2
+      ? ![6, 7].includes(installationStep) || Boolean(selectedInstallationOfferData)
+      : hasInstallationUsageData;
+
   const installationNextLabel =
-    installationStep === 5 ? "Continuar a cotización" : "Siguiente";
+    installationStep === 1
+      ? "Confirmar modalidad"
+      : installationStep === 2
+        ? "Confirmar datos y continuar"
+        : installationStep === 3
+          ? "Confirmar objetivo"
+          : installationStep === 4
+            ? "Confirmar ubicación"
+            : installationStep === 5
+              ? "Confirmar perfil"
+              : installationStep === 6
+                ? "Seleccionar y continuar"
+                : installationStep === 7
+                  ? "Continuar a cotización"
+                  : "Siguiente";
 
   const renderHomeView = () => (
     <>
@@ -8007,10 +8014,7 @@ Mensaje: ${message || "-"}`,
               key={step.id}
               className={`wizard-step ${installationStep === step.id ? "active" : ""} ${installationStep > step.id ? "completed" : ""}`}
               type="button"
-              disabled={
-                (step.id >= 5 && !selectedInstallationOfferData) ||
-                (step.id === 6 && installationStep < 5)
-              }
+              disabled={step.id > installationStep}
               onClick={() => setInstallationStep(step.id)}
             >
               <span className="wizard-step-index">{step.id}</span>
@@ -8026,14 +8030,21 @@ Mensaje: ${message || "-"}`,
           {installationStep === 1 && (
             <>
               <div className="wizard-copy">
-                <h3 className="wizard-title">Define tu punto de partida</h3>
-                <p className="wizard-text mobile-essential-hide">
-                  Puedes comenzar con tu boleta, con tu consumo o con ambos datos para construir una evaluación referencial clara y útil desde el inicio.
+                <h3 className="wizard-title">¿Con qué dato quieres comenzar?</h3>
+                <p className="wizard-text">
+                  Elige la forma más fácil para ti. En el siguiente paso te pediremos solo el dato necesario y luego avanzaremos automáticamente.
+                </p>
+              </div>
+
+              <div className="info-card">
+                <h3 className="info-title">¿Qué opción conviene elegir?</h3>
+                <p className="info-text">
+                  Si tienes tu cuenta eléctrica a mano, puedes usar el monto mensual, el consumo en kWh o ambos. Con ambos datos la referencia inicial queda más completa.
                 </p>
               </div>
 
               <div className="mode-card compact-selector-card">
-                <label className="label">¿Cómo quieres cotizar?</label>
+                <label className="label">Forma de cotizar</label>
                 <select
                   className="select"
                   value={installationInputMode}
@@ -8051,11 +8062,29 @@ Mensaje: ${message || "-"}`,
                   {installationInputModeOptions[installationInputMode].helper}
                 </div>
               </div>
+            </>
+          )}
+
+          {installationStep === 2 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Ingresa tu consumo eléctrico</h3>
+                <p className="wizard-text">
+                  Completa el dato seleccionado. Cuando esté listo, presiona <strong>Confirmar datos y continuar</strong>; la vista bajará al siguiente paso automáticamente.
+                </p>
+              </div>
+
+              <div className="info-card">
+                <h3 className="info-title">Dónde encontrar estos datos</h3>
+                <p className="info-text">
+                  El monto corresponde al total aproximado de tu cuenta mensual. El consumo aparece en la boleta expresado en <strong>kWh</strong>. No necesitas adjuntar la boleta todavía.
+                </p>
+              </div>
 
               <div className="fields-grid wizard-fields">
                 {installationInputMode !== "consumption" && (
                   <div className="field">
-                    <label className="label">Monto mensual aproximado</label>
+                    <label className="label">Monto mensual de la boleta</label>
                     <input
                       className="input"
                       type="text"
@@ -8069,7 +8098,7 @@ Mensaje: ${message || "-"}`,
                       placeholder="Ejemplo: 250000"
                     />
                     <div className="hint">
-                      Puedes ingresar solo el valor de tu boleta mensual.
+                      Ingresa el total aproximado que pagas normalmente, sin puntos ni símbolos.
                     </div>
                   </div>
                 )}
@@ -8090,10 +8119,40 @@ Mensaje: ${message || "-"}`,
                       placeholder="Ejemplo: 900"
                     />
                     <div className="hint">
-                      Dato visible en la boleta, expresado en kWh por mes.
+                      Busca en tu boleta el consumo del período, normalmente indicado como kWh.
                     </div>
                   </div>
                 )}
+              </div>
+
+              {!hasInstallationUsageData && (
+                <div className="mode-note">
+                  Completa {installationInputMode === "both" ? "ambos datos" : "el dato solicitado"} para habilitar el botón de confirmación.
+                </div>
+              )}
+
+              {hasInstallationUsageData && (
+                <div className="mode-note">
+                  <strong>Datos listos.</strong> La evaluación usará {installationMetrics.modeSummaryLabel.toLowerCase()} como base del cálculo.
+                </div>
+              )}
+            </>
+          )}
+
+          {installationStep === 3 && (
+            <>
+              <div className="wizard-copy">
+                <h3 className="wizard-title">Define qué quieres lograr con el sistema</h3>
+                <p className="wizard-text">
+                  Este paso ajusta el tamaño sugerido del proyecto. Si no quieres complicarte, deja <strong>Compensación optimizada</strong> y Sakiara hará una propuesta equilibrada.
+                </p>
+              </div>
+
+              <div className="info-card">
+                <h3 className="info-title">¿Qué significa cobertura?</h3>
+                <p className="info-text">
+                  Es la parte de tu consumo que buscamos compensar con energía solar. En invierno hay menos producción, por eso una meta invernal alta normalmente requiere más paneles.
+                </p>
               </div>
 
               <div className="mode-card wizard-highlight-card goal-card compact-selector-card">
@@ -8124,7 +8183,7 @@ Mensaje: ${message || "-"}`,
                         ))}
                       </select>
                       <div className="hint">
-                        Parte desde 50% para mantener una inversión más flexible.
+                        Una meta mayor aumenta la potencia solar sugerida para los meses más exigentes.
                       </div>
                     </div>
 
@@ -8143,29 +8202,22 @@ Mensaje: ${message || "-"}`,
                           ))}
                         </select>
                         <div className="hint">
-                          El sistema usa el escenario más exigente entre invierno y verano.
+                          El cálculo compara ambas temporadas y dimensiona con el escenario más exigente.
                         </div>
                       </div>
                     )}
                   </div>
                 )}
-
-                <div className="hint">
-                  Elige el criterio que mejor representa tu objetivo de inversión y uso real del sistema.
-                </div>
               </div>
 
-              <div className="mode-note mobile-essential-hide">
-                <strong>{installationMetrics.modeSummaryLabel}:</strong>{" "}
-                {installationMetrics.modeSummaryHint}
-                <br />
+              <div className="mode-note">
                 <strong>{installationMetrics.coverageObjectiveLabel}:</strong>{" "}
                 {installationMetrics.coverageObjectiveHint}
               </div>
             </>
           )}
 
-          {installationStep === 2 && (
+          {installationStep === 4 && (
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">
@@ -8225,7 +8277,7 @@ Mensaje: ${message || "-"}`,
             </>
           )}
 
-          {installationStep === 3 && (
+          {installationStep === 5 && (
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Selecciona el perfil del hogar</h3>
@@ -8255,7 +8307,7 @@ Mensaje: ${message || "-"}`,
             </>
           )}
 
-          {installationStep === 4 && (
+          {installationStep === 6 && (
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">
@@ -8372,7 +8424,7 @@ Mensaje: ${message || "-"}`,
             </>
           )}
 
-          {installationStep === 5 && (
+          {installationStep === 7 && (
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Elige cómo financiar tu proyecto</h3>
@@ -8520,7 +8572,7 @@ Mensaje: ${message || "-"}`,
             </>
           )}
 
-          {installationStep === 6 && (
+          {installationStep === 8 && (
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Solicita tu evaluación comercial</h3>
@@ -8745,7 +8797,7 @@ Mensaje: ${message || "-"}`,
             <button
               className="btn-primary"
               type="button"
-              disabled={!canProceedToContact}
+              disabled={!canProceedInstallation}
               onClick={() =>
                 setInstallationStep((current) =>
                   Math.min(installationSteps.length, current + 1),
