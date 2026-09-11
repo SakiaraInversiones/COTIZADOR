@@ -312,6 +312,23 @@ const installationInputModeOptions = {
 
 const projectShowcase = [
   {
+    title: "Melipilla",
+    power: "4,68 kWp",
+    type: "Residencial + batería",
+    images: [
+      "/proyectos/melipilla-paneles-8x585w.jpg",
+      "/proyectos/melipilla-livoltek-dyness-15kwh.jpg",
+    ],
+    description:
+      "Sistema residencial con 8 módulos de 585 W, inversor de 8 kW y batería Dyness de 15 kWh. El proyecto incluyó la gestión y adecuación eléctrica para aumentar el empalme de 16 A a 40 A ante la compañía eléctrica.",
+    meta: [
+      { label: "Campo fotovoltaico", value: "8 × 585 W · 4,68 kWp" },
+      { label: "Inversor", value: "8 kW" },
+      { label: "Batería", value: "Dyness · 15 kWh" },
+      { label: "Empalme", value: "16 A → 40 A" },
+    ],
+  },
+  {
     title: "Talagante",
     power: "8 kW",
     type: "Residencial",
@@ -4130,7 +4147,10 @@ const buildInstallationReportMarkup = ({
       .cp-cover *,
       .cp-page * {
         min-width: 0;
-        overflow-wrap: anywhere;
+        overflow-wrap: normal;
+        word-break: normal;
+        hyphens: none;
+        -webkit-hyphens: none;
       }
       .cp-cover-top,
       .cp-page-header,
@@ -5179,7 +5199,7 @@ const buildInstallationReportMarkup = ({
         font-size: 7.6px;
         line-height: 1.25;
         color: #222b3b;
-        overflow-wrap: anywhere;
+        overflow-wrap: normal;
       }
       .cp-closing-note {
         display: flex;
@@ -7880,8 +7900,8 @@ Mensaje: ${message || "-"}`,
       <section className="section-card" id="proyectos">
         <div className="section-head">
           <p className="eyebrow">Proyectos realizados</p>
-          <h2 className="section-title">
-            Instalaciones reales desarrolladas por Sakiara Solar
+          <h2 className="section-title project-section-title">
+            Proyectos solares ejecutados por <span className="brand-no-break">Sakiara Solar</span>
           </h2>
           <p className="section-text">
             Una muestra de proyectos fotovoltaicos ejecutados en distintos formatos, con soluciones pensadas para aprovechar mejor la energía solar y presentar una instalación limpia, ordenada y profesional.
@@ -7891,13 +7911,26 @@ Mensaje: ${message || "-"}`,
         <div className="project-grid">
           {projectShowcase.map((project) => (
             <article key={project.title} className="project-card">
-              <div className="project-image-wrap">
-                <img
-                  className="project-image"
-                  src={project.image}
-                  alt={`Proyecto fotovoltaico en ${project.title}`}
-                />
-              </div>
+              {project.images?.length ? (
+                <div className="project-image-wrap project-image-wrap--dual">
+                  {project.images.slice(0, 2).map((image, imageIndex) => (
+                    <img
+                      key={image}
+                      className={`project-image project-image--${imageIndex === 0 ? "primary" : "secondary"}`}
+                      src={image}
+                      alt={`${imageIndex === 0 ? "Paneles solares" : "Inversor y batería"} del proyecto en ${project.title}`}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="project-image-wrap">
+                  <img
+                    className="project-image"
+                    src={project.image}
+                    alt={`Proyecto fotovoltaico en ${project.title}`}
+                  />
+                </div>
+              )}
 
               <div className="project-body">
                 <div className="project-top">
@@ -7910,15 +7943,26 @@ Mensaje: ${message || "-"}`,
 
                 <p className="project-description">{project.description}</p>
 
-                <div className="project-meta-grid">
-                  <div className="project-meta-item">
-                    <span>Ubicación</span>
-                    <strong>{project.title}</strong>
-                  </div>
-                  <div className="project-meta-item">
-                    <span>Potencia instalada</span>
-                    <strong>{project.power}</strong>
-                  </div>
+                <div className={`project-meta-grid ${project.meta?.length > 2 ? "project-meta-grid--extended" : ""}`}>
+                  {project.meta?.length ? (
+                    project.meta.map((item) => (
+                      <div className="project-meta-item" key={`${project.title}-${item.label}`}>
+                        <span>{item.label}</span>
+                        <strong>{item.value}</strong>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="project-meta-item">
+                        <span>Ubicación</span>
+                        <strong>{project.title}</strong>
+                      </div>
+                      <div className="project-meta-item">
+                        <span>Potencia instalada</span>
+                        <strong>{project.power}</strong>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <button
@@ -8004,26 +8048,22 @@ Mensaje: ${message || "-"}`,
           </div>
           <div className="wizard-topbar">
             <div className="pill">Cotización de instalación</div>
-            <div className="pill">Paso {installationStep} de {installationSteps.length}</div>
+            <div className="pill">
+              Paso {installationStep} de {installationSteps.length} · {installationSteps[installationStep - 1]?.title}
+            </div>
           </div>
         </div>
 
-        <div className="wizard-progress installation-wizard-progress">
-          {installationSteps.map((step) => (
-            <button
-              key={step.id}
-              className={`wizard-step ${installationStep === step.id ? "active" : ""} ${installationStep > step.id ? "completed" : ""}`}
-              type="button"
-              disabled={step.id > installationStep}
-              onClick={() => setInstallationStep(step.id)}
-            >
-              <span className="wizard-step-index">{step.id}</span>
-              <span className="wizard-step-copy">
-                <strong>{step.title}</strong>
-                <small>{step.description}</small>
-              </span>
-            </button>
-          ))}
+        <div
+          className="installation-progress-compact"
+          aria-label={`Paso ${installationStep} de ${installationSteps.length}: ${installationSteps[installationStep - 1]?.title || "Cotización"}`}
+        >
+          <div className="installation-progress-track" aria-hidden="true">
+            <span
+              className="installation-progress-fill"
+              style={{ width: `${(installationStep / installationSteps.length) * 100}%` }}
+            />
+          </div>
         </div>
 
         <div className="wizard-panel">
@@ -10327,8 +10367,24 @@ Mensaje: ${message || "-"}`,
           margin-top: 24px;
         }
 
-        .installation-wizard-progress {
-          grid-template-columns: repeat(6, minmax(0, 1fr));
+        .installation-progress-compact {
+          margin-top: 16px;
+        }
+
+        .installation-progress-track {
+          width: 100%;
+          height: 6px;
+          overflow: hidden;
+          border-radius: 999px;
+          background: rgba(102, 102, 107, 0.10);
+        }
+
+        .installation-progress-fill {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+          background: #f1d433;
+          transition: width 0.28s ease;
         }
 
         .wizard-step {
@@ -10879,9 +10935,9 @@ Mensaje: ${message || "-"}`,
           font-size: 14px;
           line-height: 1.65;
           color: #707179;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-          hyphens: auto;
+          overflow-wrap: normal;
+          word-break: normal;
+          hyphens: none;
         }
 
         .enterprise-stat-value,
@@ -10897,9 +10953,9 @@ Mensaje: ${message || "-"}`,
         .project-description,
         .final-cta-list div,
         .enterprise-check-text {
-          overflow-wrap: anywhere;
-          word-break: break-word;
-          hyphens: auto;
+          overflow-wrap: normal;
+          word-break: normal;
+          hyphens: none;
         }
 
         .enterprise-stat-grid > *,
@@ -10971,9 +11027,9 @@ Mensaje: ${message || "-"}`,
           font-size: clamp(20px, 2.1vw, 28px);
           line-height: 1.14;
           color: #30323a;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-          hyphens: auto;
+          overflow-wrap: normal;
+          word-break: normal;
+          hyphens: none;
           text-wrap: pretty;
         }
 
@@ -10983,8 +11039,8 @@ Mensaje: ${message || "-"}`,
           font-size: 15px;
           line-height: 1.45;
           color: #7b7c84;
-          overflow-wrap: anywhere;
-          word-break: break-word;
+          overflow-wrap: normal;
+          word-break: normal;
         }
 
         .enterprise-check-card {
@@ -11149,6 +11205,28 @@ Mensaje: ${message || "-"}`,
           display: block;
         }
 
+        .project-image-wrap--dual {
+          display: grid;
+          grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr);
+          gap: 3px;
+        }
+
+        .project-image-wrap--dual .project-image {
+          min-width: 0;
+        }
+
+        .project-image--primary {
+          object-position: center 48%;
+        }
+
+        .project-image--secondary {
+          object-position: center 42%;
+        }
+
+        .project-meta-grid--extended {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
         .project-body {
           padding: 20px;
           display: flex;
@@ -11269,8 +11347,8 @@ Mensaje: ${message || "-"}`,
 
         .section-head {
           text-align: center;
-          max-width: 760px;
-          margin: 0 auto 20px;
+          max-width: 860px;
+          margin: 0 auto 22px;
         }
 
         .eyebrow {
@@ -11287,6 +11365,23 @@ Mensaje: ${message || "-"}`,
           font-size: 40px;
           line-height: 1.08;
           color: #66666b;
+          overflow-wrap: normal;
+          word-break: normal;
+          hyphens: none;
+          text-wrap: balance;
+        }
+
+        .project-section-title {
+          max-width: 840px;
+          margin-left: auto;
+          margin-right: auto;
+          font-size: clamp(34px, 3.4vw, 44px);
+          line-height: 1.1;
+          letter-spacing: -0.025em;
+        }
+
+        .brand-no-break {
+          white-space: nowrap;
         }
 
         .section-text {
@@ -11716,7 +11811,7 @@ Mensaje: ${message || "-"}`,
           line-height: 1;
           font-weight: 800;
           color: #66666b;
-          overflow-wrap: anywhere;
+          overflow-wrap: normal;
         }
 
         .stats-grid {
@@ -12346,6 +12441,43 @@ Mensaje: ${message || "-"}`,
             min-height: 54px;
             white-space: normal;
           }
+
+          .project-section-title {
+            font-size: clamp(28px, 8.2vw, 34px);
+            line-height: 1.12;
+            letter-spacing: -0.02em;
+          }
+        }
+
+        /* Capa tipográfica final: nunca cortar palabras del contenido de la web. */
+        .sakiara-root,
+        .sakiara-root * {
+          -webkit-hyphens: none !important;
+          hyphens: none !important;
+          word-break: normal !important;
+          overflow-wrap: normal !important;
+        }
+
+        .sakiara-root h1,
+        .sakiara-root h2,
+        .sakiara-root h3,
+        .sakiara-root .wizard-title,
+        .sakiara-root .section-title,
+        .sakiara-root .service-title,
+        .sakiara-root .project-title,
+        .sakiara-root .offer-title,
+        .sakiara-root .info-title {
+          text-wrap: balance;
+        }
+
+        .sakiara-root p,
+        .sakiara-root .section-text,
+        .sakiara-root .service-text,
+        .sakiara-root .project-description,
+        .sakiara-root .wizard-text,
+        .sakiara-root .hint,
+        .sakiara-root .note {
+          text-wrap: pretty;
         }
       `}</style>
 
