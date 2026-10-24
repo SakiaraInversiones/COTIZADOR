@@ -547,6 +547,7 @@ const ENTERPRISE_TECH_CREW_LABOR_CLP_PER_DAY = 140000;
 const ENTERPRISE_HELPER_CREW_LABOR_CLP_PER_DAY = 80000;
 const ENTERPRISE_LOCAL_LOGISTICS_CLP_PER_DAY = 20000;
 const ENTERPRISE_LODGING_CLP_PER_DAY = 70000;
+const ENTERPRISE_SIGNAGE_NET = 100000;
 
 // Política logística Sakiara: el cálculo combina distancia y tiempo real de traslado.
 // - Local: hasta 30 min por sentido.
@@ -3972,7 +3973,7 @@ const buildInstallationReportMarkup = ({
             <div class="cp-section-title">Qué ocurre con la boleta</div>
             <ul class="cp-check-list">
               <li>Disminuye la energía comprada a la distribuidora.</li>
-              <li>La valorización de excedentes reduce el costo energético modelado.</li>
+              <li>La valorización de excedentes es referencial y depende de la liquidación de la distribuidora.</li>
               <li>Pueden mantenerse cargos fijos u otros conceptos.</li>
             </ul>
           </article>
@@ -4047,11 +4048,11 @@ const buildInstallationReportMarkup = ({
 
         <div class="cp-return-card">
           <div>
-            <span>Ahorro económico anual modelado</span>
+            <span>Ahorro anual simulado*</span>
             <strong>${escapeHtml(formatCLP(selectedAnnualSavings))}</strong>
           </div>
           <div>
-            <span>Retorno simple referencial</span>
+            <span>Retorno simple preliminar*</span>
             <strong>${escapeHtml(formatNumber(simplePaybackYears, 1))} años</strong>
           </div>
           <div>
@@ -4061,7 +4062,7 @@ const buildInstallationReportMarkup = ({
         </div>
 
         <div class="cp-note-strip">
-          <strong>Transparencia comercial.</strong>
+          <strong>Alcance de la estimación.</strong>
           <span>Se muestran los precios finales para cada forma de pago. Las condiciones de cuotas, intereses, impuestos u otros cargos dependen del emisor de la tarjeta.</span>
         </div>
         ${pageFooter(6)}
@@ -5359,7 +5360,7 @@ const buildEnterpriseQuotationMarkup = ({
             estructura ${escapeHtml(metrics.surfaceTypeLabel.toLowerCase())},
             ${escapeHtml(formatNumber(metrics.stringPlan.stringCount))} strings y
             ${escapeHtml(formatNumber(metrics.executionPlan.projectCalendarDays))} días calendario estimados de ejecución,
-            con ${escapeHtml((metrics.executionPlan.logisticsLabel || "logística local").toLowerCase())}.
+            sujeto a las condiciones de acceso y montaje verificadas en terreno.
             El precio final queda sujeto a levantamiento técnico, empalme, recorridos, ingeniería y stock.
           </div>
           <div class="eq-totals">
@@ -5563,7 +5564,7 @@ const buildEnterpriseReportMarkup = ({
             <div class="er-data-row"><span>Comuna</span><strong>${escapeHtml(communeLabel)}</strong></div>
             <div class="er-data-row"><span>Referencia solar anual</span><strong>${escapeHtml(formatNumber(metrics.annualProductionFactor, 0))} kWh/kWp-mes</strong></div>
             <div class="er-data-row"><span>Referencia climática</span><strong>${escapeHtml(climateProfile?.label || regionLabel)}</strong></div>
-            <div class="er-data-row"><span>Condición logística</span><strong>${escapeHtml(metrics.executionPlan.logisticsLabel || (metrics.executionPlan.isRemoteProject ? "Proyecto con alojamiento" : "Logística local"))}</strong></div>
+            <div class="er-data-row"><span>Ubicación del proyecto</span><strong>${escapeHtml(metrics.locationLabel)}</strong></div>
           </section>
         </div>
         <div class="er-chart-grid">${generationChart}${balanceChart}</div>
@@ -5759,7 +5760,7 @@ const getHuaweiBatteryTopology = (requestedCount) => {
 };
 
 // SAKIARA SOLAR STUDIO · experiencia educativa previa a la descarga.
-// No modifica cotizaciones, logística, márgenes ni el generador PDF.
+// Integra un recorrido visual del sistema sin modificar los documentos comerciales.
 const SAKIARA_BACKUP_RESERVE_PERCENT = 10;
 const SAKIARA_SIMULATED_INVERTER_AC_KW = 8;
 
@@ -6169,12 +6170,8 @@ export default function SakiaraLandingPage() {
   const installationMetrics = useMemo(() => {
     const vatMultiplier = 1.19;
 
-    // Costos de VENTA NETOS extraídos de "DEFINITIVO HUAWEI" y
-    // "DEFINITIVO SOLIS" (Plantilla Presupuestos SAKIARA NOV 26.xlsx).
-    // Margen sobre VENTA (no recargo): primarios 10%, mano de obra 30%,
-    // materiales CC 20%, tablero AC 20%, estructura 10%.
-    // Conservamos intacto el cálculo geográfico de logística, formatos PDF,
-    // evaluación energética y modalidades de pago existentes.
+    // Parámetros comerciales de Sakiara y sus componentes de cotización.
+    // Mantener el cálculo vigente de logística y las modalidades de pago.
     const moduleSellPerPanel = 106336.11111111;
     const huaweiInverterNet = 826257.52222222;
     const solisInverterNet = 1213818.8608777;
@@ -6184,12 +6181,12 @@ export default function SakiaraLandingPage() {
     const acBoardNet = 732597.68907563;
     const structureBlockNet = 66711.484593838;
     const huaweiSmartPowerSensorNet = 59331.465919701;
-    // DEFINITIVO HUAWEI: H6 (módulo), H7 (DC/DC), H8 (SmartGuard).
+    // Huawei: módulo, conversión DC/DC y dispositivo de transferencia.
     // No duplicar SmartGuard al agregar otro DC/DC.
     const huaweiBatteryModuleNet = 1580972.588888889;
     const huaweiDcdcConverterNet = 734390.588888889;
     const huaweiSmartGuardNet = 643305.8777777778;
-    // DEFINITIVO SOLIS: H9 por cada Dyness PowerBrick SC 16 kWh.
+    // Solis: almacenamiento nominal por unidad.
     const solisBatteryUnitNet = 1633333.3333333333;
     const huaweiTopology = getHuaweiBatteryTopology(huaweiBatteryModules);
     const huaweiBatteryPackNet =
@@ -6267,6 +6264,17 @@ export default function SakiaraLandingPage() {
         "Puedes cotizar con tu boleta, con tu consumo o con ambos datos.";
     }
 
+    // Reserva para cargos no compensables y diferencias de facturación.
+    // Hipótesis conservadora de simulación, NO es una tarifa oficial.
+    const nonCompensableBillReserve = Math.min(
+      normalizedMonthlyBill * 0.06,
+      12000,
+    );
+    const capBillSavings = (rawBenefit) =>
+      clamp(rawBenefit, 0, Math.max(normalizedMonthlyBill - nonCompensableBillReserve, 0));
+
+    // Referencia preliminar de inyección; la valorización efectiva depende
+    // del contrato y del mecanismo de facturación de la distribuidora.
     const exportRate = derivedTariff * 0.55;
     const annualProductionFactor = installationSolarProfile.annual;
     const winterProductionFactor = installationSolarProfile.winter;
@@ -6395,8 +6403,9 @@ export default function SakiaraLandingPage() {
     );
     const selfConsumptionValueNoBattery = selfConsumedNoBattery * derivedTariff;
     const injectionCreditNoBattery = exportedNoBattery * exportRate;
-    const monthlySavingsNoBattery =
-      selfConsumptionValueNoBattery + injectionCreditNoBattery;
+    const monthlySavingsNoBattery = capBillSavings(
+      selfConsumptionValueNoBattery + injectionCreditNoBattery,
+    );
     const annualSavingsNoBattery = monthlySavingsNoBattery * 12;
 
     const winterSelfConsumedNoBattery = Math.min(
@@ -6407,9 +6416,10 @@ export default function SakiaraLandingPage() {
       winterGenerationKWh - winterSelfConsumedNoBattery,
       0,
     );
-    const winterMonthlySavingsNoBattery =
+    const winterMonthlySavingsNoBattery = capBillSavings(
       winterSelfConsumedNoBattery * derivedTariff +
-      winterExportedNoBattery * exportRate;
+      winterExportedNoBattery * exportRate,
+    );
 
     const summerSelfConsumedNoBattery = Math.min(
       summerGenerationKWh * selfConsumptionNoBatteryRate,
@@ -6419,48 +6429,62 @@ export default function SakiaraLandingPage() {
       summerGenerationKWh - summerSelfConsumedNoBattery,
       0,
     );
-    const summerMonthlySavingsNoBattery =
+    const summerMonthlySavingsNoBattery = capBillSavings(
       summerSelfConsumedNoBattery * derivedTariff +
-      summerExportedNoBattery * exportRate;
+      summerExportedNoBattery * exportRate,
+    );
 
-    const selfConsumedWithBattery = Math.min(
-      monthlyGenerationKWh * selfConsumptionWithBatteryRate,
-      monthlyConsumptionKWh,
-    );
-    const exportedWithBattery = Math.max(
-      monthlyGenerationKWh - selfConsumedWithBattery,
-      0,
-    );
-    const selfConsumptionValueWithBattery =
-      selfConsumedWithBattery * derivedTariff;
-    const injectionCreditWithBattery = exportedWithBattery * exportRate;
-    const monthlySavingsWithBattery =
-      selfConsumptionValueWithBattery + injectionCreditWithBattery;
-    const annualSavingsWithBattery = monthlySavingsWithBattery * 12;
+    // Cada química/configuración tiene su propio potencial de traslado horario.
+    // No se supone que una batería de 5 kWh aproveche la misma energía que una de 16 kWh.
+    const calculateBatteryScenario = (nominalBatteryKWh) => {
+      const estimatePeriod = (productionKWh) => {
+        const directConsumptionKWh = Math.min(
+          productionKWh * selfConsumptionNoBatteryRate,
+          monthlyConsumptionKWh,
+        );
+        const solarSurplusKWh = Math.max(productionKWh - directConsumptionKWh, 0);
+        const residualLoadKWh = Math.max(monthlyConsumptionKWh - directConsumptionKWh, 0);
+        // 26 ciclos útiles al mes; 80% de profundidad útil y 88% de eficiencia.
+        const monthlyShiftLimitKWh = Math.max(nominalBatteryKWh, 0) * 26 * 0.8 * 0.88;
+        const shiftedKWh = Math.min(solarSurplusKWh * 0.88, residualLoadKWh, monthlyShiftLimitKWh);
+        const selfConsumed = directConsumptionKWh + shiftedKWh;
+        const exported = Math.max(productionKWh - directConsumptionKWh - shiftedKWh / 0.88, 0);
+        const savings = capBillSavings(selfConsumed * derivedTariff + exported * exportRate);
+        return { selfConsumed, exported, savings };
+      };
+      const average = estimatePeriod(monthlyGenerationKWh);
+      const winter = estimatePeriod(winterGenerationKWh);
+      const summer = estimatePeriod(summerGenerationKWh);
+      return {
+        selfConsumed: average.selfConsumed,
+        exported: average.exported,
+        winterSelfConsumed: winter.selfConsumed,
+        winterExported: winter.exported,
+        summerSelfConsumed: summer.selfConsumed,
+        summerExported: summer.exported,
+        monthlySavings: average.savings,
+        annualSavings: average.savings * 12,
+        winterMonthlySavings: winter.savings,
+        summerMonthlySavings: summer.savings,
+        compensation: clamp((average.savings / Math.max(normalizedMonthlyBill, 1)) * 100, 0, 100),
+        winterCompensation: clamp((winter.savings / Math.max(normalizedMonthlyBill, 1)) * 100, 0, 100),
+        summerCompensation: clamp((summer.savings / Math.max(normalizedMonthlyBill, 1)) * 100, 0, 100),
+      };
+    };
 
-    const winterSelfConsumedWithBattery = Math.min(
-      winterGenerationKWh * selfConsumptionWithBatteryRate,
-      monthlyConsumptionKWh,
-    );
-    const winterExportedWithBattery = Math.max(
-      winterGenerationKWh - winterSelfConsumedWithBattery,
-      0,
-    );
-    const winterMonthlySavingsWithBattery =
-      winterSelfConsumedWithBattery * derivedTariff +
-      winterExportedWithBattery * exportRate;
-
-    const summerSelfConsumedWithBattery = Math.min(
-      summerGenerationKWh * selfConsumptionWithBatteryRate,
-      monthlyConsumptionKWh,
-    );
-    const summerExportedWithBattery = Math.max(
-      summerGenerationKWh - summerSelfConsumedWithBattery,
-      0,
-    );
-    const summerMonthlySavingsWithBattery =
-      summerSelfConsumedWithBattery * derivedTariff +
-      summerExportedWithBattery * exportRate;
+    const huaweiBatteryScenario = calculateBatteryScenario(huaweiTopology.capacityKWh);
+    const solisBatteryScenario = calculateBatteryScenario(safeSolisBatteryModules * SOLIS_DYNESS_SC_KWH);
+    const activeBatteryScenario = solarStudioBrand === "solis" ? solisBatteryScenario : huaweiBatteryScenario;
+    const selfConsumedWithBattery = activeBatteryScenario.selfConsumed;
+    const exportedWithBattery = activeBatteryScenario.exported;
+    const winterSelfConsumedWithBattery = activeBatteryScenario.winterSelfConsumed;
+    const winterExportedWithBattery = activeBatteryScenario.winterExported;
+    const summerSelfConsumedWithBattery = activeBatteryScenario.summerSelfConsumed;
+    const summerExportedWithBattery = activeBatteryScenario.summerExported;
+    const monthlySavingsWithBattery = activeBatteryScenario.monthlySavings;
+    const annualSavingsWithBattery = activeBatteryScenario.annualSavings;
+    const winterMonthlySavingsWithBattery = activeBatteryScenario.winterMonthlySavings;
+    const summerMonthlySavingsWithBattery = activeBatteryScenario.summerMonthlySavings;
 
     const fixedLogisticsNet = Math.max(
       workbookBaseLogisticsNet,
@@ -6524,11 +6548,8 @@ export default function SakiaraLandingPage() {
       100,
     );
 
-    const projectExecutionNote = installationLogisticsMetrics.isRemoteProject
-      ? "La propuesta incorpora alojamiento por distancia o tiempo de traslado y puede ajustarse según evaluación técnica, alcance real del proyecto y validación final del sitio."
-      : installationLogisticsMetrics.isIntermediateProject
-        ? "La propuesta incorpora logística intermedia por tiempo de traslado diario y puede ajustarse según evaluación técnica y validación final del sitio."
-        : "La propuesta considera logística local referencial y puede ajustarse según evaluación técnica y validación final del sitio.";
+    const projectExecutionNote =
+      "Inversión referencial según la ubicación indicada. La ingeniería, el montaje y las condiciones definitivas se confirman tras una visita técnica.";
 
     const coverageObjectiveLabel = isWinterGoal
       ? `Cobertura invernal objetivo ${formatNumber(winterCoverageTargetPercent)}%`
@@ -6599,6 +6620,8 @@ export default function SakiaraLandingPage() {
       monthlySavingsWithBattery,
       annualSavingsNoBattery,
       annualSavingsWithBattery,
+      huaweiBatteryScenario,
+      solisBatteryScenario,
       projectCostHuaweiNoBattery: projectCostHuaweiNoBatteryGross,
       projectCostHuaweiWithBattery: projectCostHuaweiWithBatteryGross,
       projectCostSolisNoBattery: projectCostSolisNoBatteryGross,
@@ -6613,12 +6636,12 @@ export default function SakiaraLandingPage() {
         projectCostHuaweiNoBatteryGross / Math.max(annualSavingsNoBattery, 1),
       paybackHuaweiWithBattery:
         projectCostHuaweiWithBatteryGross /
-        Math.max(annualSavingsWithBattery, 1),
+        Math.max(huaweiBatteryScenario.annualSavings, 1),
       paybackSolisNoBattery:
         projectCostSolisNoBatteryGross / Math.max(annualSavingsNoBattery, 1),
       paybackSolisWithBattery:
         projectCostSolisWithBatteryGross /
-        Math.max(annualSavingsWithBattery, 1),
+        Math.max(solisBatteryScenario.annualSavings, 1),
       locationLabel: `${selectedInstallationRegion.label} · ${selectedInstallationCommune.label}`,
       logisticsTotal: fixedLogisticsNet,
       laborDays: installationLogisticsMetrics.laborDays,
@@ -6685,6 +6708,7 @@ export default function SakiaraLandingPage() {
     summerCoverageTargetPercent,
     huaweiBatteryModules,
     solisBatteryModules,
+    solarStudioBrand,
   ]);
 
   const maintenanceMetrics = useMemo(() => {
@@ -6824,7 +6848,8 @@ export default function SakiaraLandingPage() {
       acProtectionPlan.totalNet +
       executionPlan.laborNet +
       executionPlan.logisticsNet +
-      certificationNet;
+      certificationNet +
+      ENTERPRISE_SIGNAGE_NET;
     const engineeringNet = Math.max(
       ENTERPRISE_ENGINEERING_MIN_NET,
       directNet * ENTERPRISE_ENGINEERING_FACTOR,
@@ -6850,8 +6875,10 @@ export default function SakiaraLandingPage() {
     );
     const exportedKWh = Math.max(monthlyGenerationKWh - selfConsumedKWh, 0);
     const exportRate = derivedTariff * ENTERPRISE_REFERENCE_EXPORT_RATE_FACTOR;
-    const monthlySavings =
-      selfConsumedKWh * derivedTariff + exportedKWh * exportRate;
+    const monthlySavings = Math.min(
+      selfConsumedKWh * derivedTariff + exportedKWh * exportRate,
+      Math.max(monthlyBill - Math.min(monthlyBill * 0.06, 12000), 0),
+    );
     const annualSavings = monthlySavings * 12;
     const compensationPercent = clamp(
       (monthlySavings / Math.max(monthlyBill, 1)) * 100,
@@ -6909,7 +6936,12 @@ export default function SakiaraLandingPage() {
         totalNet: certificationNet,
       },
       {
-        description: "INGENIERÍA, COORDINACIÓN Y AJUSTE COMERCIAL",
+        description: "SEÑALÉTICAS DE SEGURIDAD",
+        quantity: 1,
+        totalNet: ENTERPRISE_SIGNAGE_NET,
+      },
+      {
+        description: "INGENIERÍA Y COORDINACIÓN DE PROYECTO",
         quantity: 1,
         totalNet: engineeringNet + marketAdjustmentNet,
       },
@@ -6935,6 +6967,7 @@ export default function SakiaraLandingPage() {
       { description: "Canalización y accesorios CC", quantity: 1 },
       ...acProtectionPlan.items,
       { description: "Certificación SEC y tramitación", quantity: 1 },
+      { description: "Señaléticas de seguridad", quantity: 1 },
     ];
 
     return {
@@ -7083,7 +7116,7 @@ export default function SakiaraLandingPage() {
         value: `${formatNumber(installationMetrics.monthlyConsumptionKWh)} kWh/mes`,
       },
       { label: "Ubicación", value: installationMetrics.locationLabel },
-      { label: "Logística", value: installationMetrics.logisticsLabel },
+      { label: "Ubicación evaluada", value: installationMetrics.locationLabel },
       ...(projectAddress.trim()
         ? [{ label: "Dirección del proyecto", value: projectAddress.trim() }]
         : []),
@@ -7143,7 +7176,7 @@ export default function SakiaraLandingPage() {
     { label: "Tipo de proyecto", value: enterpriseMetrics.projectTypeLabel },
     { label: "Superficie", value: enterpriseMetrics.surfaceTypeLabel },
     { label: "Ubicación", value: enterpriseMetrics.locationLabel },
-    { label: "Logística", value: enterpriseMetrics.executionPlan.logisticsLabel },
+    { label: "Zona de instalación", value: enterpriseMetrics.locationLabel },
     ...(projectAddress.trim()
       ? [{ label: "Dirección del proyecto", value: projectAddress.trim() }]
       : []),
@@ -7319,7 +7352,7 @@ Mensaje: ${message || "-"}`,
         tone: "success",
         message:
           uploadedFiles.length > 0
-            ? "Solicitud enviada correctamente. Tus archivos quedaron vinculados al correo mediante enlaces de descarga."
+            ? "Solicitud enviada. Tus archivos se compartieron mediante enlaces de descarga."
             : "Solicitud enviada correctamente.",
       });
     } catch (error) {
@@ -7876,11 +7909,11 @@ Mensaje: ${message || "-"}`,
         `${metrics.quotationCosts?.huaweiDcdcConverters || 1} controlador(es) DC/DC + 1 SmartGuard; respaldo de tablero general sujeto a potencia BACKUP.`,
       badge: "Huawei híbrido",
       priceValue: metrics.projectCostHuaweiWithBattery,
-      annualSavingsValue: metrics.annualSavingsWithBattery,
+      annualSavingsValue: metrics.huaweiBatteryScenario.annualSavings,
       price: formatCLP(metrics.projectCostHuaweiWithBattery),
-      savings: formatCLP(metrics.monthlySavingsWithBattery),
-      winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
-      summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
+      savings: formatCLP(metrics.huaweiBatteryScenario.monthlySavings),
+      winterCompensation: `${formatNumber(metrics.huaweiBatteryScenario.winterCompensation)}%`,
+      summerCompensation: `${formatNumber(metrics.huaweiBatteryScenario.summerCompensation)}%`,
       payback: `${formatNumber(metrics.paybackHuaweiWithBattery, 1)} años`,
       variant: "hybrid",
     },
@@ -7891,11 +7924,11 @@ Mensaje: ${message || "-"}`,
         "Almacenamiento Dyness nominal; potencia y BMS sujetos a validación de ingeniería.",
       badge: "Solis híbrido",
       priceValue: metrics.projectCostSolisWithBattery,
-      annualSavingsValue: metrics.annualSavingsWithBattery,
+      annualSavingsValue: metrics.solisBatteryScenario.annualSavings,
       price: formatCLP(metrics.projectCostSolisWithBattery),
-      savings: formatCLP(metrics.monthlySavingsWithBattery),
-      winterCompensation: `${formatNumber(metrics.winterCompensationWithBattery)}%`,
-      summerCompensation: `${formatNumber(metrics.summerCompensationWithBattery)}%`,
+      savings: formatCLP(metrics.solisBatteryScenario.monthlySavings),
+      winterCompensation: `${formatNumber(metrics.solisBatteryScenario.winterCompensation)}%`,
+      summerCompensation: `${formatNumber(metrics.solisBatteryScenario.summerCompensation)}%`,
       payback: `${formatNumber(metrics.paybackSolisWithBattery, 1)} años`,
       variant: "solis hybrid",
     },
@@ -7984,7 +8017,7 @@ Mensaje: ${message || "-"}`,
                   : "Siguiente";
 
   // Cotizador residencial unificado: reemplaza el wizard de 8 pantallas.
-  // Reutiliza el motor de costos, márgenes, ubicación, logística y PDF existentes.
+  // Reutiliza el motor de cotización, ubicación y exportación PDF.
   const renderSolarStudioConfigurator = (location = "home") => {
     const hasBattery = solarStudioBatteryEnabled;
     const isHuawei = solarStudioBrand === "huawei";
@@ -8025,9 +8058,9 @@ Mensaje: ${message || "-"}`,
           <div>
             <p className="ss-studio-eyebrow">SAKIARA SOLAR STUDIO</p>
             <h2>Diseña tu proyecto solar</h2>
-            <p>Configura tu sistema, compara el ahorro y el presupuesto en tiempo real. Todo en una sola pantalla.</p>
+            <p>Explora configuraciones, conoce la generación proyectada y solicita una evaluación técnica. Valores estimados en pesos chilenos.</p>
           </div>
-          <span className="ss-live-pill"><span aria-hidden="true">●</span> Cálculo en vivo</span>
+          <span className="ss-live-pill"><span aria-hidden="true">●</span> Estimación actualizada</span>
         </div>
         <div className="ss-simulator-layout">
           <div className="ss-simulator-fields">
@@ -8050,7 +8083,7 @@ Mensaje: ${message || "-"}`,
             </label>}
             {!hasInstallationUsageData && <p className="ss-studio-alert">Ingresa los datos de consumo para continuar.</p>}
 
-            <div className="ss-studio-section-heading"><strong>02 · Ubicación del proyecto</strong><span>Generación y logística reales del cotizador</span></div>
+            <div className="ss-studio-section-heading"><strong>02 · Ubicación del proyecto</strong><span>Estimación solar según ubicación</span></div>
             <div className="ss-simulator-fields-two">
               <label className="ss-field"><span>Región</span>
                 <select value={installationRegion} onChange={(e) => {
@@ -8069,8 +8102,7 @@ Mensaje: ${message || "-"}`,
             </div>
             <div className="ss-location-note">
               <strong>{selectedInstallationCommune.label}</strong>
-              <span>{installationMetrics.logisticsLabel} · Traslados y hospedaje considerados en la inversión.</span>
-              {installationMetrics.isRemoteProject && <span>{installationMetrics.lodgingNights} noche(s) de hospedaje, según planificación del proyecto.</span>}
+              <span>El cálculo considera la región y comuna seleccionadas. La factibilidad final se confirma mediante visita técnica.</span>
             </div>
 
             <div className="ss-studio-section-heading"><strong>03 · Diseño y compensación</strong><span>Dimensionamiento instantáneo</span></div>
@@ -8095,7 +8127,7 @@ Mensaje: ${message || "-"}`,
               </select>
             </label>
 
-            <div className="ss-studio-section-heading"><strong>04 · Equipos y baterías</strong><span>Huawei o Solis · precios DEFINITIVO</span></div>
+            <div className="ss-studio-section-heading"><strong>04 · Equipos y baterías</strong><span>Equipos certificados · configuración flexible</span></div>
             <div className="ss-simulator-fields-two">
               <label className="ss-field"><span>Inversor</span>
                 <select value={solarStudioBrand} onChange={(e) => setSolarStudioBrand(e.target.value)}>
@@ -8140,34 +8172,34 @@ Mensaje: ${message || "-"}`,
           </div>
 
           <div className="ss-simulator-result" aria-live="polite" aria-atomic="false">
-            <div className="ss-studio-result-eyebrow">TU PROPUESTA ACTUALIZADA</div>
+            <div className="ss-studio-result-eyebrow">PROPUESTA SOLAR REFERENCIAL</div>
             <h3 className="ss-studio-offer-name">{isHuawei ? "Huawei" : "Solis"} {hasBattery ? "con almacenamiento" : "fotovoltaico"}</h3>
             <p className="ss-studio-result-location">{selectedInstallationCommune.label} · {selectedInstallationRegion.label}</p>
             <div className="ss-simulator-metrics">
               <div><span>Inversión estimada · IVA incluido</span><strong>{formatCLP(installationPaymentSelection.finalPrice)}</strong></div>
-              <div><span>Ahorro mensual estimado</span><strong>{formatCLP(estimatedSavings)}</strong></div>
+              <div><span>Ahorro potencial mensual*</span><strong>{formatCLP(estimatedSavings)}</strong></div>
               <div><span>Potencia fotovoltaica</span><strong>{formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp</strong><small>{formatNumber(installationMetrics.estimatedPanels)} paneles</small></div>
               <div><span>Almacenamiento nominal</span><strong>{hasBattery ? `${formatNumber(nominalStorage, isHuawei ? 0 : 2)} kWh` : "Sin batería"}</strong></div>
             </div>
             <div className="ss-studio-result-detail">
               <div><span>Consumo mensual</span><strong>{formatNumber(installationMetrics.monthlyConsumptionKWh)} kWh</strong></div>
-              <div><span>Generación mensual</span><strong>{formatNumber(installationMetrics.monthlyGenerationKWh)} kWh</strong></div>
-              <div><span>Compensación en invierno</span><strong>{formatNumber(winterCoverage)}%</strong></div>
-              <div><span>Compensación en verano</span><strong>{formatNumber(summerCoverage)}%</strong></div>
-              <div><span>Retorno simple estimado</span><strong>{formatNumber(installationPaymentSelection.paybackYears,1)} años</strong></div>
-              <div><span>Logística incorporada</span><strong>Sí · según ubicación</strong></div>
+              <div><span>Generación promedio mensual</span><strong>{formatNumber(installationMetrics.monthlyGenerationKWh)} kWh</strong></div>
+              <div><span>Reducción estimada · invierno</span><strong>{formatNumber(winterCoverage)}%</strong></div>
+              <div><span>Reducción estimada · verano</span><strong>{formatNumber(summerCoverage)}%</strong></div>
+              <div><span>Retorno simple preliminar</span><strong>≈ {formatNumber(installationPaymentSelection.paybackYears,1)} años</strong></div>
+              <div><span>Estado del estudio</span><strong>Evaluación preliminar</strong></div>
               {hasBattery && isHuawei && <div><span>Controladores DC/DC</span><strong>{installationMetrics.quotationCosts.huaweiDcdcConverters} + SmartGuard</strong></div>}
               {installationPaymentMethod === "card" && <div><span>Cuota base ({installationInstallments})</span><strong>{formatCLP(selectedInstallationInstallmentAmount)}</strong></div>}
             </div>
             <div className="ss-simulator-compare"><span>Cuenta actual</span><strong>{formatCLP(installationMetrics.monthlyBill)}</strong></div>
             <div className="ss-simulator-bar"><i style={{width:"100%"}} /></div>
-            <div className="ss-simulator-compare"><span>Cuenta equivalente tras ahorro*</span><strong>{formatCLP(monthlyRemaining)}</strong></div>
+            <div className="ss-simulator-compare"><span>Boleta mensual proyectada*</span><strong>{formatCLP(monthlyRemaining)}</strong></div>
             <div className="ss-simulator-bar"><i className="ss-simulator-savings" style={{width:`${Math.max(0,Math.min(100,(monthlyRemaining/currentUsage)*100))}%`}} /></div>
             <button className="btn-primary ss-simulator-button" type="button" disabled={!hasInstallationUsageData} onClick={goFinal}>
-              Ver mi casa solar y descargar documentos →
+              Ver propuesta y descargar documentos →
             </button>
-            <p className="ss-simulator-caveat">*Cálculos referenciales. La inversión incluye los materiales, márgenes, logística, señaléticas y certificación configurados por Sakiara. La evaluación final depende de levantamiento técnico, protecciones y factibilidad.</p>
-            <p className="ss-studio-disclaimer">Baterías: mayor capacidad de respaldo no supone por sí misma un mayor ahorro. Precio y producción son estimaciones, no una oferta vinculante.</p>
+            <p className="ss-simulator-caveat">*Proyección referencial, no garantizada. El ahorro depende de la radiación, el perfil horario de consumo, las tarifas, la valorización de excedentes y los cargos no compensables. La inversión final se confirma tras evaluación técnica.</p>
+            <p className="ss-studio-disclaimer">Una batería puede aumentar el autoconsumo y ofrecer respaldo, sujeto a compatibilidad, capacidad y condiciones del proyecto. La simulación no constituye una oferta vinculante.</p>
           </div>
         </div>
       </section>
@@ -8666,7 +8698,7 @@ Mensaje: ${message || "-"}`,
                       accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
                     />
                     <div className="hint">
-                      Hasta 25 MB por archivo. Se enviarán por enlaces seguros dentro del correo.
+                      Hasta 25 MB por archivo. Los enlaces podrán abrirse si se comparte su dirección. No adjuntes documentos con claves o datos bancarios.
                     </div>
                   </div>
                 </div>
@@ -9124,7 +9156,7 @@ Mensaje: ${message || "-"}`,
                       accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
                     />
                     <div className="hint">
-                      Hasta 25 MB por archivo. Se enviarán por enlaces seguros dentro del correo.
+                      Hasta 25 MB por archivo. Los enlaces podrán abrirse si se comparte su dirección. No adjuntes documentos con claves o datos bancarios.
                     </div>
                   </div>
                 </div>
@@ -9340,7 +9372,7 @@ Mensaje: ${message || "-"}`,
               <div className="wizard-copy">
                 <h3 className="wizard-title">Ubicación y condiciones generales</h3>
                 <p className="wizard-text mobile-essential-hide">
-                  La comuna modifica la generación y la logística. El tipo de superficie cambia la estructura y los materiales considerados.
+                  La ubicación influye en la producción solar estimada. El tipo de superficie permite adaptar la propuesta a las características del proyecto.
                 </p>
               </div>
 
@@ -9403,7 +9435,7 @@ Mensaje: ${message || "-"}`,
               <div className="summary-grid">
                 <SummaryCard label="Ubicación" value={selectedEnterpriseCommune.label} sub={selectedEnterpriseRegion.label} />
                 <SummaryCard label="Montaje" value={enterpriseMetrics.structurePlan.typeLabel} sub={`${formatNumber(enterpriseMetrics.structurePlan.requiredAreaM2)} m² estimados`} />
-                <SummaryCard label="Ejecución" value={`${formatNumber(enterpriseMetrics.executionPlan.projectCalendarDays)} días`} sub={enterpriseMetrics.executionPlan.logisticsLabel} />
+                <SummaryCard label="Ejecución" value={`${formatNumber(enterpriseMetrics.executionPlan.projectCalendarDays)} días`} sub="Plazo referencial, sujeto a evaluación" />
               </div>
             </>
           )}
@@ -9543,7 +9575,7 @@ Mensaje: ${message || "-"}`,
                   <div className="contact-box attachment-box">
                     <label className="label">Adjunto 2</label>
                     <input className="input file-input" type="file" name="adjunto_2" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx" />
-                    <div className="hint">Hasta 25 MB por archivo.</div>
+                    <div className="hint">Hasta 25 MB por archivo. No adjuntes claves ni datos bancarios; los enlaces de archivo no son privados.</div>
                   </div>
                 </div>
 
@@ -10047,8 +10079,17 @@ Mensaje: ${message || "-"}`,
         .ss-final-navigation p{margin:0;color:#5b697b;font-size:13px;}
         .ss-final-panel{background:#fff;}
         .ss-final-return{display:flex;justify-content:center;margin-top:24px;}
+        .ss-unified .ss-simulator-result{box-shadow:0 12px 32px rgba(26,37,53,.07);}
+        .ss-unified .ss-simulator-metrics>div{transition:border-color .18s ease,box-shadow .18s ease;}
+        .ss-unified .ss-simulator-metrics>div:hover{border-color:#ddba5b;box-shadow:0 3px 12px rgba(38,43,54,.04);}
+        .ss-unified .ss-field select:hover,.ss-unified .ss-studio-number:hover{border-color:#b1bac8 !important;}
+        .ss-unified .ss-studio-result-detail>div{padding:5px 0;}
+        .ss-unified .ss-simulator-metrics strong,.ss-unified .ss-studio-result-detail strong{font-variant-numeric:tabular-nums;}
+        .ss-unified .ss-simulator-compare strong{font-variant-numeric:tabular-nums;}
+        .ss-unified .ss-simulator-button{min-height:57px;transition:transform .18s ease,background .18s ease;}
+        .ss-unified .ss-simulator-button:not(:disabled):active{transform:translateY(1px);}
         @media(max-width:920px){.ss-unified .ss-simulator-layout{grid-template-columns:1fr;}.ss-unified .ss-simulator-result{position:static;}}
-        @media(max-width:600px){.ss-unified{padding:17px 12px;}.ss-unified .ss-simulator-head{display:block;}.ss-live-pill{margin-top:12px;}.ss-unified .ss-simulator-fields-two,.ss-unified .ss-studio-result-detail{grid-template-columns:1fr;}.ss-unified .ss-simulator-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.ss-unified .ss-simulator-result{padding:14px;}.ss-unified .ss-simulator-metrics>div{padding:10px;}}
+        @media(max-width:600px){.ss-unified{padding:17px 12px;}.ss-unified .ss-simulator-head{display:block;}.ss-live-pill{margin-top:12px;}.ss-unified .ss-simulator-fields-two{grid-template-columns:1fr;}.ss-unified .ss-studio-result-detail{grid-template-columns:repeat(2,minmax(0,1fr));}.ss-unified .ss-simulator-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.ss-unified .ss-simulator-result{padding:14px;}.ss-unified .ss-simulator-metrics>div{padding:10px;}.ss-unified .ss-simulator-metrics strong{font-size:16px !important;}.ss-unified .ss-studio-result-detail strong{font-size:12px;}}
 
         .hero-brand-logo.huawei {
           height: 30px;
