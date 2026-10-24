@@ -5974,7 +5974,7 @@ export default function SakiaraLandingPage() {
   );
 
   const [installationInputMode, setInstallationInputMode] =
-    useState("combined");
+    useState("bill");
   const [coverageGoalMode, setCoverageGoalMode] = useState("optimized");
   const [winterCoverageTargetPercent, setWinterCoverageTargetPercent] = useState(50);
   const [summerCoverageTargetPercent, setSummerCoverageTargetPercent] = useState(80);
@@ -7328,7 +7328,7 @@ Mensaje: ${message || "-"}`,
     const reportMetrics = { ...installationMetrics };
     const reportOffers = createInstallationOfferOptions(reportMetrics);
     const reportSelectedOffer =
-      reportOffers.find((offer) => offer.key === selectedInstallationOffer) || null;
+      reportOffers.find((offer) => offer.key === `${solarStudioBrand}${solarStudioBatteryEnabled ? "WithBattery" : "NoBattery"}`) || null;
     const reportProfileLabel = selectedProfile.label;
     const reportProfileDescription = selectedProfile.description;
     const reportRegionLabel = selectedInstallationRegion.label;
@@ -7802,14 +7802,8 @@ Mensaje: ${message || "-"}`,
     activeView === "empresas" ? "Cotizar empresa" : "Cotiza ahora";
 
   const installationSteps = [
-    { id: 1, title: "Modalidad", description: "Elige cómo quieres cotizar" },
-    { id: 2, title: "Consumo", description: "Ingresa boleta, kWh o ambos" },
-    { id: 3, title: "Objetivo", description: "Define cuánto quieres compensar" },
-    { id: 4, title: "Ubicación", description: "Región y comuna del proyecto" },
-    { id: 5, title: "Perfil", description: "Cuándo consumes más energía" },
-    { id: 6, title: "Propuesta", description: "Compara las alternativas" },
-    { id: 7, title: "Financiamiento", description: "Contado o tarjeta de crédito" },
-    { id: 8, title: "Contacto", description: "Cotización e informe final" },
+    { id: 1, title: "Simulación en vivo", description: "Todos los ajustes en una pantalla" },
+    { id: 2, title: "Casa solar y documentos", description: "Visualización, contacto y descarga" },
   ];
 
   const enterpriseSteps = [
@@ -7899,7 +7893,7 @@ Mensaje: ${message || "-"}`,
 
   const selectedInstallationOfferData =
     installationOfferOptions.find(
-      (offer) => offer.key === selectedInstallationOffer,
+      (offer) => offer.key === `${solarStudioBrand}${solarStudioBatteryEnabled ? "WithBattery" : "NoBattery"}`,
     ) || null;
 
   const installationCashPrice =
@@ -7975,6 +7969,197 @@ Mensaje: ${message || "-"}`,
                   ? "Continuar a cotización"
                   : "Siguiente";
 
+  // Cotizador residencial unificado: reemplaza el wizard de 8 pantallas.
+  // Reutiliza el motor de costos, márgenes, ubicación, logística y PDF existentes.
+  const renderSolarStudioConfigurator = (location = "home") => {
+    const hasBattery = solarStudioBatteryEnabled;
+    const isHuawei = solarStudioBrand === "huawei";
+    const estimatedSavings = hasBattery
+      ? installationMetrics.monthlySavingsWithBattery
+      : installationMetrics.monthlySavingsNoBattery;
+    const winterCoverage = hasBattery
+      ? installationMetrics.winterCompensationWithBattery
+      : installationMetrics.winterCompensationNoBattery;
+    const summerCoverage = hasBattery
+      ? installationMetrics.summerCompensationWithBattery
+      : installationMetrics.summerCompensationNoBattery;
+    const nominalStorage = !hasBattery ? 0 : isHuawei
+      ? installationMetrics.quotationCosts.huaweiCapacityKWh
+      : installationMetrics.quotationCosts.solisCapacityKWh;
+    const annualSavings = hasBattery
+      ? installationMetrics.annualSavingsWithBattery
+      : installationMetrics.annualSavingsNoBattery;
+    const monthlyRemaining = Math.max(0, installationMetrics.monthlyBill - estimatedSavings);
+    const currentUsage = Math.max(installationMetrics.monthlyBill, 1);
+    const storageDescription = !hasBattery
+      ? "Sistema sin almacenamiento"
+      : isHuawei
+        ? `${huaweiBatteryModules} módulos LUNA2000-S0 · ${installationMetrics.quotationCosts.huaweiDcdcConverters} DC/DC + 1 SmartGuard`
+        : `${solisBatteryModules} PowerBrick SC · validación BMS y protecciones en ingeniería`;
+    const goFinal = () => {
+      if (!hasInstallationUsageData) return;
+      const offerKey = `${solarStudioBrand}${hasBattery ? "WithBattery" : "NoBattery"}`;
+      setSelectedInstallationOffer(offerKey);
+      setExpandedInstallationOffer(offerKey);
+      setInstallationStep(2);
+      goToView("instalacion");
+    };
+
+    return (
+      <section className="section-card ss-simulator-wrap ss-unified" id={location === "home" ? "simulador-solar-sakiara" : "wizard-instalacion"}>
+        <div className="ss-simulator-head">
+          <div>
+            <p className="ss-studio-eyebrow">SAKIARA SOLAR STUDIO</p>
+            <h2>Diseña tu proyecto solar</h2>
+            <p>Configura tu sistema, compara el ahorro y el presupuesto en tiempo real. Todo en una sola pantalla.</p>
+          </div>
+          <span className="ss-live-pill"><span aria-hidden="true">●</span> Cálculo en vivo</span>
+        </div>
+        <div className="ss-simulator-layout">
+          <div className="ss-simulator-fields">
+            <div className="ss-studio-section-heading"><strong>01 · Tu consumo eléctrico</strong><span>Boleta, kWh o ambos</span></div>
+            <label className="ss-field">
+              <span>Datos disponibles</span>
+              <select value={installationInputMode} onChange={(e) => setInstallationInputMode(e.target.value)}>
+                {Object.entries(installationInputModeOptions).map(([value, option]) => <option key={value} value={value}>{option.label}</option>)}
+              </select>
+            </label>
+            {installationInputMode !== "consumption" && <label className="ss-simulator-range">
+              <span>Cuenta eléctrica mensual <strong>{formatCLP(installationMetrics.monthlyBill)}</strong></span>
+              <input aria-label="Ajustar cuenta eléctrica mensual" type="range" min="30000" max="1000000" step="10000" value={Math.min(1000000, Math.max(30000, Number(monthlyBillInput) || 250000))} onChange={(e) => setMonthlyBillInput(e.target.value)} />
+              <input aria-label="Monto exacto de la cuenta eléctrica" className="ss-studio-number" type="number" inputMode="numeric" min="0" step="1000" value={monthlyBillInput} onChange={(e) => setMonthlyBillInput(sanitizeIntegerInput(e.target.value))} />
+              <small>Arrastra o escribe el monto exacto de tu cuenta mensual en pesos chilenos.</small>
+            </label>}
+            {installationInputMode !== "bill" && <label className="ss-field">
+              <span>Consumo mensual de la boleta (kWh)</span>
+              <input className="ss-studio-number" type="number" min="0" step="1" inputMode="numeric" value={billConsumptionInput} onChange={(e) => setBillConsumptionInput(sanitizeIntegerInput(e.target.value))} />
+            </label>}
+            {!hasInstallationUsageData && <p className="ss-studio-alert">Ingresa los datos de consumo para continuar.</p>}
+
+            <div className="ss-studio-section-heading"><strong>02 · Ubicación del proyecto</strong><span>Generación y logística reales del cotizador</span></div>
+            <div className="ss-simulator-fields-two">
+              <label className="ss-field"><span>Región</span>
+                <select value={installationRegion} onChange={(e) => {
+                  const region = e.target.value;
+                  setInstallationRegion(region);
+                  setInstallationCommune(Object.keys(maintenanceRegionData[region].communes)[0]);
+                }}>
+                  {maintenanceRegionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label className="ss-field"><span>Comuna</span>
+                <select value={installationCommune} onChange={(e) => setInstallationCommune(e.target.value)}>
+                  {installationCommuneOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="ss-location-note">
+              <strong>{selectedInstallationCommune.label}</strong>
+              <span>{installationMetrics.logisticsLabel} · Traslados y hospedaje considerados en la inversión.</span>
+              {installationMetrics.isRemoteProject && <span>{installationMetrics.lodgingNights} noche(s) de hospedaje, según planificación del proyecto.</span>}
+            </div>
+
+            <div className="ss-studio-section-heading"><strong>03 · Diseño y compensación</strong><span>Dimensionamiento instantáneo</span></div>
+            <label className="ss-field"><span>Objetivo de la instalación</span>
+              <select value={coverageGoalMode} onChange={(e) => setCoverageGoalMode(e.target.value)}>
+                <option value="optimized">Compensación optimizada</option>
+                <option value="winter">Cobertura objetivo en invierno</option>
+                <option value="seasonal">Cobertura en invierno y verano</option>
+              </select>
+            </label>
+            {coverageGoalMode !== "optimized" && <label className="ss-simulator-range">
+              <span>Meta de cobertura en invierno <strong>{winterCoverageTargetPercent}%</strong></span>
+              <input type="range" min="30" max="100" step="5" value={winterCoverageTargetPercent} onChange={(e) => setWinterCoverageTargetPercent(Number(e.target.value))}/>
+            </label>}
+            {coverageGoalMode === "seasonal" && <label className="ss-simulator-range">
+              <span>Meta de cobertura en verano <strong>{summerCoverageTargetPercent}%</strong></span>
+              <input type="range" min="30" max="100" step="5" value={summerCoverageTargetPercent} onChange={(e) => setSummerCoverageTargetPercent(Number(e.target.value))}/>
+            </label>}
+            <label className="ss-field"><span>¿Cuándo se consume más electricidad en la vivienda?</span>
+              <select value={profile} onChange={(e) => setProfile(e.target.value)}>
+                {Object.entries(profileMap).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}
+              </select>
+            </label>
+
+            <div className="ss-studio-section-heading"><strong>04 · Equipos y baterías</strong><span>Huawei o Solis · precios DEFINITIVO</span></div>
+            <div className="ss-simulator-fields-two">
+              <label className="ss-field"><span>Inversor</span>
+                <select value={solarStudioBrand} onChange={(e) => setSolarStudioBrand(e.target.value)}>
+                  <option value="huawei">Huawei SUN2000-LC0</option>
+                  <option value="solis">Solis S6 Plus</option>
+                </select>
+              </label>
+              <label className="ss-field"><span>Almacenamiento</span>
+                <select value={hasBattery ? "yes" : "no"} onChange={(e) => setSolarStudioBatteryEnabled(e.target.value === "yes")}>
+                  <option value="no">Solo paneles solares</option>
+                  <option value="yes">Paneles + baterías</option>
+                </select>
+              </label>
+            </div>
+            {hasBattery && <label className="ss-field"><span>{isHuawei ? "Módulos Huawei LUNA2000-S0 · 5 kWh cada uno" : "Dyness PowerBrick SC · 16,08 kWh cada una"}</span>
+              {isHuawei ? <select value={huaweiBatteryModules} onChange={(e) => setHuaweiBatteryModules(Number(e.target.value))}>
+                {Array.from({length:6},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} módulo(s) · {n*5} kWh · {Math.ceil(n/3)} DC/DC</option>)}
+              </select> : <select value={solisBatteryModules} onChange={(e) => setSolisBatteryModules(Number(e.target.value))}>
+                {Array.from({length:SOLIS_SC_QUOTE_MAX},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} unidad(es) · {formatNumber(n*SOLIS_DYNESS_SC_KWH,2)} kWh</option>)}
+              </select>}
+            </label>}
+            {hasBattery && <div className="ss-location-note"><span>{storageDescription}</span></div>}
+
+            <div className="ss-studio-section-heading"><strong>05 · Forma de pago</strong><span>Valor al contado o con tarjeta</span></div>
+            <div className="ss-simulator-fields-two">
+              <label className="ss-field"><span>Modalidad</span>
+                <select value={installationPaymentMethod} onChange={(e) => {
+                  setInstallationPaymentMethod(e.target.value);
+                  if(e.target.value === "card") setInstallationInstallments(recommendedInstallationInstallments);
+                }}>
+                  <option value="cash">Precio preferencial contado</option>
+                  <option value="card">Tarjeta de crédito</option>
+                </select>
+              </label>
+              {installationPaymentMethod === "card" && <label className="ss-field"><span>Cantidad de cuotas</span>
+                <select value={installationInstallments} onChange={(e) => setInstallationInstallments(Number(e.target.value))}>
+                  {INSTALLATION_CARD_INSTALLMENT_OPTIONS.map(n=><option key={n} value={n}>{n} cuotas · {formatCLP(installationCardPrice/n)}/mes</option>)}
+                </select>
+              </label>}
+            </div>
+            {installationPaymentMethod === "card" && <p className="ss-studio-disclaimer">Cuota base informativa: no incorpora intereses, comisiones ni costos particulares del banco emisor.</p>}
+          </div>
+
+          <div className="ss-simulator-result" aria-live="polite" aria-atomic="false">
+            <div className="ss-studio-result-eyebrow">TU PROPUESTA ACTUALIZADA</div>
+            <h3 className="ss-studio-offer-name">{isHuawei ? "Huawei" : "Solis"} {hasBattery ? "con almacenamiento" : "fotovoltaico"}</h3>
+            <p className="ss-studio-result-location">{selectedInstallationCommune.label} · {selectedInstallationRegion.label}</p>
+            <div className="ss-simulator-metrics">
+              <div><span>Inversión estimada · IVA incluido</span><strong>{formatCLP(installationPaymentSelection.finalPrice)}</strong></div>
+              <div><span>Ahorro mensual estimado</span><strong>{formatCLP(estimatedSavings)}</strong></div>
+              <div><span>Potencia fotovoltaica</span><strong>{formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp</strong><small>{formatNumber(installationMetrics.estimatedPanels)} paneles</small></div>
+              <div><span>Almacenamiento nominal</span><strong>{hasBattery ? `${formatNumber(nominalStorage, isHuawei ? 0 : 2)} kWh` : "Sin batería"}</strong></div>
+            </div>
+            <div className="ss-studio-result-detail">
+              <div><span>Consumo mensual</span><strong>{formatNumber(installationMetrics.monthlyConsumptionKWh)} kWh</strong></div>
+              <div><span>Generación mensual</span><strong>{formatNumber(installationMetrics.monthlyGenerationKWh)} kWh</strong></div>
+              <div><span>Compensación en invierno</span><strong>{formatNumber(winterCoverage)}%</strong></div>
+              <div><span>Compensación en verano</span><strong>{formatNumber(summerCoverage)}%</strong></div>
+              <div><span>Retorno simple estimado</span><strong>{formatNumber(installationPaymentSelection.paybackYears,1)} años</strong></div>
+              <div><span>Logística incorporada</span><strong>Sí · según ubicación</strong></div>
+              {hasBattery && isHuawei && <div><span>Controladores DC/DC</span><strong>{installationMetrics.quotationCosts.huaweiDcdcConverters} + SmartGuard</strong></div>}
+              {installationPaymentMethod === "card" && <div><span>Cuota base ({installationInstallments})</span><strong>{formatCLP(selectedInstallationInstallmentAmount)}</strong></div>}
+            </div>
+            <div className="ss-simulator-compare"><span>Cuenta actual</span><strong>{formatCLP(installationMetrics.monthlyBill)}</strong></div>
+            <div className="ss-simulator-bar"><i style={{width:"100%"}} /></div>
+            <div className="ss-simulator-compare"><span>Cuenta equivalente tras ahorro*</span><strong>{formatCLP(monthlyRemaining)}</strong></div>
+            <div className="ss-simulator-bar"><i className="ss-simulator-savings" style={{width:`${Math.max(0,Math.min(100,(monthlyRemaining/currentUsage)*100))}%`}} /></div>
+            <button className="btn-primary ss-simulator-button" type="button" disabled={!hasInstallationUsageData} onClick={goFinal}>
+              Ver mi casa solar y descargar documentos →
+            </button>
+            <p className="ss-simulator-caveat">*Cálculos referenciales. La inversión incluye los materiales, márgenes, logística, señaléticas y certificación configurados por Sakiara. La evaluación final depende de levantamiento técnico, protecciones y factibilidad.</p>
+            <p className="ss-studio-disclaimer">Baterías: mayor capacidad de respaldo no supone por sí misma un mayor ahorro. Precio y producción son estimaciones, no una oferta vinculante.</p>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const renderHomeView = () => (
     <>
       <section className="hero-banner">
@@ -8049,88 +8234,7 @@ Mensaje: ${message || "-"}`,
         </div>
       </section>
 
-      <section className="section-card ss-simulator-wrap" id="simulador-solar-sakiara">
-        <div className="ss-simulator-head">
-          <div>
-            <p className="hero-kicker">SAKIARA SOLAR STUDIO</p>
-            <h2>Simula tu ahorro solar</h2>
-            <p>Descubre el potencial de tu hogar y compara opciones reales Huawei y Solis.</p>
-          </div>
-        </div>
-        <div className="ss-simulator-layout">
-          <div className="ss-simulator-fields">
-            <label className="ss-simulator-range">
-              <span>Cuenta eléctrica mensual <strong>{formatCLP(installationMetrics.monthlyBill)}</strong></span>
-              <input type="range" min="30000" max="500000" step="10000"
-                value={Math.min(500000, Math.max(30000, Number(monthlyBillInput) || 250000))}
-                onChange={(e) => {setInstallationInputMode("bill"); setMonthlyBillInput(e.target.value);}} />
-              <small>$30.000 — $500.000</small>
-            </label>
-            <div className="ss-simulator-fields-two">
-              <label className="ss-field"><span>Elige tecnología</span>
-                <select value={solarStudioBrand} onChange={(e) => setSolarStudioBrand(e.target.value)}>
-                  <option value="huawei">Huawei SUN2000-LC0</option>
-                  <option value="solis">Solis S6 Plus</option>
-                </select>
-              </label>
-              <label className="ss-field"><span>Almacenamiento</span>
-                <select value={solarStudioBatteryEnabled ? "yes" : "no"}
-                  onChange={(e) => setSolarStudioBatteryEnabled(e.target.value === "yes")}>
-                  <option value="no">Solo paneles solares</option>
-                  <option value="yes">Paneles + baterías</option>
-                </select>
-              </label>
-            </div>
-            {solarStudioBatteryEnabled && (
-              <label className="ss-field">
-                <span>{solarStudioBrand === "huawei" ? "Cantidad de módulos LUNA2000 de 5 kWh" : "Cantidad de baterías PowerBrick SC de 16,08 kWh"}</span>
-                {solarStudioBrand === "huawei" ? (
-                  <select value={huaweiBatteryModules} onChange={(e) => setHuaweiBatteryModules(Number(e.target.value))}>
-                    {Array.from({length: 6}, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} módulo(s) · {n * 5} kWh · {Math.ceil(n / 3)} DC/DC</option>)}
-                  </select>
-                ) : (
-                  <select value={solisBatteryModules} onChange={(e) => setSolisBatteryModules(Number(e.target.value))}>
-                    {Array.from({length: SOLIS_SC_QUOTE_MAX}, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} unidad(es) · {formatNumber(n * SOLIS_DYNESS_SC_KWH, 2)} kWh</option>)}
-                  </select>
-                )}
-              </label>
-            )}
-            <label className="ss-simulator-range">
-              <span>Meta de compensación en invierno <strong>{coverageGoalMode === "winter" ? `${winterCoverageTargetPercent}%` : "Optimizada"}</strong></span>
-              <input type="range" min="30" max="90" step="5"
-                value={winterCoverageTargetPercent}
-                onChange={(e) => {setCoverageGoalMode("winter"); setWinterCoverageTargetPercent(Number(e.target.value));}}/>
-              <small>Desliza para fijar un objetivo invernal. La evaluación completa también considera comuna y perfil de consumo.</small>
-            </label>
-          </div>
-          {(() => {
-            const battery = solarStudioBatteryEnabled;
-            const huawei = solarStudioBrand === "huawei";
-            const savings = battery ? installationMetrics.monthlySavingsWithBattery : installationMetrics.monthlySavingsNoBattery;
-            const budget = huawei
-              ? (battery ? installationMetrics.projectCostHuaweiWithBattery : installationMetrics.projectCostHuaweiNoBattery)
-              : (battery ? installationMetrics.projectCostSolisWithBattery : installationMetrics.projectCostSolisNoBattery);
-            return <div className="ss-simulator-result">
-              <div className="ss-simulator-metrics">
-                <div><span>Ahorro mensual estimado</span><strong>{formatCLP(savings)}</strong></div>
-                <div><span>Potencia FV orientativa</span><strong>{formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp</strong></div>
-                <div><span>Inversión referencial (IVA incl.)</span><strong>{formatCLP(budget)}</strong></div>
-                <div><span>Almacenamiento nominal</span><strong>{battery ? `${formatNumber(huawei ? installationMetrics.quotationCosts.huaweiCapacityKWh : installationMetrics.quotationCosts.solisCapacityKWh, huawei ? 0 : 2)} kWh` : "Sin baterías"}</strong></div>
-              </div>
-              <div className="ss-simulator-compare"><span>Cuenta actual</span><strong>{formatCLP(installationMetrics.monthlyBill)}</strong></div>
-              <div className="ss-simulator-bar"><i style={{width: '100%'}}/></div>
-              <div className="ss-simulator-compare"><span>Cuenta equivalente tras ahorro*</span><strong>{formatCLP(Math.max(0, installationMetrics.monthlyBill - savings))}</strong></div>
-              <div className="ss-simulator-bar"><i style={{width: `${Math.max(0, Math.min(100, ((installationMetrics.monthlyBill - savings) / Math.max(installationMetrics.monthlyBill, 1)) * 100))}%`}} className="ss-simulator-savings"/></div>
-              <button className="btn-primary ss-simulator-button" type="button" onClick={() => {
-                setSelectedInstallationOffer(`${solarStudioBrand}${battery ? "WithBattery" : "NoBattery"}`);
-                setExpandedInstallationOffer(`${solarStudioBrand}${battery ? "WithBattery" : "NoBattery"}`);
-                goToView("instalacion");
-              }}>Continuar a mi cotización personalizada</button>
-              <small className="ss-simulator-caveat">*Estimación, no oferta vinculante. Se utiliza el motor de cálculo existente de Sakiara. Las capacidades son nominales; un mayor banco de baterías no implica ahorro adicional automático. La configuración final requiere ingeniería y visita técnica.</small>
-            </div>;
-          })()}
-        </div>
-      </section>
+      {renderSolarStudioConfigurator("home")}
 
       <section className="section-card home-services-wrap">
         <div className="service-grid home-service-grid">
@@ -8394,632 +8498,14 @@ Mensaje: ${message || "-"}`,
 
   const renderInstallationView = () => (
     <>
-      <section className="hero-banner subview-hero installation-hero">
-        <div className="subview-hero-image installation-hero-image" aria-hidden="true" />
-        <div className="hero-banner-inner subview-hero-inner">
-          <div className="hero-banner-copy subview-hero-copy">
-            <p className="hero-kicker">Evaluación de inversión solar</p>
-            <h1 className="hero-banner-title subview-hero-title">
-              <span>Revisa si tu propiedad</span>
-              <span>tiene sentido para energía solar</span>
-            </h1>
-            <p className="hero-banner-text subview-hero-text">
-              Construye una propuesta referencial clara, compara alternativas y da el siguiente paso con mejor información técnica y comercial.
-            </p>
+      {installationStep === 1 ? renderSolarStudioConfigurator("installation") : (
+        <section className="section-card ss-final-section" id="wizard-instalacion">
+          <div className="ss-final-navigation">
+            <button className="btn-secondary" type="button" onClick={() => setInstallationStep(1)}>← Modificar mi simulación</button>
+            <div><span className="ss-studio-eyebrow">SAKIARA SOLAR STUDIO</span><h2>Tu casa solar y documentos</h2><p>Visualiza el funcionamiento del sistema configurado y descarga tu propuesta.</p></div>
           </div>
-        </div>
-      </section>
-
-      <section className="section-card" id="wizard-instalacion">
-        <div className="section-head wizard-section-head compact">
-          <div className="back-row">
-            <button
-              className="btn-secondary"
-              type="button"
-              onClick={() => goToView("home")}
-            >
-              ← Volver al inicio
-            </button>
-          </div>
-          <div className="wizard-topbar">
-            <div className="pill">Cotización de instalación</div>
-            <div className="pill">
-              Paso {installationStep} de {installationSteps.length} · {installationSteps[installationStep - 1]?.title}
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="installation-progress-compact"
-          aria-label={`Paso ${installationStep} de ${installationSteps.length}: ${installationSteps[installationStep - 1]?.title || "Cotización"}`}
-        >
-          <div className="installation-progress-track" aria-hidden="true">
-            <span
-              className="installation-progress-fill"
-              style={{ width: `${(installationStep / installationSteps.length) * 100}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="wizard-panel">
-          {installationStep === 1 && (
-            <>
-              <div className="wizard-copy">
-                <h3 className="wizard-title">¿Con qué dato quieres comenzar?</h3>
-                <p className="wizard-text">
-                  Elige la forma más fácil para ti. En el siguiente paso te pediremos solo el dato necesario y luego avanzaremos automáticamente.
-                </p>
-              </div>
-
-              <div className="info-card">
-                <h3 className="info-title">¿Qué opción conviene elegir?</h3>
-                <p className="info-text">
-                  Si tienes tu cuenta eléctrica a mano, puedes usar el monto mensual, el consumo en kWh o ambos. Con ambos datos la referencia inicial queda más completa.
-                </p>
-              </div>
-
-              <div className="mode-card compact-selector-card">
-                <label className="label">Forma de cotizar</label>
-                <select
-                  className="select"
-                  value={installationInputMode}
-                  onChange={(e) => setInstallationInputMode(e.target.value)}
-                >
-                  {Object.entries(installationInputModeOptions).map(
-                    ([value, option]) => (
-                      <option key={value} value={value}>
-                        {option.label}
-                      </option>
-                    ),
-                  )}
-                </select>
-                <div className="hint">
-                  {installationInputModeOptions[installationInputMode].helper}
-                </div>
-              </div>
-            </>
-          )}
-
+          <div className="wizard-panel ss-final-panel">
           {installationStep === 2 && (
-            <>
-              <div className="wizard-copy">
-                <h3 className="wizard-title">Ingresa tu consumo eléctrico</h3>
-                <p className="wizard-text">
-                  Completa el dato seleccionado. Cuando esté listo, presiona <strong>Confirmar datos y continuar</strong>; la vista bajará al siguiente paso automáticamente.
-                </p>
-              </div>
-
-              <div className="info-card">
-                <h3 className="info-title">Dónde encontrar estos datos</h3>
-                <p className="info-text">
-                  El monto corresponde al total aproximado de tu cuenta mensual. El consumo aparece en la boleta expresado en <strong>kWh</strong>. No necesitas adjuntar la boleta todavía.
-                </p>
-              </div>
-
-              <div className="fields-grid wizard-fields">
-                {installationInputMode !== "consumption" && (
-                  <div className="field">
-                    <label className="label">Monto mensual de la boleta</label>
-                    <input
-                      className="input"
-                      type="text"
-                      inputMode="numeric"
-                      value={monthlyBillInput}
-                      onChange={(e) =>
-                        setMonthlyBillInput(
-                          sanitizeIntegerInput(e.target.value),
-                        )
-                      }
-                      placeholder="Ejemplo: 250000"
-                    />
-                    <div className="hint">
-                      Ingresa el total aproximado que pagas normalmente, sin puntos ni símbolos.
-                    </div>
-                  </div>
-                )}
-
-                {installationInputMode !== "bill" && (
-                  <div className="field">
-                    <label className="label">Consumo mensual</label>
-                    <input
-                      className="input"
-                      type="text"
-                      inputMode="numeric"
-                      value={billConsumptionInput}
-                      onChange={(e) =>
-                        setBillConsumptionInput(
-                          sanitizeIntegerInput(e.target.value),
-                        )
-                      }
-                      placeholder="Ejemplo: 900"
-                    />
-                    <div className="hint">
-                      Busca en tu boleta el consumo del período, normalmente indicado como kWh.
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {!hasInstallationUsageData && (
-                <div className="mode-note">
-                  Completa {installationInputMode === "both" ? "ambos datos" : "el dato solicitado"} para habilitar el botón de confirmación.
-                </div>
-              )}
-
-              {hasInstallationUsageData && (
-                <div className="mode-note">
-                  <strong>Datos listos.</strong> La evaluación usará {installationMetrics.modeSummaryLabel.toLowerCase()} como base del cálculo.
-                </div>
-              )}
-            </>
-          )}
-
-          {installationStep === 3 && (
-            <>
-              <div className="wizard-copy">
-                <h3 className="wizard-title">Define qué quieres lograr con el sistema</h3>
-                <p className="wizard-text">
-                  Este paso ajusta el tamaño sugerido del proyecto. Si no quieres complicarte, deja <strong>Compensación optimizada</strong> y Sakiara hará una propuesta equilibrada.
-                </p>
-              </div>
-
-              <div className="info-card">
-                <h3 className="info-title">¿Qué significa cobertura?</h3>
-                <p className="info-text">
-                  Es la parte de tu consumo que buscamos compensar con energía solar. En invierno hay menos producción, por eso una meta invernal alta normalmente requiere más paneles.
-                </p>
-              </div>
-
-              <div className="mode-card wizard-highlight-card goal-card compact-selector-card">
-                <label className="label">Objetivo del dimensionamiento</label>
-                <select
-                  className="select"
-                  value={coverageGoalMode}
-                  onChange={(e) => setCoverageGoalMode(e.target.value)}
-                >
-                  <option value="optimized">Compensación optimizada</option>
-                  <option value="winter">Ajustar cobertura en invierno</option>
-                  <option value="seasonal">Cobertura estacional</option>
-                </select>
-
-                {(coverageGoalMode === "winter" || coverageGoalMode === "seasonal") && (
-                  <div className="compact-select-grid">
-                    <div className="field compact-field">
-                      <label className="label">Meta de cobertura invernal</label>
-                      <select
-                        className="select"
-                        value={winterCoverageTargetPercent}
-                        onChange={(e) => setWinterCoverageTargetPercent(Number(e.target.value))}
-                      >
-                        {WINTER_COVERAGE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}%
-                          </option>
-                        ))}
-                      </select>
-                      <div className="hint">
-                        Una meta mayor aumenta la potencia solar sugerida para los meses más exigentes.
-                      </div>
-                    </div>
-
-                    {coverageGoalMode === "seasonal" && (
-                      <div className="field compact-field">
-                        <label className="label">Meta de cobertura en verano</label>
-                        <select
-                          className="select"
-                          value={summerCoverageTargetPercent}
-                          onChange={(e) => setSummerCoverageTargetPercent(Number(e.target.value))}
-                        >
-                          {SUMMER_COVERAGE_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}%
-                            </option>
-                          ))}
-                        </select>
-                        <div className="hint">
-                          El cálculo compara ambas temporadas y dimensiona con el escenario más exigente.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="mode-note">
-                <strong>{installationMetrics.coverageObjectiveLabel}:</strong>{" "}
-                {installationMetrics.coverageObjectiveHint}
-              </div>
-            </>
-          )}
-
-          {installationStep === 4 && (
-            <>
-              <div className="wizard-copy">
-                <h3 className="wizard-title">
-                  Define la ubicación del proyecto
-                </h3>
-                <p className="wizard-text mobile-essential-hide">
-                  La ubicación nos ayuda a ajustar la evaluación de tu proyecto
-                  de forma más realista, sin agregar complejidad innecesaria.
-                </p>
-              </div>
-
-              <div className="fields-grid wizard-fields step-location-grid">
-                <div className="field">
-                  <label className="label">Región del proyecto</label>
-                  <select
-                    className="select"
-                    value={installationRegion}
-                    onChange={(e) => {
-                      const nextRegion = e.target.value;
-                      const nextCommune = Object.keys(
-                        maintenanceRegionData[nextRegion].communes,
-                      )[0];
-                      setInstallationRegion(nextRegion);
-                      setInstallationCommune(nextCommune);
-                    }}
-                  >
-                    {maintenanceRegionOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="hint">
-                    Selecciona la región donde se desarrollará el proyecto.
-                  </div>
-                </div>
-
-                <div className="field">
-                  <label className="label">Comuna del proyecto</label>
-                  <select
-                    className="select"
-                    value={installationCommune}
-                    onChange={(e) => setInstallationCommune(e.target.value)}
-                  >
-                    {installationCommuneOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="hint">
-                    La ubicación se integra de forma interna al cálculo.
-                  </div>
-                </div>
-
-              </div>
-            </>
-          )}
-
-          {installationStep === 5 && (
-            <>
-              <div className="wizard-copy">
-                <h3 className="wizard-title">Selecciona el perfil del hogar</h3>
-                <p className="wizard-text mobile-essential-hide">
-                  Elige el comportamiento de consumo que mejor represente tu hogar.
-                  La descripción y el gráfico ejemplar te ayudan a elegir rápido y de forma simple.
-                </p>
-              </div>
-
-              <div className="profile-options-grid wizard-fields">
-                <ProfileOptionCard
-                  option={profileMap.outside}
-                  isSelected={profile === "outside"}
-                  onSelect={() => setProfile("outside")}
-                />
-                <ProfileOptionCard
-                  option={profileMap.mixed}
-                  isSelected={profile === "mixed"}
-                  onSelect={() => setProfile("mixed")}
-                />
-                <ProfileOptionCard
-                  option={profileMap.home}
-                  isSelected={profile === "home"}
-                  onSelect={() => setProfile("home")}
-                />
-              </div>
-            </>
-          )}
-
-          {installationStep === 6 && (
-            <>
-              <div className="wizard-copy">
-                <h3 className="wizard-title">
-                  Compara tu propuesta referencial
-                </h3>
-                <p className="wizard-text mobile-essential-hide">
-                  Revisa cada alternativa con calma, compara inversión, compensación y retorno referencial, y luego selecciona la que mejor dialogue con tu objetivo.
-                </p>
-              </div>
-
-              <div className="summary-grid">
-                <SummaryCard
-                  label="Ubicación"
-                  value={selectedInstallationCommune.label}
-                  sub={selectedInstallationRegion.label}
-                />
-                <SummaryCard
-                  label="Proyecto sugerido"
-                  value={`${formatNumber(installationMetrics.estimatedPanels)} paneles`}
-                  sub={`${formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
-                />
-                <SummaryCard
-                  label="Alternativa elegida"
-                  value={selectedInstallationOfferData?.title || "Selecciona una alternativa"}
-                  sub={selectedInstallationOfferData?.badge || "antes de continuar"}
-                />
-              </div>
-
-              <div className="summary-grid compact-grid">
-                <SummaryCard
-                  label={
-                    installationInputMode === "consumption"
-                      ? "Boleta estimada"
-                      : "Monto evaluado"
-                  }
-                  value={formatCLP(installationMetrics.monthlyBill)}
-                  sub="según datos ingresados"
-                />
-                <SummaryCard
-                  label="Consumo mensual"
-                  value={formatNumber(
-                    installationMetrics.monthlyConsumptionKWh,
-                  )}
-                  sub="kWh por mes"
-                />
-                <SummaryCard
-                  label="Generación promedio"
-                  value={formatNumber(
-                    installationMetrics.monthlyGenerationKWh,
-                  )}
-                  sub="kWh/mes estimados"
-                />
-              </div>
-
-              {installationMetrics.suggestWinterCoverage && (
-                <div className="info-card">
-                  <h3 className="info-title">Sugerencia para 100% en invierno</h3>
-                  <p className="info-text">
-                    Con los datos ingresados, para apuntar a una cobertura total en invierno conviene subir a
-                    <strong> {formatNumber(installationMetrics.winterGoalPanels)} paneles</strong>
-                    {installationMetrics.additionalPanelsForWinter > 0
-                      ? ` (+${formatNumber(installationMetrics.additionalPanelsForWinter)} paneles)`
-                      : ""}
-                    , equivalente a
-                    <strong> {formatNumber(installationMetrics.winterGoalSystemSizeKwp, 1)} kWp</strong>.
-                  </p>
-                  <p className="info-text">
-                    Ese ajuste usa un factor de producción invernal más exigente y lleva la compensación estimada en invierno a
-                    <strong> 100%</strong>.
-                  </p>
-                  <button
-                    className="btn-secondary"
-                    type="button"
-                    onClick={() => {
-                      setWinterCoverageTargetPercent(100);
-                      setCoverageGoalMode("winter");
-                    }}
-                  >
-                    Usar cobertura al 100% en invierno
-                  </button>
-                </div>
-              )}
-
-              <div className="ss-battery-picker" aria-label="Personaliza el almacenamiento de tu sistema">
-                <div className="ss-battery-picker-head">
-                  <strong>Personaliza el almacenamiento</strong>
-                  <span>Precios según las hojas DEFINITIVO de Sakiara</span>
-                </div>
-                <div className="ss-battery-picker-grid">
-                  <label className="ss-field">
-                    <span>Huawei LUNA2000-S0 · módulos de 5 kWh</span>
-                    <select value={huaweiBatteryModules} onChange={(e) => setHuaweiBatteryModules(Number(e.target.value))}>
-                      {Array.from({length: 6}, (_, idx) => idx + 1).map((quantity) => (
-                        <option key={quantity} value={quantity}>{quantity} módulo{quantity > 1 ? "s" : ""} · {quantity * 5} kWh</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="ss-field">
-                    <span>Solis + Dyness PowerBrick SC · 16,08 kWh</span>
-                    <select value={solisBatteryModules} onChange={(e) => setSolisBatteryModules(Number(e.target.value))}>
-                      {Array.from({length: SOLIS_SC_QUOTE_MAX}, (_, idx) => idx + 1).map((quantity) => (
-                        <option key={quantity} value={quantity}>{quantity} unidad{quantity > 1 ? "es" : ""} · {formatNumber(quantity * SOLIS_DYNESS_SC_KWH, 2)} kWh</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <p className="ss-battery-hint">
-                  Huawei: {installationMetrics.quotationCosts.huaweiDcdcConverters} controlador(es) DC/DC
-                  para {huaweiBatteryModules} módulo(s), más 1 SmartGuard obligatorio.
-                  Solis: el selector comercial admite hasta {SOLIS_SC_QUOTE_MAX} unidades;
-                  las cantidades mayores requieren validar compatibilidad BMS, corriente,
-                  protecciones y accesorios antes de emitir una oferta definitiva.
-                  Agregar baterías aumenta capacidad nominal, no asegura un aumento proporcional del ahorro.
-                </p>
-              </div>
-              <div className="cards-grid offer-stack single-column-grid">
-                {installationOfferOptions.map((offer) => (
-                  <OfferCard
-                    key={offer.key}
-                    title={offer.title}
-                    subtitle={offer.subtitle}
-                    badge={offer.badge}
-                    price={offer.price}
-                    savings={offer.savings}
-                    winterCompensation={offer.winterCompensation}
-                    summerCompensation={offer.summerCompensation}
-                    payback={offer.payback}
-                    variant={offer.variant}
-                    collapsible
-                    selectable
-                    isOpen={expandedInstallationOffer === offer.key}
-                    onToggle={() =>
-                      setExpandedInstallationOffer((current) =>
-                        current === offer.key ? "" : offer.key,
-                      )
-                    }
-                    isSelected={selectedInstallationOffer === offer.key}
-                    onSelect={() => setSelectedInstallationOffer(offer.key)}
-                  />
-                ))}
-              </div>
-
-              <div className="note mobile-essential-hide">
-                Selecciona una alternativa antes de continuar. {installationMetrics.projectExecutionNote} Se consideró una RGH referencial de {formatNumber(installationMetrics.annualGhi, 2)} kWh/m²/día y un factor solar de {formatNumber(installationMetrics.annualProductionFactor, 0)} kWh/kWp/mes promedio, {formatNumber(installationMetrics.winterProductionFactor, 0)} kWh/kWp/mes en invierno y {formatNumber(installationMetrics.summerProductionFactor, 0)} kWh/kWp/mes en verano para {selectedInstallationCommune.label}.
-              </div>
-            </>
-          )}
-
-          {installationStep === 7 && (
-            <>
-              <div className="wizard-copy">
-                <h3 className="wizard-title">Elige cómo financiar tu proyecto</h3>
-                <p className="wizard-text mobile-essential-hide">
-                  Compara el precio preferencial contado con la alternativa de tarjeta de crédito.
-                  Si eliges tarjeta, puedes simular una cuota base cercana a lo que hoy pagas mensualmente en electricidad.
-                </p>
-              </div>
-
-              <div className="summary-grid">
-                <SummaryCard
-                  label="Alternativa seleccionada"
-                  value={selectedInstallationOfferData?.title || "Pendiente"}
-                  sub={selectedInstallationOfferData?.badge || "selecciona una alternativa"}
-                />
-                <SummaryCard
-                  label="Cuenta eléctrica actual"
-                  value={formatCLP(installationMetrics.monthlyBill)}
-                  sub="referencia mensual ingresada"
-                />
-                <SummaryCard
-                  label="Proyecto"
-                  value={`${formatNumber(installationMetrics.estimatedPanels)} paneles`}
-                  sub={`${formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp estimados`}
-                />
-              </div>
-
-              <div className="financing-options-grid">
-                <button
-                  className={`financing-option${installationPaymentMethod === "cash" ? " selected" : ""}`}
-                  type="button"
-                  onClick={() => setInstallationPaymentMethod("cash")}
-                >
-                  <div className="financing-option-topline">
-                    <span className="offer-badge">Mejor precio</span>
-                    <span className="financing-check">
-                      {installationPaymentMethod === "cash" ? "Seleccionado" : "Elegir"}
-                    </span>
-                  </div>
-                  <h3>Precio preferencial contado</h3>
-                  <strong className="financing-price">
-                    {formatCLP(installationCashPrice)}
-                  </strong>
-                  <p>
-                    Equipos e insumos se pagan al inicio del proyecto y la mano de obra posteriormente según la ejecución acordada.
-                  </p>
-                </button>
-
-                <button
-                  className={`financing-option${installationPaymentMethod === "card" ? " selected" : ""}`}
-                  type="button"
-                  onClick={() => {
-                    setInstallationPaymentMethod("card");
-                    setInstallationInstallments(
-                      recommendedInstallationInstallments,
-                    );
-                  }}
-                >
-                  <div className="financing-option-topline">
-                    <span className="offer-badge">Financiamiento</span>
-                    <span className="financing-check">
-                      {installationPaymentMethod === "card" ? "Seleccionado" : "Elegir"}
-                    </span>
-                  </div>
-                  <h3>Tarjeta de crédito</h3>
-                  <strong className="financing-price">
-                    {formatCLP(installationCardPrice)}
-                  </strong>
-                  <p>
-                    Permite financiar el valor del proyecto con las cuotas disponibles para la tarjeta del cliente.
-                  </p>
-                </button>
-              </div>
-
-              {installationPaymentMethod === "card" ? (
-                <div className="financing-simulator">
-                  <div className="wizard-copy financing-simulator-head">
-                    <h3 className="wizard-title">Simula tus cuotas</h3>
-                    <p className="wizard-text">
-                      Selecciona una cantidad de cuotas para comparar la cuota base con tu gasto eléctrico mensual actual.
-                    </p>
-                  </div>
-
-                  <div className="installment-options">
-                    {INSTALLATION_CARD_INSTALLMENT_OPTIONS.map((installments) => (
-                      <button
-                        key={installments}
-                        className={`installment-option${installationInstallments === installments ? " selected" : ""}`}
-                        type="button"
-                        onClick={() => setInstallationInstallments(installments)}
-                      >
-                        <strong>{installments} cuotas</strong>
-                        <span>
-                          {formatCLP(installationCardPrice / installments)}
-                        </span>
-                        {recommendedInstallationInstallments === installments && (
-                          <small>Más cercana a tu cuenta</small>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="summary-grid compact-grid financing-comparison">
-                    <SummaryCard
-                      label="Cuenta eléctrica actual"
-                      value={formatCLP(installationMetrics.monthlyBill)}
-                      sub="gasto mensual de referencia"
-                    />
-                    <SummaryCard
-                      label={`${formatNumber(installationInstallments)} cuotas`}
-                      value={formatCLP(selectedInstallationInstallmentAmount)}
-                      sub="+ interés según banco emisor"
-                    />
-                    <SummaryCard
-                      label="Comparación mensual"
-                      value={formatCLP(
-                        Math.abs(
-                          installationMetrics.monthlyBill -
-                            selectedInstallationInstallmentAmount,
-                        ),
-                      )}
-                      sub={
-                        selectedInstallationInstallmentAmount <=
-                        installationMetrics.monthlyBill
-                          ? "por debajo de tu cuenta actual"
-                          : "por sobre tu cuenta actual"
-                      }
-                    />
-                  </div>
-
-                  <div className="mode-note">
-                    <strong>Referencia de financiamiento:</strong>{" "}
-                    La cuota mostrada corresponde al precio del proyecto dividido en las cuotas seleccionadas.
-                    El interés, costo total y número de cuotas efectivamente disponibles dependen del banco emisor y de la tarjeta del cliente.
-                  </div>
-                </div>
-              ) : (
-                <div className="mode-note">
-                  <strong>Alternativa más económica:</strong>{" "}
-                  El pago contado mantiene el menor precio del proyecto.
-                  Frente a la modalidad con tarjeta, la diferencia referencial es de{" "}
-                  <strong>{formatCLP(Math.max(installationCardPrice - installationCashPrice, 0))}</strong>.
-                </div>
-              )}
-            </>
-          )}
-
-          {installationStep === 8 && (
             <>
               <div className="wizard-copy">
                 <h3 className="wizard-title">Solicita tu evaluación comercial</h3>
@@ -9235,39 +8721,12 @@ Mensaje: ${message || "-"}`,
               </div>
             </>
           )}
-        </div>
-
-        <div className="wizard-nav">
-          <button
-            className="btn-secondary"
-            type="button"
-            onClick={() =>
-              setInstallationStep((current) => Math.max(1, current - 1))
-            }
-            disabled={installationStep === 1}
-          >
-            Atrás
-          </button>
-
-          {installationStep < installationSteps.length ? (
-            <button
-              className="btn-primary"
-              type="button"
-              disabled={!canProceedInstallation}
-              onClick={() =>
-                setInstallationStep((current) =>
-                  Math.min(installationSteps.length, current + 1),
-                )
-              }
-            >
-              {installationNextLabel}
-            </button>
-          ) : null}
-        </div>
-      </section>
+          </div>
+          <div className="ss-final-return"><button className="btn-secondary" type="button" onClick={() => setInstallationStep(1)}>← Volver a modificar mi proyecto</button></div>
+        </section>
+      )}
     </>
   );
-
 
   const renderMaintenanceView = () => (
     <>
@@ -10522,6 +9981,59 @@ Mensaje: ${message || "-"}`,
         .ss-battery-picker-head span {font-size:12px; opacity:.73;}
         .ss-battery-hint {font-size:12px; line-height:1.6; opacity:.74; margin:11px 0 0;}
         @media(max-width:770px){.ss-simulator-layout{grid-template-columns:1fr;}.ss-simulator-fields-two,.ss-battery-picker-grid{grid-template-columns:1fr;}.ss-simulator-result{padding:14px;}}
+
+
+        /* Sakiara Solar Studio unificado: alto contraste en superficie clara. */
+        .ss-unified {background:#fff !important;color:#263143 !important;border:1px solid #e0e3e8;box-shadow:0 12px 38px rgba(25,35,55,.055);padding:clamp(20px,3vw,38px);}
+        .ss-unified .ss-simulator-head h2{color:#1c2736 !important;letter-spacing:-.035em;font-weight:800;}
+        .ss-unified .ss-simulator-head p,.ss-unified .ss-simulator-head p:last-child{color:#4b596c !important;opacity:1 !important;}
+        .ss-unified .ss-studio-eyebrow,.ss-studio-eyebrow{display:block;color:#866015 !important;font-size:11px !important;font-weight:850;letter-spacing:.15em;line-height:1.4;margin:0 0 8px;text-transform:uppercase;text-shadow:none !important;}
+        .ss-live-pill{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;color:#5d4a22;background:#fff6d9;border:1px solid #edda9b;border-radius:30px;padding:9px 13px;font-size:12px;font-weight:750;}
+        .ss-live-pill span{color:#c58c1e;}
+        .ss-unified .ss-simulator-layout{align-items:start;grid-template-columns:minmax(0,1.07fr) minmax(0,.93fr);}
+        .ss-unified .ss-simulator-fields{gap:17px;}
+        .ss-unified .ss-studio-section-heading{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:5px 13px;border-bottom:1px solid #e8ebef;padding:9px 0 11px;margin-top:6px;}
+        .ss-unified .ss-studio-section-heading strong{font-size:15px;color:#243143;font-weight:850;}
+        .ss-unified .ss-studio-section-heading span{font-size:11px;color:#6e7988;}
+        .ss-unified .ss-field,.ss-unified .ss-simulator-range{color:#2c3847;font-weight:700;font-size:13px;}
+        .ss-unified .ss-field>span,.ss-unified .ss-simulator-range>span{color:#2c3847 !important;opacity:1 !important;}
+        .ss-unified .ss-field select,.ss-unified .ss-studio-number{box-sizing:border-box;display:block;width:100%;padding:12px 13px;min-height:46px;color:#1b2838 !important;background:#fff !important;border:1px solid #cbd3df !important;border-radius:10px;font-size:13px;line-height:1.4;font-weight:600;box-shadow:0 2px 4px rgba(10,20,40,.025);}
+        .ss-unified .ss-field select option{color:#1d2737 !important;background:#fff !important;}
+        .ss-unified select:focus-visible,.ss-unified input:focus-visible{outline:3px solid #e7b648 !important;outline-offset:2px;}
+        .ss-unified .ss-simulator-range input[type="range"]{accent-color:#d7a524;}
+        .ss-unified .ss-simulator-range small{opacity:1;color:#718092;font-size:11px;font-weight:400;}
+        .ss-unified .ss-studio-alert{background:#fff1ee;color:#993b2b;border-radius:8px;padding:9px 12px;font-size:12px;}
+        .ss-unified .ss-location-note{display:grid;gap:4px;padding:11px 13px;background:#f7f8fa;border:1px solid #e6e8ed;border-radius:10px;color:#4a586a;font-size:12px;line-height:1.5;}
+        .ss-unified .ss-location-note strong{color:#283446;}
+        .ss-unified .ss-studio-disclaimer{font-size:11px;line-height:1.6;color:#687588;margin:2px 0;}
+        .ss-unified .ss-simulator-result{position:sticky;top:94px;background:#f7f8fa !important;border:1px solid #dfe3e8;border-radius:20px;padding:23px;color:#273143 !important;}
+        .ss-unified .ss-studio-result-eyebrow{color:#8a661d;font-weight:800;letter-spacing:.12em;font-size:10px;}
+        .ss-unified .ss-studio-offer-name{color:#1c2736;font-size:clamp(19px,2vw,25px);font-weight:850;margin:5px 0 3px;}
+        .ss-unified .ss-studio-result-location{color:#647184;font-size:12px;margin:0 0 19px;}
+        .ss-unified .ss-simulator-metrics{gap:16px 11px;margin-bottom:18px;}
+        .ss-unified .ss-simulator-metrics>div{background:#fff;border:1px solid #e5e8ed;border-radius:11px;padding:12px;min-width:0;}
+        .ss-unified .ss-simulator-metrics span{color:#596678 !important;opacity:1 !important;font-size:11px;}
+        .ss-unified .ss-simulator-metrics strong{color:#273548 !important;font-size:clamp(16px,1.7vw,22px);word-break:break-word;}
+        .ss-unified .ss-simulator-metrics>div:first-child strong{color:#9a6a0a !important;}
+        .ss-unified .ss-simulator-metrics small{color:#6c7581;font-size:11px;}
+        .ss-unified .ss-studio-result-detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;border-top:1px solid #e2e5e9;padding:14px 0;margin-bottom:8px;}
+        .ss-unified .ss-studio-result-detail>div{display:grid;gap:4px;}
+        .ss-unified .ss-studio-result-detail span{color:#657182;font-size:11px;}
+        .ss-unified .ss-studio-result-detail strong{color:#293749;font-size:13px;}
+        .ss-unified .ss-simulator-compare{color:#344356 !important;font-size:12px;}
+        .ss-unified .ss-simulator-compare strong{color:#253142 !important;}
+        .ss-unified .ss-simulator-caveat{opacity:1;color:#667282;font-size:11px;}
+        .ss-unified .ss-simulator-button{background:#f0d435 !important;color:#18202b !important;border:0;border-radius:13px;font-weight:850;box-shadow:0 5px 15px rgba(153,111,18,.13);padding:15px;white-space:normal;line-height:1.35;}
+        .ss-unified .ss-simulator-button:hover{background:#f5de56 !important;}
+        .ss-unified .ss-simulator-button:disabled{opacity:.5;cursor:not-allowed;}
+        .ss-final-section{background:#fff;color:#293649;}
+        .ss-final-navigation{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-bottom:24px;}
+        .ss-final-navigation h2{margin:3px 0;color:#243143;font-size:clamp(23px,3vw,32px);}
+        .ss-final-navigation p{margin:0;color:#5b697b;font-size:13px;}
+        .ss-final-panel{background:#fff;}
+        .ss-final-return{display:flex;justify-content:center;margin-top:24px;}
+        @media(max-width:920px){.ss-unified .ss-simulator-layout{grid-template-columns:1fr;}.ss-unified .ss-simulator-result{position:static;}}
+        @media(max-width:600px){.ss-unified{padding:17px 12px;}.ss-unified .ss-simulator-head{display:block;}.ss-live-pill{margin-top:12px;}.ss-unified .ss-simulator-fields-two,.ss-unified .ss-studio-result-detail{grid-template-columns:1fr;}.ss-unified .ss-simulator-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.ss-unified .ss-simulator-result{padding:14px;}.ss-unified .ss-simulator-metrics>div{padding:10px;}}
 
         .hero-brand-logo.huawei {
           height: 30px;
