@@ -2670,13 +2670,28 @@ const getInstallationQuotationItems = (
     });
   }
 
-  if (includesBattery) {
+  if (includesBattery && isHuawei) {
     rows.push({
-      description: isHuawei
-        ? "SISTEMA DE BATERÍA HUAWEI LUNA"
-        : "SISTEMA DE BATERÍA SOLIS / DYNESS",
+      description: "BATERÍA HUAWEI LUNA2000-5-E0 · 5 kWh",
+      quantity: costs.huaweiBatteryModules || 1,
+      totalNet: (costs.huaweiBatteryModules || 1) * (costs.huaweiBatteryModuleNet || 0),
+    });
+    rows.push({
+      description: "CONTROLADOR HUAWEI LUNA2000-5KW-C0 (DC/DC)",
+      quantity: costs.huaweiDcdcConverters || 1,
+      totalNet: (costs.huaweiDcdcConverters || 1) * (costs.huaweiDcdcConverterNet || 0),
+    });
+    rows.push({
+      description: "HUAWEI SMARTGUARD 63A-S0 · RESPALDO",
       quantity: 1,
-      totalNet: isHuawei ? costs.huaweiBatteryPackNet : costs.solisBatteryPackNet,
+      totalNet: costs.huaweiSmartGuardNet || 0,
+    });
+  }
+  if (includesBattery && isSolis) {
+    rows.push({
+      description: "BATERÍA DYNESS POWERBRICK SC · 16,08 kWh",
+      quantity: costs.solisBatteryModules || 1,
+      totalNet: costs.solisBatteryPackNet || 0,
     });
   }
 
@@ -3228,22 +3243,22 @@ const buildInstallationReportMarkup = ({
     huaweiWithBattery: {
       shortTitle: "Huawei · con batería",
       inverter: "Huawei híbrido 8 kW",
-      storage: "Huawei LUNA · 5 kWh",
-      storageShort: "1 × LUNA 5 kWh",
-      batteryKWh: 5,
+      storage: `Huawei LUNA S0 · ${formatNumber(metrics.quotationCosts?.huaweiCapacityKWh || 5, 0)} kWh`,
+      storageShort: `${metrics.quotationCosts?.huaweiBatteryModules || 1} × LUNA 5 kWh`,
+      batteryKWh: metrics.quotationCosts?.huaweiCapacityKWh || 5,
       components:
-        "1 batería Huawei LUNA de 5 kWh + módulo de potencia, Smart Guard y Smart Power Sensor, según arquitectura final.",
+        `${metrics.quotationCosts?.huaweiBatteryModules || 1} módulo(s) LUNA2000-5-E0 de 5 kWh, ${metrics.quotationCosts?.huaweiDcdcConverters || 1} controlador(es) DC/DC LUNA2000-5KW-C0, 1 SmartGuard-63A-S0 y Smart Power Sensor.`,
       purpose:
         "Mayor autoconsumo, desplazamiento de energía hacia la tarde/noche y respaldo según cargas críticas.",
     },
     solisWithBattery: {
       shortTitle: "Solis · con batería",
       inverter: "Solis S6 Plus híbrido 8 kW",
-      storage: "Dyness PowerBrick · ~15 kWh",
-      storageShort: "1 × PowerBrick ~15 kWh",
-      batteryKWh: 14.336,
+      storage: `Dyness PowerBrick SC · ${formatNumber(metrics.quotationCosts?.solisCapacityKWh || 16.08, 2)} kWh nominales`,
+      storageShort: `${metrics.quotationCosts?.solisBatteryModules || 1} × PowerBrick SC`,
+      batteryKWh: metrics.quotationCosts?.solisCapacityKWh || 16.08,
       components:
-        "1 batería Dyness PowerBrick de 14,336 kWh nominales, con comunicación BMS al inversor Solis S6 Plus.",
+        `${metrics.quotationCosts?.solisBatteryModules || 1} unidad(es) Dyness PowerBrick SC de 16,08 kWh nominales; conexión BMS/CAN, corriente de carga/descarga y accesorios sujetos a validación técnica.`,
       purpose:
         "Mayor aprovechamiento de la generación solar fuera del horario de producción y menor compra desde la red.",
     },
@@ -5714,6 +5729,243 @@ const buildEnterpriseReportMarkup = ({
   `;
 };
 
+// SAKIARA SOLAR STUDIO · topología verificada según manuales oficiales.
+// Huawei LUNA2000-S0: 3 módulos de 5 kWh por LUNA2000-5KW-C0,
+// 2 controladores como máximo (6 módulos = 30 kWh).
+// Dyness PowerBrick SC: hasta 50 equipos según Dyness; el selector
+// comercial limita a 6 unidades hasta validar BMS, cableado y corriente
+// del inversor Solis 8 kW para el proyecto.
+const HUAWEI_S0_MODULE_KWH = 5;
+const HUAWEI_S0_MODULES_PER_DCDC = 3;
+const HUAWEI_S0_MAX_DCDC = 2;
+const SOLIS_DYNESS_SC_KWH = 16.08;
+const SOLIS_SC_QUOTE_MAX = 6; // máximo de cotizador, no máximo de fabricante
+
+const getHuaweiBatteryTopology = (requestedCount) => {
+  const modules = Math.min(
+    Math.max(Math.floor(Number(requestedCount) || 1), 1),
+    HUAWEI_S0_MODULES_PER_DCDC * HUAWEI_S0_MAX_DCDC,
+  );
+  const dcdcConverters = Math.ceil(modules / HUAWEI_S0_MODULES_PER_DCDC);
+  return {
+    modules,
+    dcdcConverters,
+    smartGuards: 1,
+    capacityKWh: modules * HUAWEI_S0_MODULE_KWH,
+    towers: Array.from({length: dcdcConverters}, (_, index) =>
+      Math.min(HUAWEI_S0_MODULES_PER_DCDC, modules - index * HUAWEI_S0_MODULES_PER_DCDC)
+    ),
+  };
+};
+
+// SAKIARA SOLAR STUDIO · experiencia educativa previa a la descarga.
+// No modifica cotizaciones, logística, márgenes ni el generador PDF.
+const SAKIARA_BACKUP_RESERVE_PERCENT = 10;
+const SAKIARA_SIMULATED_INVERTER_AC_KW = 8;
+
+const calculateSakiaraEnergyFlow = ({
+  mode, systemKwp, batteryKwh, batteryPowerKw, irradiancePercent,
+  householdLoadKw, criticalLoadKw, socPercent,
+}) => {
+  const hasBattery = batteryKwh > 0;
+  const gridAvailable = mode !== "outage";
+  const reservePercent = SAKIARA_BACKUP_RESERVE_PERCENT;
+  const backupReady = hasBattery && socPercent > reservePercent;
+  const rawSolarKw = mode === "night" ? 0 : Math.min(
+    Math.max(0, systemKwp) * 0.85 * Math.max(0, irradiancePercent) / 100,
+    SAKIARA_SIMULATED_INVERTER_AC_KW,
+  );
+  // Sin batería formadora de red/backup operativo, el sistema conectado a red
+  // se desconecta durante un corte (protección anti-isla).
+  const solarKw = gridAvailable || backupReady ? rawSolarKw : 0;
+  const loadKw = mode === "outage" ? criticalLoadKw : householdLoadKw;
+  const inverterLimit = SAKIARA_SIMULATED_INVERTER_AC_KW;
+  const solarToHouseKw = Math.min(solarKw, loadKw, inverterLimit);
+  const solarSurplusKw = Math.max(0, solarKw - solarToHouseKw);
+  const batteryUsableKwh = hasBattery
+    ? Math.max(0, batteryKwh * (socPercent - reservePercent) / 100) * 0.9
+    : 0;
+  const batteryDischargeKw = backupReady
+    ? Math.min(Math.max(0, loadKw - solarToHouseKw), batteryPowerKw,
+      Math.max(0, inverterLimit - solarToHouseKw))
+    : 0;
+  const batteryChargeKw = hasBattery && socPercent < 100
+    ? Math.min(solarSurplusKw, batteryPowerKw, Math.max(0, (100 - socPercent) / 100 * batteryKwh))
+    : 0;
+  const gridImportKw = gridAvailable
+    ? Math.max(0, loadKw - solarToHouseKw - batteryDischargeKw)
+    : 0;
+  const gridExportKw = gridAvailable
+    ? Math.max(0, solarSurplusKw - batteryChargeKw)
+    : 0;
+  const suppliedKw = Math.min(loadKw,
+    solarToHouseKw + batteryDischargeKw + gridImportKw);
+  const unservedKw = Math.max(0, loadKw - suppliedKw);
+  const curtailedKw = Math.max(0, solarKw - solarToHouseKw - batteryChargeKw - gridExportKw);
+  const deficitKw = Math.max(0, loadKw - solarToHouseKw);
+  const autonomyHours = mode === "outage" && hasBattery && backupReady && deficitKw > 0
+    ? batteryUsableKwh / deficitKw
+    : null;
+  return {
+    hasBattery, gridAvailable, backupReady, solarKw, solarToHouseKw,
+    batteryChargeKw, batteryDischargeKw, gridImportKw, gridExportKw,
+    suppliedKw, unservedKw, curtailedKw, loadKw, batteryUsableKwh,
+    autonomyHours, batteryPowerKw, reservePercent,
+  };
+};
+
+function SakiaraHomeEnergyPreview({ offer, metrics, huaweiModules, solisModules, commune }) {
+  const [mode, setMode] = useState("day");
+  const [sun, setSun] = useState(75);
+  const [loadKw, setLoadKw] = useState(3);
+  const [criticalKw, setCriticalKw] = useState(1.5);
+  const [soc, setSoc] = useState(75);
+
+  if (!offer) return null;
+  const chosenKey = offer.key || "";
+  const isHuawei = chosenKey.startsWith("huawei");
+  const hasBattery = chosenKey.endsWith("WithBattery");
+  const selectedCount = isHuawei ? huaweiModules : solisModules;
+  const batteryKwh = hasBattery
+    ? isHuawei ? selectedCount * HUAWEI_S0_MODULE_KWH : selectedCount * SOLIS_DYNESS_SC_KWH
+    : 0;
+  const dcdcCount = isHuawei && hasBattery ? Math.ceil(selectedCount / HUAWEI_S0_MODULES_PER_DCDC) : 0;
+  // Potencia máxima simplificada para explicar flujo, NO promesa de entrega.
+  const assumedBatteryLimitKw = hasBattery ? Math.min(8, isHuawei ? dcdcCount * 5 : 5) : 0;
+  const flow = calculateSakiaraEnergyFlow({
+    mode,
+    systemKwp: metrics.estimatedSystemSizeKwp,
+    batteryKwh,
+    batteryPowerKw: assumedBatteryLimitKw,
+    irradiancePercent: sun,
+    householdLoadKw: loadKw,
+    criticalLoadKw: criticalKw,
+    socPercent: soc,
+  });
+  const kw = (n) => `${Number(n).toLocaleString("es-CL", {maximumFractionDigits: 1, minimumFractionDigits: 1})} kW`;
+  const cap = (n) => Number(n).toLocaleString("es-CL", {maximumFractionDigits: 2});
+  const batteryMode = flow.batteryChargeKw > 0 ? "Cargando" : flow.batteryDischargeKw > 0 ? "Descargando" : "En espera";
+  const gridMode = mode === "outage" ? "Desconectada" : flow.gridImportKw > 0 ? "Importando" : flow.gridExportKw > 0 ? "Inyectando" : "En equilibrio";
+  const dayTitle = mode === "day" ? "Producción solar" : mode === "night" ? "Consumo nocturno" : "Respaldo durante un corte";
+  const houseFlow = flow.suppliedKw > 0;
+  const gridReverse = flow.gridImportKw > 0;
+  const batteryReverse = flow.batteryDischargeKw > 0;
+  const allowExport = flow.gridExportKw > 0;
+
+  return (
+    <section className="sv-preview" aria-label="Simulación de energía fotovoltaica interactiva">
+      <div className="sv-header">
+        <div>
+          <div className="sv-eyebrow">SAKIARA SOLAR STUDIO · EXPERIENCIA INTERACTIVA</div>
+          <h3>Visualiza tu casa funcionando con energía solar</h3>
+          <p>Así podría distribuirse la energía con la <strong>propuesta seleccionada</strong>, antes de descargar tu cotización.</p>
+        </div>
+        <div className="sv-capacity-pill">{cap(metrics.estimatedSystemSizeKwp)} kWp fotovoltaicos</div>
+      </div>
+      <div className="sv-specs">
+        <span><strong>{isHuawei ? "Huawei híbrido" : "Solis S6 Plus"}</strong> · inversor 8 kW</span>
+        <span><strong>{formatNumber(metrics.estimatedPanels)} paneles</strong> Jinko de 585 W</span>
+        <span><strong>{hasBattery ? `${selectedCount} ${isHuawei ? "módulo(s) LUNA" : "unidad(es) Dyness"} · ${cap(batteryKwh)} kWh` : "Sin baterías"}</strong></span>
+        <span>{commune}</span>
+      </div>
+      <div className="sv-tabs" role="group" aria-label="Escenario de funcionamiento">
+        {[["day", "☀ Día"], ["night", "☾ Noche"], ["outage", "⚡ Corte de red"]].map(([key, label]) => (
+          <button key={key} type="button" className={`sv-tab ${mode === key ? "sv-tab-on" : ""}`} aria-pressed={mode === key} onClick={() => setMode(key)}>{label}</button>
+        ))}
+      </div>
+      <div className="sv-scene">
+        <div className="sv-scene-top">
+          <span className="sv-scene-caption">{dayTitle}</span>
+          <span className={`sv-grid-status ${mode === "outage" ? "sv-offline" : ""}`}><i /> {mode === "outage" ? "Red desconectada" : "Red disponible"}</span>
+        </div>
+        <div className="sv-value-strip">
+          <div><small>Generación solar</small><strong>{kw(flow.solarKw)}</strong></div>
+          <div><small>Consumo vivienda</small><strong>{kw(flow.loadKw)}</strong></div>
+          <div><small>Batería</small><strong>{hasBattery ? `${soc}%` : "—"}</strong></div>
+          <div><small>Red</small><strong>{mode === "outage" ? "SIN RED" : kw(flow.gridImportKw || flow.gridExportKw)}</strong></div>
+        </div>
+        <svg className="sv-diagram" viewBox="0 0 680 366" role="img" aria-label={`Paneles ${kw(flow.solarKw)}, vivienda ${kw(flow.loadKw)}, batería ${hasBattery ? `${soc}%` : "ausente"}, red ${gridMode}`}>
+          <defs>
+            <linearGradient id="svGradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#17283a"/><stop offset="1" stopColor="#0b1524"/></linearGradient>
+            <linearGradient id="svPanel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#366696"/><stop offset="1" stopColor="#183d67"/></linearGradient>
+          </defs>
+          <rect x="0" y="0" width="680" height="366" fill="url(#svGradient)" rx="18"/>
+          {mode === "night" ? <g fill="#e6eaf3" opacity="0.85"><circle cx="57" cy="30" r="2"/><circle cx="169" cy="20" r="1"/><circle cx="560" cy="50" r="1.8"/><path d="M80 31a21 21 0 1 0 25-30A21 21 0 0 1 80 31" fill="#e8e3c7"/></g> : <g><circle cx="64" cy="43" r="19" fill="#ffd161"/><circle cx="64" cy="43" r="31" fill="none" stroke="#ffd161" strokeWidth="3" opacity=".2"/></g>}
+          {/* Base fija del diagrama: cuatro conexiones, siempre visibles. */}
+          <path className="sv-wire" d="M170 139 H241 V171 H281"/>
+          <path className="sv-wire" d="M377 171 H437"/>
+          <path className="sv-wire" d="M329 209 V278"/>
+          <path className="sv-wire" d="M398 171 V308 H480"/>
+          {flow.solarKw > 0 && <path className="sv-energy sv-energy-solar" d="M170 139 H241 V171 H281"/>}
+          {houseFlow && <path className="sv-energy sv-energy-house" d="M377 171 H437"/>}
+          {hasBattery && (flow.batteryChargeKw > 0 || flow.batteryDischargeKw > 0) && <path className={`sv-energy sv-energy-battery ${batteryReverse ? "sv-backwards" : ""}`} d="M329 209 V278"/>}
+          {(flow.gridImportKw > 0 || allowExport) && <path className={`sv-energy sv-energy-grid ${gridReverse ? "sv-backwards" : ""}`} d="M398 171 V308 H480"/>}
+          <g transform="translate(24 104)">
+            <rect width="146" height="85" rx="12" fill="#182c43" stroke="#607992"/>
+            <g transform="translate(19 11) skewX(-11)"><rect width="105" height="47" fill="url(#svPanel)" stroke="#9cc8ed" strokeWidth="2" rx="3"/><path d="M26 0 V47 M52 0 V47 M78 0 V47 M0 23 H105" stroke="#a7cbeb" opacity=".8"/></g>
+            <text x="73" y="74" className="sv-svg-label">PANELES SOLARES</text>
+          </g>
+          <g transform="translate(281 134)">
+            <rect width="96" height="75" rx="13" fill="#1d2b3c" stroke="#889aae"/>
+            <path d="M18 26 Q30 12 43 26 T76 26" stroke="#edc257" strokeWidth="3" fill="none"/>
+            <text x="48" y="56" className="sv-svg-label">INVERSOR</text>
+          </g>
+          <g transform="translate(437 100)">
+            <path d="M-7 56 L91 0 L189 56" fill="#294360" stroke="#a2b6ca" strokeWidth="4" strokeLinejoin="round"/>
+            <path d="M6 55 V133 H176 V55" fill="#21394e" stroke="#a2b6ca" strokeWidth="2"/>
+            <rect x="72" y="80" width="39" height="53" fill="#132132" stroke="#a9b9c9"/>
+            <rect x="24" y="76" width="29" height="26" fill={houseFlow ? "#f1cf79" : "#4a5c70"}/>
+            <rect x="131" y="76" width="29" height="26" fill={houseFlow ? "#f1cf79" : "#4a5c70"}/>
+            <text x="91" y="153" className="sv-svg-label">VIVIENDA</text>
+          </g>
+          <g transform="translate(273 278)">
+            <rect width="112" height="69" rx="11" fill="#1d2b3c" stroke={hasBattery ? "#a8bbce" : "#516073"}/>
+            <rect x="14" y="12" width="79" height="28" rx="5" fill="#32465c" stroke="#8b9baa"/>
+            <rect x="17" y="15" width={hasBattery ? 73 * soc / 100 : 0} height="22" rx="3" fill="#e9bf59"/>
+            <rect x="93" y="20" width="6" height="12" rx="2" fill="#8b9baa"/>
+            <text x="56" y="58" className="sv-svg-label">{hasBattery ? "BATERÍA" : "SIN BATERÍA"}</text>
+          </g>
+          <g transform="translate(480 276)">
+            <rect width="137" height="71" rx="11" fill="#1d2b3c" stroke={mode === "outage" ? "#bf6970" : "#7a91a6"}/>
+            <path d="M68 8 V42 M44 22 H92 M51 30 H85 M56 38 H80 M44 22 L68 8 L92 22" stroke="#a6b8ce" strokeWidth="2" fill="none"/>
+            <text x="68" y="59" className="sv-svg-label">{mode === "outage" ? "RED EN CORTE" : "RED ELÉCTRICA"}</text>
+          </g>
+          <text x="219" y="126" className="sv-svg-quantity">{kw(flow.solarKw)}</text>
+          <text x="410" y="152" className="sv-svg-quantity">{kw(flow.suppliedKw)}</text>
+          <text x="254" y="248" className="sv-svg-quantity">{!hasBattery ? "No instalada" : flow.batteryChargeKw > 0 ? `Carga ${kw(flow.batteryChargeKw)}` : flow.batteryDischargeKw > 0 ? `Entrega ${kw(flow.batteryDischargeKw)}` : "En espera"}</text>
+          <text x="462" y="260" className="sv-svg-quantity">{mode === "outage" ? "Aislada" : gridReverse ? `Importa ${kw(flow.gridImportKw)}` : allowExport ? `Inyecta ${kw(flow.gridExportKw)}` : "Sin intercambio"}</text>
+        </svg>
+        <div className="sv-legend"><span><b className="sv-dot-solar"/> Flujo solar</span><span><b className="sv-dot-battery"/> Batería</span><span><b className="sv-dot-grid"/> Red</span><span>Las líneas animadas indican energía circulando</span></div>
+      </div>
+      <div className="sv-controls">
+        <div className="sv-control"><label htmlFor="sv-sun">Radiación solar <strong>{mode === "night" ? "Sin sol" : `${sun}%`}</strong></label><input id="sv-sun" type="range" min="0" max="100" step="5" value={sun} disabled={mode === "night"} onChange={e => setSun(Number(e.target.value))}/></div>
+        <div className="sv-control"><label htmlFor="sv-house">Demanda del hogar <strong>{kw(loadKw)}</strong></label><input id="sv-house" type="range" min="0.5" max="9" step="0.5" value={loadKw} onChange={e => setLoadKw(Number(e.target.value))}/></div>
+        {hasBattery && <div className="sv-control"><label htmlFor="sv-soc">Carga de la batería <strong>{soc}%</strong></label><input id="sv-soc" type="range" min="0" max="100" step="5" value={soc} onChange={e => setSoc(Number(e.target.value))}/></div>}
+        {mode === "outage" && <div className="sv-control"><label htmlFor="sv-critical">Cargas críticas conectadas a EPS <strong>{kw(criticalKw)}</strong></label><input id="sv-critical" type="range" min="0.5" max="9" step="0.5" value={criticalKw} onChange={e => setCriticalKw(Number(e.target.value))}/></div>}
+      </div>
+      <div className="sv-results">
+        <div><small>{hasBattery ? "Capacidad instalada" : "Almacenamiento"}</small><strong>{hasBattery ? `${cap(batteryKwh)} kWh` : "Sin batería"}</strong></div>
+        <div><small>Estado de batería</small><strong>{hasBattery ? batteryMode : "No instalada"}</strong></div>
+        <div><small>Intercambio con red</small><strong>{gridMode}</strong></div>
+        <div><small>Demanda atendida</small><strong>{kw(flow.suppliedKw)}</strong></div>
+      </div>
+      {mode === "outage" && (
+        <div className={`sv-backup-message ${flow.unservedKw > 0 ? "sv-attention" : ""}`}>
+          <strong>{!hasBattery ? "Sin respaldo durante cortes de suministro" : flow.unservedKw > 0 ? "Respaldo insuficiente para las cargas seleccionadas" : "Respaldo ilustrativo de cargas críticas"}</strong>
+          <span>{!hasBattery
+            ? "Sin batería ni salida de respaldo operativa, el sistema FV conectado a red se desconecta para evitar funcionamiento en isla."
+            : flow.unservedKw > 0
+              ? `Quedan ${kw(flow.unservedKw)} sin alimentar. Reduce las cargas críticas o revisa la capacidad real de EPS y batería.`
+              : flow.autonomyHours === null
+                ? "La radiación solar cubre la demanda actual; la autonomía dependerá de la evolución del sol y del consumo."
+                : `Autonomía orientativa: ${Math.max(0, flow.autonomyHours).toLocaleString("es-CL", {maximumFractionDigits: 1})} h si se mantienen estas condiciones y la radiación actual.`}</span>
+        </div>
+      )}
+      <p className="sv-disclaimer">Demostración educativa con potencias instantáneas (kW), no mediciones en tiempo real. La producción depende de radiación y pérdidas de referencia; las potencias de batería son límites ilustrativos. El respaldo EPS, el SmartGuard Huawei, las cargas admisibles, la reserva SOC y la compatibilidad Solis/Dyness requieren ingeniería y puesta en servicio. Cambiar estos controles <strong>no altera la cotización ni los documentos PDF</strong>.</p>
+    </section>
+  );
+}
+
 export default function SakiaraLandingPage() {
   const [activeView, setActiveView] = useState(() =>
     getViewFromPath(
@@ -5740,6 +5992,10 @@ export default function SakiaraLandingPage() {
   const [installationInstallments, setInstallationInstallments] =
     useState(24);
   const [profile, setProfile] = useState("outside");
+  const [huaweiBatteryModules, setHuaweiBatteryModules] = useState(1);
+  const [solisBatteryModules, setSolisBatteryModules] = useState(1);
+  const [solarStudioBrand, setSolarStudioBrand] = useState("huawei");
+  const [solarStudioBatteryEnabled, setSolarStudioBatteryEnabled] = useState(false);
 
   const [maintenanceSystemSizeInput, setMaintenanceSystemSizeInput] =
     useState("8");
@@ -5899,21 +6155,39 @@ export default function SakiaraLandingPage() {
   const installationMetrics = useMemo(() => {
     const vatMultiplier = 1.19;
 
-    // Valores sincronizados con la planilla maestra de presupuesto.
-    // Los márgenes comerciales ya están incorporados en estos costos de venta netos.
-    const moduleSellPerPanel = 88976.76717745923;
-    const huaweiInverterNet = 977382.3529411765;
-    const solisInverterNet = 1474000;
-    const certSecNet = 500000;
+    // Costos de VENTA NETOS extraídos de "DEFINITIVO HUAWEI" y
+    // "DEFINITIVO SOLIS" (Plantilla Presupuestos SAKIARA NOV 26.xlsx).
+    // Margen sobre VENTA (no recargo): primarios 10%, mano de obra 30%,
+    // materiales CC 20%, tablero AC 20%, estructura 10%.
+    // Conservamos intacto el cálculo geográfico de logística, formatos PDF,
+    // evaluación energética y modalidades de pago existentes.
+    const moduleSellPerPanel = 106336.11111111;
+    const huaweiInverterNet = 826257.52222222;
+    const solisInverterNet = 1213818.8608777;
+    const certSecNet = 400000;
     const workbookBaseLogisticsNet = 250000;
-    const ccCablingNet = 487052.55561047967;
-    const acBoardNet = 225482.9461196243;
-    const structureBlockNet = 91246.66337123084;
-    const huaweiSmartPowerSensorNet = 62821.55215027188;
-    const huaweiBatteryPackNet = 3201535.459416708;
-    const solisBatteryPackNet = 1876470.5882352942;
+    const ccCablingNet = 841370.44117647;
+    const acBoardNet = 732597.68907563;
+    const structureBlockNet = 66711.484593838;
+    const huaweiSmartPowerSensorNet = 59331.465919701;
+    // DEFINITIVO HUAWEI: H6 (módulo), H7 (DC/DC), H8 (SmartGuard).
+    // No duplicar SmartGuard al agregar otro DC/DC.
+    const huaweiBatteryModuleNet = 1580972.588888889;
+    const huaweiDcdcConverterNet = 734390.588888889;
+    const huaweiSmartGuardNet = 643305.8777777778;
+    // DEFINITIVO SOLIS: H9 por cada Dyness PowerBrick SC 16 kWh.
+    const solisBatteryUnitNet = 1633333.3333333333;
+    const huaweiTopology = getHuaweiBatteryTopology(huaweiBatteryModules);
+    const huaweiBatteryPackNet =
+      huaweiTopology.modules * huaweiBatteryModuleNet +
+      huaweiTopology.dcdcConverters * huaweiDcdcConverterNet +
+      huaweiSmartGuardNet;
+    const safeSolisBatteryModules = Math.min(
+      Math.max(Math.floor(Number(solisBatteryModules) || 1), 1), SOLIS_SC_QUOTE_MAX
+    );
+    const solisBatteryPackNet = safeSolisBatteryModules * solisBatteryUnitNet;
     const signageNet = 100000;
-    const laborGrossMargin = 0.2;
+    const laborGrossMargin = 0.3;
 
     const enteredMonthlyBill = Number(monthlyBillInput || 0);
     const enteredMonthlyConsumptionKWh = Number(billConsumptionInput || 0);
@@ -6283,6 +6557,17 @@ export default function SakiaraLandingPage() {
         huaweiSmartPowerSensorNet,
         huaweiBatteryPackNet,
         solisBatteryPackNet,
+        huaweiBatteryModuleNet,
+        huaweiDcdcConverterNet,
+        huaweiSmartGuardNet,
+        solisBatteryUnitNet,
+        huaweiBatteryModules: huaweiTopology.modules,
+        huaweiDcdcConverters: huaweiTopology.dcdcConverters,
+        huaweiSmartGuards: huaweiTopology.smartGuards,
+        huaweiCapacityKWh: huaweiTopology.capacityKWh,
+        huaweiTowerModules: huaweiTopology.towers,
+        solisBatteryModules: safeSolisBatteryModules,
+        solisCapacityKWh: safeSolisBatteryModules * SOLIS_DYNESS_SC_KWH,
       },
       selfConsumedNoBattery,
       exportedNoBattery,
@@ -6384,6 +6669,8 @@ export default function SakiaraLandingPage() {
     coverageGoalMode,
     winterCoverageTargetPercent,
     summerCoverageTargetPercent,
+    huaweiBatteryModules,
+    solisBatteryModules,
   ]);
 
   const maintenanceMetrics = useMemo(() => {
@@ -6749,6 +7036,11 @@ export default function SakiaraLandingPage() {
                 },
               ]
             : []),
+          ...(selectedInstallationOfferData.key === "huaweiWithBattery"
+            ? [{label: "Almacenamiento", value: `${installationMetrics.quotationCosts.huaweiBatteryModules} módulos LUNA (5 kWh c/u), ${installationMetrics.quotationCosts.huaweiDcdcConverters} DC/DC y SmartGuard` }]
+            : selectedInstallationOfferData.key === "solisWithBattery"
+              ? [{label: "Almacenamiento", value: `${installationMetrics.quotationCosts.solisBatteryModules} PowerBrick SC (${formatNumber(installationMetrics.quotationCosts.solisCapacityKWh, 2)} kWh)` }]
+              : []),
           { label: "Ahorro estimado", value: selectedInstallationOfferData.savings },
           {
             label: "Invierno estimado",
@@ -7571,9 +7863,9 @@ Mensaje: ${message || "-"}`,
     },
     {
       key: "huaweiWithBattery",
-      title: "Huawei con batería LUNA",
+      title: `Huawei con ${metrics.quotationCosts?.huaweiBatteryModules || 1} módulo(s) LUNA · ${formatNumber(metrics.quotationCosts?.huaweiCapacityKWh || 5, 0)} kWh`,
       subtitle:
-        "Alternativa híbrida para sumar respaldo y mayor aprovechamiento energético.",
+        `${metrics.quotationCosts?.huaweiDcdcConverters || 1} controlador(es) DC/DC + 1 SmartGuard; respaldo según cargas críticas.`,
       badge: "Huawei híbrido",
       priceValue: metrics.projectCostHuaweiWithBattery,
       annualSavingsValue: metrics.annualSavingsWithBattery,
@@ -7586,9 +7878,9 @@ Mensaje: ${message || "-"}`,
     },
     {
       key: "solisWithBattery",
-      title: "Solis con batería",
+      title: `Solis con ${metrics.quotationCosts?.solisBatteryModules || 1} PowerBrick SC · ${formatNumber(metrics.quotationCosts?.solisCapacityKWh || 16.08, 2)} kWh`,
       subtitle:
-        "Alternativa híbrida referencial para priorizar respaldo y continuidad operativa.",
+        "Almacenamiento Dyness nominal; potencia y BMS sujetos a validación de ingeniería.",
       badge: "Solis híbrido",
       priceValue: metrics.projectCostSolisWithBattery,
       annualSavingsValue: metrics.annualSavingsWithBattery,
@@ -7754,6 +8046,89 @@ Mensaje: ${message || "-"}`,
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="section-card ss-simulator-wrap" id="simulador-solar-sakiara">
+        <div className="ss-simulator-head">
+          <div>
+            <p className="hero-kicker">SAKIARA SOLAR STUDIO</p>
+            <h2>Simula tu ahorro solar</h2>
+            <p>Descubre el potencial de tu hogar y compara opciones reales Huawei y Solis.</p>
+          </div>
+        </div>
+        <div className="ss-simulator-layout">
+          <div className="ss-simulator-fields">
+            <label className="ss-simulator-range">
+              <span>Cuenta eléctrica mensual <strong>{formatCLP(installationMetrics.monthlyBill)}</strong></span>
+              <input type="range" min="30000" max="500000" step="10000"
+                value={Math.min(500000, Math.max(30000, Number(monthlyBillInput) || 250000))}
+                onChange={(e) => {setInstallationInputMode("bill"); setMonthlyBillInput(e.target.value);}} />
+              <small>$30.000 — $500.000</small>
+            </label>
+            <div className="ss-simulator-fields-two">
+              <label className="ss-field"><span>Elige tecnología</span>
+                <select value={solarStudioBrand} onChange={(e) => setSolarStudioBrand(e.target.value)}>
+                  <option value="huawei">Huawei SUN2000-LC0</option>
+                  <option value="solis">Solis S6 Plus</option>
+                </select>
+              </label>
+              <label className="ss-field"><span>Almacenamiento</span>
+                <select value={solarStudioBatteryEnabled ? "yes" : "no"}
+                  onChange={(e) => setSolarStudioBatteryEnabled(e.target.value === "yes")}>
+                  <option value="no">Solo paneles solares</option>
+                  <option value="yes">Paneles + baterías</option>
+                </select>
+              </label>
+            </div>
+            {solarStudioBatteryEnabled && (
+              <label className="ss-field">
+                <span>{solarStudioBrand === "huawei" ? "Cantidad de módulos LUNA2000 de 5 kWh" : "Cantidad de baterías PowerBrick SC de 16,08 kWh"}</span>
+                {solarStudioBrand === "huawei" ? (
+                  <select value={huaweiBatteryModules} onChange={(e) => setHuaweiBatteryModules(Number(e.target.value))}>
+                    {Array.from({length: 6}, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} módulo(s) · {n * 5} kWh · {Math.ceil(n / 3)} DC/DC</option>)}
+                  </select>
+                ) : (
+                  <select value={solisBatteryModules} onChange={(e) => setSolisBatteryModules(Number(e.target.value))}>
+                    {Array.from({length: SOLIS_SC_QUOTE_MAX}, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} unidad(es) · {formatNumber(n * SOLIS_DYNESS_SC_KWH, 2)} kWh</option>)}
+                  </select>
+                )}
+              </label>
+            )}
+            <label className="ss-simulator-range">
+              <span>Meta de compensación en invierno <strong>{coverageGoalMode === "winter" ? `${winterCoverageTargetPercent}%` : "Optimizada"}</strong></span>
+              <input type="range" min="30" max="90" step="5"
+                value={winterCoverageTargetPercent}
+                onChange={(e) => {setCoverageGoalMode("winter"); setWinterCoverageTargetPercent(Number(e.target.value));}}/>
+              <small>Desliza para fijar un objetivo invernal. La evaluación completa también considera comuna y perfil de consumo.</small>
+            </label>
+          </div>
+          {(() => {
+            const battery = solarStudioBatteryEnabled;
+            const huawei = solarStudioBrand === "huawei";
+            const savings = battery ? installationMetrics.monthlySavingsWithBattery : installationMetrics.monthlySavingsNoBattery;
+            const budget = huawei
+              ? (battery ? installationMetrics.projectCostHuaweiWithBattery : installationMetrics.projectCostHuaweiNoBattery)
+              : (battery ? installationMetrics.projectCostSolisWithBattery : installationMetrics.projectCostSolisNoBattery);
+            return <div className="ss-simulator-result">
+              <div className="ss-simulator-metrics">
+                <div><span>Ahorro mensual estimado</span><strong>{formatCLP(savings)}</strong></div>
+                <div><span>Potencia FV orientativa</span><strong>{formatNumber(installationMetrics.estimatedSystemSizeKwp, 1)} kWp</strong></div>
+                <div><span>Inversión referencial (IVA incl.)</span><strong>{formatCLP(budget)}</strong></div>
+                <div><span>Almacenamiento nominal</span><strong>{battery ? `${formatNumber(huawei ? installationMetrics.quotationCosts.huaweiCapacityKWh : installationMetrics.quotationCosts.solisCapacityKWh, huawei ? 0 : 2)} kWh` : "Sin baterías"}</strong></div>
+              </div>
+              <div className="ss-simulator-compare"><span>Cuenta actual</span><strong>{formatCLP(installationMetrics.monthlyBill)}</strong></div>
+              <div className="ss-simulator-bar"><i style={{width: '100%'}}/></div>
+              <div className="ss-simulator-compare"><span>Cuenta equivalente tras ahorro*</span><strong>{formatCLP(Math.max(0, installationMetrics.monthlyBill - savings))}</strong></div>
+              <div className="ss-simulator-bar"><i style={{width: `${Math.max(0, Math.min(100, ((installationMetrics.monthlyBill - savings) / Math.max(installationMetrics.monthlyBill, 1)) * 100))}%`}} className="ss-simulator-savings"/></div>
+              <button className="btn-primary ss-simulator-button" type="button" onClick={() => {
+                setSelectedInstallationOffer(`${solarStudioBrand}${battery ? "WithBattery" : "NoBattery"}`);
+                setExpandedInstallationOffer(`${solarStudioBrand}${battery ? "WithBattery" : "NoBattery"}`);
+                goToView("instalacion");
+              }}>Continuar a mi cotización personalizada</button>
+              <small className="ss-simulator-caveat">*Estimación, no oferta vinculante. Se utiliza el motor de cálculo existente de Sakiara. Las capacidades son nominales; un mayor banco de baterías no implica ahorro adicional automático. La configuración final requiere ingeniería y visita técnica.</small>
+            </div>;
+          })()}
         </div>
       </section>
 
@@ -8431,6 +8806,38 @@ Mensaje: ${message || "-"}`,
                 </div>
               )}
 
+              <div className="ss-battery-picker" aria-label="Personaliza el almacenamiento de tu sistema">
+                <div className="ss-battery-picker-head">
+                  <strong>Personaliza el almacenamiento</strong>
+                  <span>Precios según las hojas DEFINITIVO de Sakiara</span>
+                </div>
+                <div className="ss-battery-picker-grid">
+                  <label className="ss-field">
+                    <span>Huawei LUNA2000-S0 · módulos de 5 kWh</span>
+                    <select value={huaweiBatteryModules} onChange={(e) => setHuaweiBatteryModules(Number(e.target.value))}>
+                      {Array.from({length: 6}, (_, idx) => idx + 1).map((quantity) => (
+                        <option key={quantity} value={quantity}>{quantity} módulo{quantity > 1 ? "s" : ""} · {quantity * 5} kWh</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="ss-field">
+                    <span>Solis + Dyness PowerBrick SC · 16,08 kWh</span>
+                    <select value={solisBatteryModules} onChange={(e) => setSolisBatteryModules(Number(e.target.value))}>
+                      {Array.from({length: SOLIS_SC_QUOTE_MAX}, (_, idx) => idx + 1).map((quantity) => (
+                        <option key={quantity} value={quantity}>{quantity} unidad{quantity > 1 ? "es" : ""} · {formatNumber(quantity * SOLIS_DYNESS_SC_KWH, 2)} kWh</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="ss-battery-hint">
+                  Huawei: {installationMetrics.quotationCosts.huaweiDcdcConverters} controlador(es) DC/DC
+                  para {huaweiBatteryModules} módulo(s), más 1 SmartGuard obligatorio.
+                  Solis: el selector comercial admite hasta {SOLIS_SC_QUOTE_MAX} unidades;
+                  las cantidades mayores requieren validar compatibilidad BMS, corriente,
+                  protecciones y accesorios antes de emitir una oferta definitiva.
+                  Agregar baterías aumenta capacidad nominal, no asegura un aumento proporcional del ahorro.
+                </p>
+              </div>
               <div className="cards-grid offer-stack single-column-grid">
                 {installationOfferOptions.map((offer) => (
                   <OfferCard
@@ -8655,6 +9062,15 @@ Mensaje: ${message || "-"}`,
                   }
                 />
               </div>
+
+              {/* Experiencia visual antes de solicitar y descargar documentos. */}
+              <SakiaraHomeEnergyPreview
+                offer={selectedInstallationOfferData}
+                metrics={installationMetrics}
+                huaweiModules={huaweiBatteryModules}
+                solisModules={solisBatteryModules}
+                commune={selectedInstallationCommune.label}
+              />
 
               <form
                 className="wizard-contact-form"
@@ -10021,6 +10437,91 @@ Mensaje: ${message || "-"}`,
           object-fit: contain;
           filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.22));
         }
+
+        /* Experiencia de flujo energético: componente aislado, previo a descarga. */
+        .sv-preview {margin:24px 0 29px;padding:23px;border:1px solid #d6dbe2;border-radius:22px;background:#fff;color:#243042;box-shadow:0 18px 40px rgba(17,24,39,.055);}
+        .sv-header {display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;}
+        .sv-eyebrow {font-size:10px;font-weight:850;letter-spacing:.14em;color:#a47713;}
+        .sv-header h3{font-size:clamp(21px,2.4vw,29px);line-height:1.22;margin:7px 0 6px;color:#1d2735;}
+        .sv-header p{font-size:13px;line-height:1.65;color:#647181;margin:0;max-width:520px;}
+        .sv-capacity-pill{white-space:nowrap;flex-shrink:0;background:#fbf2d7;border:1px solid #eed69a;color:#685018;padding:10px 14px;font-size:13px;border-radius:999px;font-weight:800;}
+        .sv-specs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 17px;}
+        .sv-specs span{background:#f1f4f8;border:1px solid #e3e7ee;padding:7px 10px;border-radius:8px;font-size:11px;color:#536173;}
+        .sv-tabs{display:flex;gap:7px;margin:0 0 12px;flex-wrap:wrap;}
+        .sv-tab{border:1px solid #d7dce3;background:#f5f7fa;color:#324052;font-size:13px;font-weight:700;padding:10px 17px;border-radius:10px;cursor:pointer;transition:all .2s ease;}
+        .sv-tab:hover{background:#fff4d9;border-color:#ead397;}
+        .sv-tab-on,.sv-tab[aria-pressed="true"]{color:#262015;background:#f7d982;border-color:#ecc256;box-shadow:0 3px 0 rgba(156,112,25,.08);}
+        .sv-scene{background:#0e1828;border-radius:18px;padding:16px;color:#f8fafc;overflow:hidden;}
+        .sv-scene-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;}
+        .sv-scene-caption{font-size:15px;font-weight:800;}
+        .sv-grid-status{font-size:11px;color:#d3e6ed;white-space:nowrap;}
+        .sv-grid-status i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#61b8cf;margin-right:5px;}
+        .sv-grid-status.sv-offline i{background:#d7777e;}
+        .sv-value-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+        .sv-value-strip>div{background:rgba(255,255,255,.065);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;min-width:0;}
+        .sv-value-strip small{display:block;color:#b1bfce;font-size:10px;margin-bottom:5px;}
+        .sv-value-strip strong{display:block;color:#fff;font-size:clamp(12px,1.7vw,20px);font-weight:850;}
+        .sv-diagram{width:100%;height:auto;display:block;margin:9px auto 0;}
+        .sv-svg-label{font-size:11px;fill:#eaf2fa;text-anchor:middle;font-weight:800;}
+        .sv-svg-quantity{font-size:11px;fill:#fcdfa0;text-anchor:middle;font-weight:750;}
+        .sv-wire{stroke:#52647a;fill:none;stroke-width:4;stroke-linecap:round;}
+        .sv-energy{fill:none;stroke-width:4.3;stroke-linecap:round;stroke-dasharray:6 10;animation:svEnergyFlow 1.15s linear infinite;}
+        .sv-energy-solar,.sv-energy-house{stroke:#f1c45a;}
+        .sv-energy-battery{stroke:#d6a9ff;}
+        .sv-energy-grid{stroke:#78c5e8;}
+        .sv-energy.sv-backwards{animation-direction:reverse;}
+        @keyframes svEnergyFlow{to{stroke-dashoffset:-32;}}
+        .sv-legend{display:flex;flex-wrap:wrap;gap:13px;color:#b7c3d3;font-size:10px;margin:0 5px 2px;}
+        .sv-legend span{display:flex;align-items:center;gap:5px;}
+        .sv-legend b{width:8px;height:8px;display:inline-block;border-radius:50%;}
+        .sv-legend .sv-dot-solar{background:#f1c45a;}.sv-legend .sv-dot-battery{background:#d6a9ff;}.sv-legend .sv-dot-grid{background:#78c5e8;}
+        .sv-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 22px;margin-top:20px;}
+        .sv-control{min-width:0;display:grid;gap:8px;}
+        .sv-control label{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#5d6878;}
+        .sv-control label strong{color:#273242;white-space:nowrap;}
+        .sv-control input[type="range"]{width:100%;accent-color:#e6b648;cursor:pointer;}
+        .sv-control input[type="range"]:disabled{opacity:.35;cursor:not-allowed;}
+        .sv-results{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:21px;}
+        .sv-results>div{border:1px solid #e8e9ed;border-radius:10px;background:#f8f9fb;padding:12px;min-width:0;}
+        .sv-results small{display:block;font-size:10px;color:#768391;margin-bottom:7px;}
+        .sv-results strong{font-size:14px;color:#222b3a;}
+        .sv-backup-message{background:#faf5e7;border:1px solid #e6cf91;color:#655323;display:grid;gap:5px;padding:13px 15px;border-radius:10px;margin-top:17px;font-size:12px;line-height:1.6;}
+        .sv-backup-message.sv-attention{background:#fff4f3;border-color:#e6b6b1;color:#8f3333;}
+        .sv-disclaimer{color:#7a8593;font-size:10.5px;line-height:1.65;margin:16px 0 0;}
+        @media(max-width:730px){.sv-preview{padding:14px 11px;border-radius:15px;}.sv-header{display:block;}.sv-capacity-pill{display:inline-block;margin-top:10px;}.sv-scene{padding:9px 6px;}.sv-value-strip{grid-template-columns:repeat(2,minmax(0,1fr));}.sv-value-strip strong{font-size:16px;}.sv-controls,.sv-results{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.sv-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}.sv-tab{padding:10px 2px;font-size:11px;}.sv-svg-quantity{font-size:12px;}.sv-specs span{font-size:10px;}}
+        @media(prefers-reduced-motion:reduce){.sv-energy{animation:none;stroke-dasharray:8 8;}}
+
+        /* Sakiara Solar Studio: add-only CSS; no existing selector altered. */
+        .ss-simulator-wrap { margin-top: 24px; }
+        .ss-simulator-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:22px; }
+        .ss-simulator-head h2 {font-size:clamp(24px,3vw,34px); margin:5px 0 7px;}
+        .ss-simulator-head p:last-child {opacity:.77; margin:0; line-height:1.5;}
+        .ss-simulator-layout {display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:stretch;}
+        .ss-simulator-fields {display:grid; gap:20px; align-content:start;}
+        .ss-simulator-fields-two,.ss-battery-picker-grid {display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+        .ss-field,.ss-simulator-range {display:grid; gap:9px; min-width:0; font-size:13px; font-weight:600;}
+        .ss-field select {display:block; width:100%; min-width:0; padding:12px; border:1px solid rgba(135,135,135,.32); border-radius:10px; background:var(--card, #242424); color:inherit; font:inherit; font-weight:500;}
+        .ss-field select option {background:#252525; color:#fff;}
+        .ss-simulator-range>span {display:flex; justify-content:space-between; gap:8px; align-items:center;}
+        .ss-simulator-range input {width:100%; accent-color:#e7b648; cursor:pointer;}
+        .ss-simulator-range small {opacity:.66; font-weight:400; font-size:11px;}
+        .ss-simulator-result {padding:20px; border:1px solid rgba(160,160,160,.22); border-radius:17px; background:rgba(150,150,150,.06);}
+        .ss-simulator-metrics {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-bottom:23px;}
+        .ss-simulator-metrics>div {display:grid; gap:6px;}
+        .ss-simulator-metrics span {font-size:12px; opacity:.7;}
+        .ss-simulator-metrics strong {font-size:clamp(16px,2vw,22px);}
+        .ss-simulator-metrics>div:first-child strong {color:#e7b648;}
+        .ss-simulator-compare {display:flex; justify-content:space-between; gap:8px; font-size:12px; margin:8px 0;}
+        .ss-simulator-bar {height:12px; border-radius:999px; overflow:hidden; background:rgba(150,150,150,.2);}
+        .ss-simulator-bar i {display:block; height:100%; border-radius:inherit; background:#989da8;}
+        .ss-simulator-bar i.ss-simulator-savings {background:#e7b648;}
+        .ss-simulator-button {width:100%; margin-top:18px;}
+        .ss-simulator-caveat {display:block; font-size:11px; line-height:1.5; opacity:.65; margin-top:12px;}
+        .ss-battery-picker {padding:16px; border:1px solid rgba(190,160,90,.5); border-radius:14px; margin:18px 0; background:rgba(180,150,70,.07);}
+        .ss-battery-picker-head {display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin-bottom:13px;}
+        .ss-battery-picker-head span {font-size:12px; opacity:.73;}
+        .ss-battery-hint {font-size:12px; line-height:1.6; opacity:.74; margin:11px 0 0;}
+        @media(max-width:770px){.ss-simulator-layout{grid-template-columns:1fr;}.ss-simulator-fields-two,.ss-battery-picker-grid{grid-template-columns:1fr;}.ss-simulator-result{padding:14px;}}
 
         .hero-brand-logo.huawei {
           height: 30px;
