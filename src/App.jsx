@@ -3249,7 +3249,7 @@ const buildInstallationReportMarkup = ({
       components:
         `${metrics.quotationCosts?.huaweiBatteryModules || 1} módulo(s) LUNA2000-5-E0 de 5 kWh, ${metrics.quotationCosts?.huaweiDcdcConverters || 1} controlador(es) DC/DC LUNA2000-5KW-C0, 1 SmartGuard-63A-S0 y Smart Power Sensor.`,
       purpose:
-        "Mayor autoconsumo, desplazamiento de energía hacia la tarde/noche y respaldo según cargas críticas.",
+        "Mayor autoconsumo y posibilidad de respaldar el tablero general de la vivienda, sujeto a la potencia BACKUP y a la ingeniería de la instalación.",
     },
     solisWithBattery: {
       shortTitle: "Solis · con batería",
@@ -3260,7 +3260,7 @@ const buildInstallationReportMarkup = ({
       components:
         `${metrics.quotationCosts?.solisBatteryModules || 1} unidad(es) Dyness PowerBrick SC de 16,08 kWh nominales; conexión BMS/CAN, corriente de carga/descarga y accesorios sujetos a validación técnica.`,
       purpose:
-        "Mayor aprovechamiento de la generación solar fuera del horario de producción y menor compra desde la red.",
+        "Mayor aprovechamiento solar fuera del horario de generación y opción de respaldo de vivienda completa mediante salida BACKUP y transferencia compatible, sujeto a validación técnica.",
     },
   };
 
@@ -3509,7 +3509,7 @@ const buildInstallationReportMarkup = ({
           <article class="cp-info-panel">
             <div class="cp-section-title">Lo que debe validarse</div>
             <ul class="cp-check-list">
-              <li>Cargas críticas que se desean respaldar.</li>
+              <li>Potencia simultánea de la vivienda completa durante el respaldo.</li>
               <li>Potencia simultánea requerida durante un corte.</li>
               <li>Estado de carga y estrategia de operación.</li>
               <li>Configuración final del tablero y protecciones.</li>
@@ -3882,7 +3882,7 @@ const buildInstallationReportMarkup = ({
             <p class="cp-body-copy">
               ${escapeHtml(
                 selectedIncludesBattery
-                  ? "La autonomía y la potencia disponible dependen de las cargas críticas, la potencia simultánea, el estado de carga y la configuración final del tablero."
+                  ? "El respaldo de toda la vivienda depende de la potencia máxima de salida BACKUP, el consumo simultáneo, el estado de las baterías y la conmutación y protecciones del tablero general."
                   : "La alternativa sin batería prioriza ahorro y autoconsumo. El respaldo ante cortes no se considera salvo que la ingeniería incorpore una arquitectura específica.",
               )}
             </p>
@@ -5763,34 +5763,42 @@ const getHuaweiBatteryTopology = (requestedCount) => {
 const SAKIARA_BACKUP_RESERVE_PERCENT = 10;
 const SAKIARA_SIMULATED_INVERTER_AC_KW = 8;
 
+// GRID representa el enlace con la red; BACKUP alimenta el tablero general completo.
+// Modelo educativo de respaldo integral: sin desconexión automática de circuitos.
+// Si la vivienda excede la capacidad instantánea de BACKUP, representamos una
+// protección por sobrecarga (casa sin suministro) en lugar de alimentar solo parte.
 const calculateSakiaraEnergyFlow = ({
   mode, systemKwp, batteryKwh, batteryPowerKw, irradiancePercent,
-  householdLoadKw, criticalLoadKw, socPercent,
+  householdLoadKw, socPercent,
 }) => {
   const hasBattery = batteryKwh > 0;
   const gridAvailable = mode !== "outage";
   const reservePercent = SAKIARA_BACKUP_RESERVE_PERCENT;
   const backupReady = hasBattery && socPercent > reservePercent;
+  const inverterLimit = SAKIARA_SIMULATED_INVERTER_AC_KW;
+  const loadKw = Math.max(0, Number(householdLoadKw) || 0); // misma vivienda en los tres modos
   const rawSolarKw = mode === "night" ? 0 : Math.min(
     Math.max(0, systemKwp) * 0.85 * Math.max(0, irradiancePercent) / 100,
-    SAKIARA_SIMULATED_INVERTER_AC_KW,
+    inverterLimit,
   );
-  // Sin batería formadora de red/backup operativo, el sistema conectado a red
-  // se desconecta durante un corte (protección anti-isla).
-  const solarKw = gridAvailable || backupReady ? rawSolarKw : 0;
-  const loadKw = mode === "outage" ? criticalLoadKw : householdLoadKw;
-  const inverterLimit = SAKIARA_SIMULATED_INVERTER_AC_KW;
+  // En esta demostración el modo isla exige batería y respaldo habilitado.
+  const availableSolarKw = gridAvailable || backupReady ? rawSolarKw : 0;
+  const availableBatteryKw = backupReady ? Math.max(0, batteryPowerKw) : 0;
+  const availableBackupKw = Math.min(inverterLimit, availableSolarKw + availableBatteryKw);
+  const backupOverload = !gridAvailable && loadKw > availableBackupKw + 1e-7;
+  const backupActive = !gridAvailable && backupReady && !backupOverload;
+  const solarKw = gridAvailable || backupActive ? availableSolarKw : 0;
   const solarToHouseKw = Math.min(solarKw, loadKw, inverterLimit);
   const solarSurplusKw = Math.max(0, solarKw - solarToHouseKw);
   const batteryUsableKwh = hasBattery
     ? Math.max(0, batteryKwh * (socPercent - reservePercent) / 100) * 0.9
     : 0;
-  const batteryDischargeKw = backupReady
-    ? Math.min(Math.max(0, loadKw - solarToHouseKw), batteryPowerKw,
+  const batteryDischargeKw = (gridAvailable || backupActive) && backupReady
+    ? Math.min(Math.max(0, loadKw - solarToHouseKw), availableBatteryKw,
       Math.max(0, inverterLimit - solarToHouseKw))
     : 0;
-  const batteryChargeKw = hasBattery && socPercent < 100
-    ? Math.min(solarSurplusKw, batteryPowerKw, Math.max(0, (100 - socPercent) / 100 * batteryKwh))
+  const batteryChargeKw = (gridAvailable || backupActive) && hasBattery && socPercent < 100
+    ? Math.min(solarSurplusKw, Math.max(0, batteryPowerKw), Math.max(0, (100 - socPercent) / 100 * batteryKwh))
     : 0;
   const gridImportKw = gridAvailable
     ? Math.max(0, loadKw - solarToHouseKw - batteryDischargeKw)
@@ -5798,16 +5806,17 @@ const calculateSakiaraEnergyFlow = ({
   const gridExportKw = gridAvailable
     ? Math.max(0, solarSurplusKw - batteryChargeKw)
     : 0;
-  const suppliedKw = Math.min(loadKw,
+  const suppliedKw = !gridAvailable && !backupActive ? 0 : Math.min(loadKw,
     solarToHouseKw + batteryDischargeKw + gridImportKw);
   const unservedKw = Math.max(0, loadKw - suppliedKw);
   const curtailedKw = Math.max(0, solarKw - solarToHouseKw - batteryChargeKw - gridExportKw);
   const deficitKw = Math.max(0, loadKw - solarToHouseKw);
-  const autonomyHours = mode === "outage" && hasBattery && backupReady && deficitKw > 0
+  const autonomyHours = mode === "outage" && backupActive && deficitKw > 0
     ? batteryUsableKwh / deficitKw
     : null;
   return {
-    hasBattery, gridAvailable, backupReady, solarKw, solarToHouseKw,
+    hasBattery, gridAvailable, backupReady, backupActive, backupOverload,
+    availableBackupKw, inverterLimit, solarKw, solarToHouseKw,
     batteryChargeKw, batteryDischargeKw, gridImportKw, gridExportKw,
     suppliedKw, unservedKw, curtailedKw, loadKw, batteryUsableKwh,
     autonomyHours, batteryPowerKw, reservePercent,
@@ -5818,7 +5827,6 @@ function SakiaraHomeEnergyPreview({ offer, metrics, huaweiModules, solisModules,
   const [mode, setMode] = useState("day");
   const [sun, setSun] = useState(75);
   const [loadKw, setLoadKw] = useState(3);
-  const [criticalKw, setCriticalKw] = useState(1.5);
   const [soc, setSoc] = useState(75);
 
   if (!offer) return null;
@@ -5839,14 +5847,13 @@ function SakiaraHomeEnergyPreview({ offer, metrics, huaweiModules, solisModules,
     batteryPowerKw: assumedBatteryLimitKw,
     irradiancePercent: sun,
     householdLoadKw: loadKw,
-    criticalLoadKw: criticalKw,
     socPercent: soc,
   });
   const kw = (n) => `${Number(n).toLocaleString("es-CL", {maximumFractionDigits: 1, minimumFractionDigits: 1})} kW`;
   const cap = (n) => Number(n).toLocaleString("es-CL", {maximumFractionDigits: 2});
   const batteryMode = flow.batteryChargeKw > 0 ? "Cargando" : flow.batteryDischargeKw > 0 ? "Descargando" : "En espera";
   const gridMode = mode === "outage" ? "Desconectada" : flow.gridImportKw > 0 ? "Importando" : flow.gridExportKw > 0 ? "Inyectando" : "En equilibrio";
-  const dayTitle = mode === "day" ? "Producción solar" : mode === "night" ? "Consumo nocturno" : "Respaldo durante un corte";
+  const dayTitle = mode === "day" ? "Producción solar · GRID" : mode === "night" ? "Consumo nocturno · GRID" : "Vivienda completa · BACKUP";
   const houseFlow = flow.suppliedKw > 0;
   const gridReverse = flow.gridImportKw > 0;
   const batteryReverse = flow.batteryDischargeKw > 0;
@@ -5857,8 +5864,8 @@ function SakiaraHomeEnergyPreview({ offer, metrics, huaweiModules, solisModules,
       <div className="sv-header">
         <div>
           <div className="sv-eyebrow">SAKIARA SOLAR STUDIO · EXPERIENCIA INTERACTIVA</div>
-          <h3>Visualiza tu casa funcionando con energía solar</h3>
-          <p>Así podría distribuirse la energía con la <strong>propuesta seleccionada</strong>, antes de descargar tu cotización.</p>
+          <h3>Visualiza toda tu vivienda en GRID y BACKUP</h3>
+          <p>El tablero general completo queda contemplado para respaldo. En un corte de red, <strong>BACKUP alimenta toda la casa</strong> siempre que el inversor y las baterías soporten el consumo simultáneo.</p>
         </div>
         <div className="sv-capacity-pill">{cap(metrics.estimatedSystemSizeKwp)} kWp fotovoltaicos</div>
       </div>
@@ -5866,6 +5873,8 @@ function SakiaraHomeEnergyPreview({ offer, metrics, huaweiModules, solisModules,
         <span><strong>{isHuawei ? "Huawei híbrido" : "Solis S6 Plus"}</strong> · inversor 8 kW</span>
         <span><strong>{formatNumber(metrics.estimatedPanels)} paneles</strong> Jinko de 585 W</span>
         <span><strong>{hasBattery ? `${selectedCount} ${isHuawei ? "módulo(s) LUNA" : "unidad(es) Dyness"} · ${cap(batteryKwh)} kWh` : "Sin baterías"}</strong></span>
+        <span><strong>GRID</strong> · conexión a red</span>
+        <span><strong>BACKUP</strong> · tablero general de toda la vivienda</span>
         <span>{commune}</span>
       </div>
       <div className="sv-tabs" role="group" aria-label="Escenario de funcionamiento">
@@ -5880,11 +5889,11 @@ function SakiaraHomeEnergyPreview({ offer, metrics, huaweiModules, solisModules,
         </div>
         <div className="sv-value-strip">
           <div><small>Generación solar</small><strong>{kw(flow.solarKw)}</strong></div>
-          <div><small>Consumo vivienda</small><strong>{kw(flow.loadKw)}</strong></div>
+          <div><small>Consumo total de la casa</small><strong>{kw(flow.loadKw)}</strong></div>
           <div><small>Batería</small><strong>{hasBattery ? `${soc}%` : "—"}</strong></div>
           <div><small>Red</small><strong>{mode === "outage" ? "SIN RED" : kw(flow.gridImportKw || flow.gridExportKw)}</strong></div>
         </div>
-        <svg className="sv-diagram" viewBox="0 0 680 366" role="img" aria-label={`Paneles ${kw(flow.solarKw)}, vivienda ${kw(flow.loadKw)}, batería ${hasBattery ? `${soc}%` : "ausente"}, red ${gridMode}`}>
+        <svg className="sv-diagram" viewBox="0 0 680 366" role="img" aria-label={`Paneles ${kw(flow.solarKw)}, vivienda completa ${kw(flow.loadKw)}, batería ${hasBattery ? `${soc}%` : "ausente"}, conexión GRID ${gridMode}, salida BACKUP ${mode === "outage" && flow.backupActive ? "activa" : "no activa"}`}>
           <defs>
             <linearGradient id="svGradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#17283a"/><stop offset="1" stopColor="#0b1524"/></linearGradient>
             <linearGradient id="svPanel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#366696"/><stop offset="1" stopColor="#183d67"/></linearGradient>
@@ -5931,37 +5940,42 @@ function SakiaraHomeEnergyPreview({ offer, metrics, huaweiModules, solisModules,
             <text x="68" y="59" className="sv-svg-label">{mode === "outage" ? "RED EN CORTE" : "RED ELÉCTRICA"}</text>
           </g>
           <text x="219" y="126" className="sv-svg-quantity">{kw(flow.solarKw)}</text>
+          <text x="409" y="136" className="sv-svg-port">BACKUP →</text>
           <text x="410" y="152" className="sv-svg-quantity">{kw(flow.suppliedKw)}</text>
           <text x="254" y="248" className="sv-svg-quantity">{!hasBattery ? "No instalada" : flow.batteryChargeKw > 0 ? `Carga ${kw(flow.batteryChargeKw)}` : flow.batteryDischargeKw > 0 ? `Entrega ${kw(flow.batteryDischargeKw)}` : "En espera"}</text>
+          <text x="451" y="286" className="sv-svg-port">GRID</text>
           <text x="462" y="260" className="sv-svg-quantity">{mode === "outage" ? "Aislada" : gridReverse ? `Importa ${kw(flow.gridImportKw)}` : allowExport ? `Inyecta ${kw(flow.gridExportKw)}` : "Sin intercambio"}</text>
         </svg>
-        <div className="sv-legend"><span><b className="sv-dot-solar"/> Flujo solar</span><span><b className="sv-dot-battery"/> Batería</span><span><b className="sv-dot-grid"/> Red</span><span>Las líneas animadas indican energía circulando</span></div>
+        <div className="sv-legend"><span><b className="sv-dot-solar"/> Flujo solar</span><span><b className="sv-dot-battery"/> Batería</span><span><b className="sv-dot-grid"/> GRID / Red</span><span>BACKUP → toda la vivienda</span></div>
       </div>
       <div className="sv-controls">
         <div className="sv-control"><label htmlFor="sv-sun">Radiación solar <strong>{mode === "night" ? "Sin sol" : `${sun}%`}</strong></label><input id="sv-sun" type="range" min="0" max="100" step="5" value={sun} disabled={mode === "night"} onChange={e => setSun(Number(e.target.value))}/></div>
-        <div className="sv-control"><label htmlFor="sv-house">Demanda del hogar <strong>{kw(loadKw)}</strong></label><input id="sv-house" type="range" min="0.5" max="9" step="0.5" value={loadKw} onChange={e => setLoadKw(Number(e.target.value))}/></div>
+        <div className="sv-control"><label htmlFor="sv-house">{mode === "outage" ? "Consumo total de la casa en BACKUP" : "Consumo total de la vivienda"} <strong>{kw(loadKw)}</strong></label><input id="sv-house" type="range" min="0.5" max="9" step="0.5" value={loadKw} onChange={e => setLoadKw(Number(e.target.value))}/></div>
         {hasBattery && <div className="sv-control"><label htmlFor="sv-soc">Carga de la batería <strong>{soc}%</strong></label><input id="sv-soc" type="range" min="0" max="100" step="5" value={soc} onChange={e => setSoc(Number(e.target.value))}/></div>}
-        {mode === "outage" && <div className="sv-control"><label htmlFor="sv-critical">Cargas críticas conectadas a EPS <strong>{kw(criticalKw)}</strong></label><input id="sv-critical" type="range" min="0.5" max="9" step="0.5" value={criticalKw} onChange={e => setCriticalKw(Number(e.target.value))}/></div>}
       </div>
       <div className="sv-results">
         <div><small>{hasBattery ? "Capacidad instalada" : "Almacenamiento"}</small><strong>{hasBattery ? `${cap(batteryKwh)} kWh` : "Sin batería"}</strong></div>
         <div><small>Estado de batería</small><strong>{hasBattery ? batteryMode : "No instalada"}</strong></div>
         <div><small>Intercambio con red</small><strong>{gridMode}</strong></div>
-        <div><small>Demanda atendida</small><strong>{kw(flow.suppliedKw)}</strong></div>
+        <div><small>Potencia alimentada al tablero general</small><strong>{kw(flow.suppliedKw)}</strong></div>
       </div>
       {mode === "outage" && (
         <div className={`sv-backup-message ${flow.unservedKw > 0 ? "sv-attention" : ""}`}>
-          <strong>{!hasBattery ? "Sin respaldo durante cortes de suministro" : flow.unservedKw > 0 ? "Respaldo insuficiente para las cargas seleccionadas" : "Respaldo ilustrativo de cargas críticas"}</strong>
+          <strong>{!hasBattery
+            ? "Sin respaldo BACKUP configurado con batería"
+            : flow.backupOverload
+              ? "BACKUP excedido: posible desconexión por sobrecarga"
+              : "Toda la vivienda alimentada desde BACKUP"}</strong>
           <span>{!hasBattery
-            ? "Sin batería ni salida de respaldo operativa, el sistema FV conectado a red se desconecta para evitar funcionamiento en isla."
-            : flow.unservedKw > 0
-              ? `Quedan ${kw(flow.unservedKw)} sin alimentar. Reduce las cargas críticas o revisa la capacidad real de EPS y batería.`
+            ? "Esta propuesta sin batería no incluye respaldo autónomo para el tablero general durante cortes de red."
+            : flow.backupOverload
+              ? `La casa requiere ${kw(flow.loadKw)} y el respaldo instantáneo ilustrativo dispone de hasta ${kw(flow.availableBackupKw)}. En una instalación sin desconexión selectiva, el inversor puede detener toda la salida BACKUP. Reduce consumo simultáneo o revisa el dimensionamiento.`
               : flow.autonomyHours === null
-                ? "La radiación solar cubre la demanda actual; la autonomía dependerá de la evolución del sol y del consumo."
-                : `Autonomía orientativa: ${Math.max(0, flow.autonomyHours).toLocaleString("es-CL", {maximumFractionDigits: 1})} h si se mantienen estas condiciones y la radiación actual.`}</span>
+                ? "La producción FV cubre ahora el consumo de toda la casa; la continuidad dependerá del sol y del estado de las baterías."
+                : `La vivienda completa está alimentada por BACKUP. Autonomía orientativa: ${Math.max(0, flow.autonomyHours).toLocaleString("es-CL", {maximumFractionDigits: 1})} h con el consumo y la radiación actuales.`}</span>
         </div>
       )}
-      <p className="sv-disclaimer">Demostración educativa con potencias instantáneas (kW), no mediciones en tiempo real. La producción depende de radiación y pérdidas de referencia; las potencias de batería son límites ilustrativos. El respaldo EPS, el SmartGuard Huawei, las cargas admisibles, la reserva SOC y la compatibilidad Solis/Dyness requieren ingeniería y puesta en servicio. Cambiar estos controles <strong>no altera la cotización ni los documentos PDF</strong>.</p>
+      <p className="sv-disclaimer">Esquema funcional educativo (no un diagrama de cableado) con potencias instantáneas, no telemetría real. GRID representa el enlace a la red y BACKUP la alimentación del <strong>tablero general completo</strong>. Huawei utiliza SmartGuard; el respaldo integral Solis requiere una configuración de transferencia/ATS compatible y verificada, cuyo costo debe confirmarse si no está itemizado. Potencia continua de referencia: 8 kW; baterías, protecciones, potencia de arranque, SOC y topología real requieren ingeniería. Esta experiencia <strong>no cambia precios ni PDF</strong>.</p>
     </section>
   );
 }
@@ -7859,7 +7873,7 @@ Mensaje: ${message || "-"}`,
       key: "huaweiWithBattery",
       title: `Huawei con ${metrics.quotationCosts?.huaweiBatteryModules || 1} módulo(s) LUNA · ${formatNumber(metrics.quotationCosts?.huaweiCapacityKWh || 5, 0)} kWh`,
       subtitle:
-        `${metrics.quotationCosts?.huaweiDcdcConverters || 1} controlador(es) DC/DC + 1 SmartGuard; respaldo según cargas críticas.`,
+        `${metrics.quotationCosts?.huaweiDcdcConverters || 1} controlador(es) DC/DC + 1 SmartGuard; respaldo de tablero general sujeto a potencia BACKUP.`,
       badge: "Huawei híbrido",
       priceValue: metrics.projectCostHuaweiWithBattery,
       annualSavingsValue: metrics.annualSavingsWithBattery,
@@ -9923,6 +9937,7 @@ Mensaje: ${message || "-"}`,
         .sv-diagram{width:100%;height:auto;display:block;margin:9px auto 0;}
         .sv-svg-label{font-size:11px;fill:#eaf2fa;text-anchor:middle;font-weight:800;}
         .sv-svg-quantity{font-size:11px;fill:#fcdfa0;text-anchor:middle;font-weight:750;}
+        .sv-svg-port{font-size:10px;fill:#d7e9ff;text-anchor:middle;font-weight:800;letter-spacing:.8px;}
         .sv-wire{stroke:#52647a;fill:none;stroke-width:4;stroke-linecap:round;}
         .sv-energy{fill:none;stroke-width:4.3;stroke-linecap:round;stroke-dasharray:6 10;animation:svEnergyFlow 1.15s linear infinite;}
         .sv-energy-solar,.sv-energy-house{stroke:#f1c45a;}
