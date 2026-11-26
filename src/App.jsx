@@ -2720,6 +2720,41 @@ const getInstallationQuotationItems = (
   }));
 };
 
+// Exportación de cotizaciones: conservar todo el contenido y su proporción.
+const prepareQuotationPdfPages = (container) => {
+  const pages = Array.from(container.querySelectorAll(".pdf-export-page"));
+  for (const page of pages) {
+    // Si la reducción sería superior al 20%, separar el bloque comercial
+    // completo (sin cortar filas ni condiciones) en una segunda hoja.
+    const width = page.getBoundingClientRect().width;
+    const a4Height = width * 297 / 210;
+    const bottom = page.querySelector(".quote-bottom-grid, .eq-bottom-grid");
+    const footer = page.querySelector(".quote-footer, .eq-footer");
+    const header = page.querySelector(".quote-header, .eq-header");
+    const company = page.querySelector(".quote-company-bar, .eq-company-bar");
+    if (page.scrollHeight > a4Height / 0.8 && bottom && footer && header) {
+      const continuation = page.cloneNode(false);
+      continuation.appendChild(header.cloneNode(true));
+      if (company) continuation.appendChild(company.cloneNode(true));
+      continuation.appendChild(bottom);
+      continuation.appendChild(footer);
+      page.after(continuation);
+    }
+  }
+  return Array.from(container.querySelectorAll(".pdf-export-page"));
+};
+
+const addQuotationPdfPage = (pdf, canvas, pageIndex) => {
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const fit = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+  const width = canvas.width * fit;
+  const height = canvas.height * fit;
+  if (pageIndex > 0) pdf.addPage("a4", "portrait");
+  pdf.addImage(canvas.toDataURL("image/jpeg", 0.94), "JPEG",
+    (pageWidth - width) / 2, 0, width, height, undefined, "FAST");
+};
+
 const buildInstallationQuotationMarkup = ({
   metrics,
   selectedOffer,
@@ -2910,8 +2945,9 @@ const buildInstallationQuotationMarkup = ({
         }
         .quote-page {
           width: 210mm;
-          height: 297mm;
+          height: auto;
           min-height: 297mm;
+          overflow: visible;
           padding: 18mm 8mm 12mm;
           box-sizing: border-box;
           background: #ffffff;
@@ -5402,7 +5438,7 @@ const buildEnterpriseQuotationMarkup = ({
 
       <style>
         .enterprise-quote-document { width:210mm; color:#3f4249; font-family:Arial,Helvetica,sans-serif; background:#fff; }
-        .enterprise-quote-page { width:210mm; height:297mm; min-height:297mm; padding:17mm 9mm 11mm; box-sizing:border-box; background:#fff; }
+        .enterprise-quote-page { width:210mm; height:auto; min-height:297mm; overflow:visible; padding:17mm 9mm 11mm; box-sizing:border-box; background:#fff; }
         .eq-header,.eq-total-layout,.eq-bottom-grid,.eq-footer { display:flex; align-items:center; }
         .eq-header { justify-content:space-between; margin-bottom:10px; }
         .eq-logo { height:14mm; width:auto; max-width:64mm; object-fit:contain; }
@@ -7538,9 +7574,9 @@ Mensaje: ${message || "-"}`,
 
       await waitForNodeImages(quotationContainer);
 
-      const pageNodes = Array.from(
-        quotationContainer.querySelectorAll(".pdf-export-page"),
-      );
+      if (document.fonts?.ready) await document.fonts.ready;
+      const pageNodes = prepareQuotationPdfPages(quotationContainer);
+      await waitForNodeImages(quotationContainer);
 
       if (!pageNodes.length) {
         throw new Error("No se encontraron páginas de la cotización para exportar.");
@@ -7561,17 +7597,13 @@ Mensaje: ${message || "-"}`,
           backgroundColor: "#ffffff",
           logging: false,
           imageTimeout: 15000,
+          width: Math.ceil(pageNode.getBoundingClientRect().width),
+          height: Math.ceil(Math.max(pageNode.scrollHeight, pageNode.getBoundingClientRect().height)),
           windowWidth: pageNode.scrollWidth,
           windowHeight: pageNode.scrollHeight,
         });
 
-        const imageData = canvas.toDataURL("image/jpeg", 0.94);
-
-        if (pageIndex > 0) {
-          pdf.addPage("a4", "portrait");
-        }
-
-        pdf.addImage(imageData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+        addQuotationPdfPage(pdf, canvas, pageIndex);
       }
 
       savePdfFile(pdf, `${fileNameBase || "cotizacion-sakiara"}.pdf`);
@@ -7637,9 +7669,9 @@ Mensaje: ${message || "-"}`,
       document.body.appendChild(quotationContainer);
       await waitForNodeImages(quotationContainer);
 
-      const pageNodes = Array.from(
-        quotationContainer.querySelectorAll(".pdf-export-page"),
-      );
+      if (document.fonts?.ready) await document.fonts.ready;
+      const pageNodes = prepareQuotationPdfPages(quotationContainer);
+      await waitForNodeImages(quotationContainer);
       if (!pageNodes.length) {
         throw new Error("No se encontraron páginas de la cotización empresa.");
       }
@@ -7658,12 +7690,12 @@ Mensaje: ${message || "-"}`,
           backgroundColor: "#ffffff",
           logging: false,
           imageTimeout: 15000,
+          width: Math.ceil(pageNode.getBoundingClientRect().width),
+          height: Math.ceil(Math.max(pageNode.scrollHeight, pageNode.getBoundingClientRect().height)),
           windowWidth: pageNode.scrollWidth,
           windowHeight: pageNode.scrollHeight,
         });
-        const imageData = canvas.toDataURL("image/jpeg", 0.94);
-        if (pageIndex > 0) pdf.addPage("a4", "portrait");
-        pdf.addImage(imageData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+        addQuotationPdfPage(pdf, canvas, pageIndex);
       }
       savePdfFile(pdf, `${fileNameBase || "cotizacion-empresa-sakiara"}.pdf`);
     } catch (error) {
